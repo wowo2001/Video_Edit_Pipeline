@@ -100,9 +100,9 @@ class AutoVideoPipeline:
             self.project_paths.text_overlay_video,
             self.project_paths.gif_overlay_video,
             Path("assets") / "like.gif",
-            x=50,
-            y=50,
-            scale=1.0
+            x=500,
+            y=1500,
+            scale=2.0
         )
 
         print("========== 18. 上传 ==========")
