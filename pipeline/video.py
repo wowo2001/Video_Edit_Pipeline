@@ -31,7 +31,7 @@ def _cut_hook_video(input_path, output_path, script_path):
 def _cut_clip_video(input_path, output_path, script_path):
     with open(script_path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    for item in enumerate(data["clips"]):
+    for _, item in enumerate(data["clips"]):
         place = item["place"]
         narration_duration = item["narrative"]["length"]
         narration_duration = srt_to_seconds(narration_duration)
