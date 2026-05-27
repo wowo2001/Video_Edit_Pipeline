@@ -76,7 +76,7 @@ class AutoVideoPipeline:
         ChatGPT().fix_subtitles(self.project_paths.final_subtitles['srt'], self.project_paths.final_subtitles['srt'])
 
         print("========== 15. 添加字幕 ==========")
-        add_subtitles(self.project_paths.masked_video, self.project_paths.final_subtitles['srt'], self.project_paths.subtitle_video, y=110)
+        add_subtitles(self.project_paths.speed_up_video, self.project_paths.final_subtitles['srt'], self.project_paths.subtitle_video, y=110)
 
         print("========== 16. 添加标题和副标题 ==========")
         if subtitle is None:

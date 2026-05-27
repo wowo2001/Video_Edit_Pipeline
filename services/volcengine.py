@@ -168,7 +168,10 @@ class Volcengine:
                 "audio_params": {
                     "format": "mp3",
                     "sample_rate": 24000
-                }
+                },
+                "additions": json.dumps({
+                    "explicit_dialect": "dongbei"
+                }, ensure_ascii=False)
             }
         }
 
