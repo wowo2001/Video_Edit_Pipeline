@@ -1,6 +1,6 @@
 from openai import OpenAI
 import re
-from config import OPENAI_API_KEY
+from config import ALI_API_KEY, OPENAI_API_KEY
 from core.utils import safe_json_parse
 from prompts.editing_rules import EDITING_RULES
 from prompts.fix_subtitles import FIX_SUBTITLE_PROMPT
@@ -10,13 +10,13 @@ from prompts.task_rules import TASK_RULES
 import json
 class ChatGPT:
     def __init__(self):
-        self.client = OpenAI(api_key=OPENAI_API_KEY)
-
+        self.client = OpenAI(api_key=ALI_API_KEY,
+                             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1")
     def generate_script(self, subtitles_path, script_path):
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = f"{TASK_RULES}\n\n{EDITING_RULES}\n\n{OUTPUT_SCHEMA}\n\n字幕内容：{subtitles}"
         response = self.client.chat.completions.create(
-            model="gpt-5.4",
+            model="qwen3.7-max",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -37,7 +37,7 @@ class ChatGPT:
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = f"{FIX_SUBTITLE_PROMPT}\n\n{subtitles}"
         response = self.client.chat.completions.create(
-            model="gpt-4.1-mini",
+            model="qwen3.7-max",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -54,7 +54,7 @@ class ChatGPT:
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = f"{GET_TITLE_PROMPT}\n\n{subtitles}"
         response = self.client.chat.completions.create(
-            model="gpt-4.1-mini",
+            model="qwen3.7-max",
             messages=[
                 {"role": "user", "content": prompt}
             ]
