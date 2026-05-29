@@ -29,16 +29,72 @@ def _cut_hook_video(input_path, output_path, script_path):
     cut_video_ffmpeg(input_path, clip_output_path, start, end + narration_duration)
 
 def _cut_clip_video(input_path, output_path, script_path):
+
     with open(script_path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    for _, item in enumerate(data["clips"]):
+
+    for item in data["clips"]:
+
         place = item["place"]
-        narration_duration = item["narrative"]["length"]
-        narration_duration = srt_to_seconds(narration_duration)
-        start = srt_to_seconds(item["clip"]["start"])
-        end = srt_to_seconds(item["clip"]["end"])
-        clip_output_path = output_path / f"clip_{place}.mp4"
-        cut_video_ffmpeg(input_path, clip_output_path, max(0, start - narration_duration), end)
+
+        narration_duration = srt_to_seconds(
+            item["narrative"]["length"]
+        )
+
+        clips = item["clip"]
+
+        temp_files = []
+
+        # =========================
+        # 1. 切每个小片段
+        # =========================
+        for idx, clip in enumerate(clips):
+
+            start = srt_to_seconds(clip["start"])
+            end = srt_to_seconds(clip["end"])
+
+            # 第一段前面预留旁白时间
+            if idx == 0:
+                start = max(0, start - narration_duration)
+
+            temp_path = output_path / f"temp_{place}_{idx}.mp4"
+
+            cut_video_ffmpeg(
+                input_path,
+                temp_path,
+                start,
+                end
+            )
+
+            temp_files.append(temp_path)
+
+        # =========================
+        # 2. 生成 concat txt
+        # =========================
+        list_file = output_path / f"concat_{place}.txt"
+
+        with open(list_file, "w", encoding="utf-8") as f:
+            for temp in temp_files:
+                f.write(f"file '{temp.name}'\n")
+
+        # =========================
+        # 3. 拼接
+        # =========================
+        final_output = output_path / f"clip_{place}.mp4"
+
+        concat_videos_ffmpeg(
+            list_file,
+            str(final_output)
+        )
+        # =========================
+        # 4. 清理 temp 文件
+        # =========================
+        for temp in temp_files:
+            try:
+                if temp.exists():
+                    temp.unlink()
+            except Exception as e:
+                print(f"[WARN] delete failed: {temp} -> {e}")
 
 def concat_videos(input_path, output_path):
 
