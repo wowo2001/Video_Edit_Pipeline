@@ -19,14 +19,69 @@ def cut_video(input_path, output_path, script_path):
     _cut_clip_video(input_path, output_path, script_path)
 
 def _cut_hook_video(input_path, output_path, script_path):
+
     with open(script_path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    narration_duration = data["hook"]["narrative"]["length"]
-    narration_duration = srt_to_seconds(narration_duration)
-    start = srt_to_seconds(data["hook"]["clip"]["start"])
-    end = srt_to_seconds(data["hook"]["clip"]["end"])
-    clip_output_path = output_path / "hook.mp4"
-    cut_video_ffmpeg(input_path, clip_output_path, start, end + narration_duration)
+
+    narration_duration = srt_to_seconds(
+        data["hook"]["narrative"]["length"]
+    )
+
+    clips = data["hook"]["clip"]
+
+    temp_files = []
+
+    # =========================
+    # 1. 切 hook 小片段
+    # =========================
+    for idx, clip in enumerate(clips):
+
+        start = srt_to_seconds(clip["start"])
+        end = srt_to_seconds(clip["end"])
+
+        # 最后一段后面补旁白时间
+        if idx == len(clips) - 1:
+            end += narration_duration
+
+        temp_path = output_path / f"temp_{idx}.mp4"
+
+        cut_video_ffmpeg(
+            input_path,
+            temp_path,
+            start,
+            end
+        )
+
+        temp_files.append(temp_path)
+
+    # =========================
+    # 2. concat txt
+    # =========================
+    list_file = output_path / "hook_concat.txt"
+
+    with open(list_file, "w", encoding="utf-8") as f:
+        for temp in temp_files:
+            f.write(f"file '{temp.name}'\n")
+
+    # =========================
+    # 3. 拼接
+    # =========================
+    final_output = output_path / "hook.mp4"
+
+    concat_videos_ffmpeg(
+        list_file,
+        str(final_output)
+    )
+
+    # =========================
+    # 4. 清理 temp
+    # =========================
+    for temp in temp_files:
+        try:
+            if temp.exists():
+                temp.unlink()
+        except Exception as e:
+            print(f"[WARN] delete failed: {temp} -> {e}")
 
 def _cut_clip_video(input_path, output_path, script_path):
 
