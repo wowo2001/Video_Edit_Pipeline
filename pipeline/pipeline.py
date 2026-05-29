@@ -20,7 +20,7 @@ class AutoVideoPipeline:
     def __init__(self):
         self.project_paths = ProjectPaths()
 
-    def run(self, url, title, subtitle = None):
+    def run(self, url, title, subtitle = None, upload=False):
 
         print("========== 1. 下载视频 ==========")
 
@@ -106,7 +106,8 @@ class AutoVideoPipeline:
         )
 
         print("========== 18. 上传 ==========")
-        safe_file_name = safe_filename(subtitle)
-        output_path = self.project_paths.root / f"{safe_file_name}.mp4"
-        shutil.copy2(self.project_paths.gif_overlay_video, output_path)
-        upload_to_drive(output_path)
+        if upload:
+            safe_file_name = safe_filename(subtitle)
+            output_path = self.project_paths.root / f"{safe_file_name}.mp4"
+            shutil.copy2(self.project_paths.gif_overlay_video, output_path)
+            upload_to_drive(output_path)
