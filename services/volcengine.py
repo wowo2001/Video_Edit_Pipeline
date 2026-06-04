@@ -119,8 +119,9 @@ class Volcengine:
                 start = ms_to_srt_time(u["start_time"])
                 end = ms_to_srt_time(u["end_time"])
 
-                text = u["text"].strip()
+                text = u["text"].strip().replace("\n", " ")
 
+                f.write(f"{i}\n")
                 f.write(f"{start} --> {end}\n")
                 f.write(f"{text}\n\n")
 
