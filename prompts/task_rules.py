@@ -1,6 +1,6 @@
+from .brief import BRIEF
 TASK_RULES = f"""
-把电视剧《东北一家人》剪成“抖音爆款短视频”。
-
+{BRIEF}
 任务：
 根据字幕文件，生成适合抖音剧情解说的视频剪辑方案。
 """

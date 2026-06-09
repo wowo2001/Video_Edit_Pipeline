@@ -19,7 +19,7 @@ class Volcengine:
         }
         self.speaker = SPEAKER
 
-    def transcribe_audio(self, input_path, output_path):
+    def transcribe_audio(self, input_path, output_path, speaker_info=False):
 
     # =========================
     # 提交任务
@@ -120,6 +120,15 @@ class Volcengine:
                 end = ms_to_srt_time(u["end_time"])
 
                 text = u["text"].strip().replace("\n", " ")
+
+                if speaker_info:
+                    speaker = (
+                        u.get("attribute", {})
+                        .get("speaker")
+                    )
+
+                    if speaker:
+                        text = f"[Speaker {speaker}] {text}"
 
                 f.write(f"{i}\n")
                 f.write(f"{start} --> {end}\n")
