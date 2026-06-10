@@ -1,11 +1,9 @@
 
 import shutil
 
-from pandas import concat
-from scipy.fftpack import dst
-
 from core.path import ProjectPaths
 from core.utils import safe_filename, clear_workdir
+from core.whisper import Whisper
 from pipeline.audio import export_audio,mix_audio
 from pipeline.download import download_video
 from pipeline.video import add_gif_overlay, add_subtitles, change_resolution, cut_video, concat_videos, mask_sub, speed_up, add_text_overlay
@@ -31,8 +29,12 @@ class AutoVideoPipeline:
         export_audio(self.project_paths.video, self.project_paths.audio)
 
         print("========== 3. 字幕识别 ==========")
-
         Volcengine().transcribe_audio(self.project_paths.audio, self.project_paths.subtitles)
+
+        Whisper().diarize(self.project_paths.audio, self.project_paths.subtitles)
+
+        ChatGPT().recognise_speaker(self.project_paths.subtitles['srt'])
+        
 
         print("========== 4. GPT 脚本 ==========")
 
