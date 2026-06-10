@@ -66,20 +66,12 @@ class Whisper:
 
         diarization = result.speaker_diarization
         embeddings = result.speaker_embeddings
-        with open("audio.rttm", "w") as f:
-            diarization.write_rttm(f)
-        
-        np.save("speaker_embeddings.npy", embeddings)
+
 
 
         # =========================
         # 3. 匹配 Speaker
         # =========================
-
-        from pyannote.database.util import load_rttm
-
-        rttm_dict = load_rttm("audio.rttm")
-        diarization = list(rttm_dict.values())[0]
 
         for utt in cloud_json["utterances"]:
 
