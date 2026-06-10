@@ -1,91 +1,148 @@
-import whisperx
 import json
-from core.utils import ms_to_srt_time
+
 from config import HF_TOKEN
-from whisperx.diarize import DiarizationPipeline
+from core.utils import ms_to_srt_time
+from pyannote.audio import Pipeline
+import torchaudio
+from pyannote.audio.pipelines.utils.hook import ProgressHook
+import numpy as np
 
 
 class Whisper:
+
     def __init__(self):
         self.hf_token = HF_TOKEN
+        self.device = "cpu"
 
-    def transcribe_audio(self, input_path, output_path, speaker_info=False):
+    def find_speaker(self, start, end, diarization):
 
-        device = "cpu"
+        best_speaker = None
+        best_score = 0
 
-        # =========================
-        # 1. Whisper 转写
-        # =========================
-        model = whisperx.load_model(
-            "small",
-            device=device,
-            compute_type="int8"
-        )
+        duration = end - start
 
-        result = model.transcribe(str(input_path))
+        for turn, _, speaker in diarization.itertracks(yield_label=True):
 
-        # =========================
-        # 2. 时间对齐
-        # # =========================
-        align_model, metadata = whisperx.load_align_model(
-            language_code="zh",
-            device=device
-        )
+            overlap = max(0, min(end, turn.end) - max(start, turn.start))
 
-        result = whisperx.align(
-            result["segments"],
-            align_model,
-            metadata,
-            str(input_path),
-            device=device
-        )
+            if overlap <= 0:
+                continue
+
+            score = overlap / duration  # ⭐关键修复
+
+            if score > best_score:
+                best_score = score
+                best_speaker = speaker
+
+        return best_speaker
+
+    def diarize(
+            self,
+            audio_path,
+            output_path
+    ):
 
         # =========================
-        # 3. speaker diarization（CPU版）
+        # 1. 读取云ASR结果
         # =========================
-        diarize_model = DiarizationPipeline(
-            token=self.hf_token,
-            device=device
-        )
 
-        diarize_segments = diarize_model(str(input_path))
-        print(f"🎤 说话人分离完成，检测到 {len(diarize_segments)} 个说话人")
+        with open(output_path["json"], "r", encoding="utf-8") as f:
+            cloud_json = json.load(f)
 
-        result = whisperx.assign_word_speakers(
-            diarize_segments,
-            result
-        )
+        # =========================
+        # 2. Speaker Diarization
+        # =========================
+
+        
+        pipeline = Pipeline.from_pretrained(
+            "pyannote/speaker-diarization-community-1",
+            token=self.hf_token
+            )
+        waveform, sample_rate = torchaudio.load(str(audio_path))
+        
+        
+        with ProgressHook() as hook:
+            result = pipeline({"waveform": waveform, "sample_rate": sample_rate}, hook=hook)
+
+        diarization = result.speaker_diarization
+        embeddings = result.speaker_embeddings
+        with open("audio.rttm", "w") as f:
+            diarization.write_rttm(f)
+        
+        np.save("speaker_embeddings.npy", embeddings)
+
+
+        # =========================
+        # 3. 匹配 Speaker
+        # =========================
+
+        from pyannote.database.util import load_rttm
+
+        rttm_dict = load_rttm("audio.rttm")
+        diarization = list(rttm_dict.values())[0]
+
+        for utt in cloud_json["utterances"]:
+
+            start = utt["start_time"] / 1000
+            end = utt["end_time"] / 1000
+
+            speaker = self.find_speaker(
+                start,
+                end,
+                diarization
+            )
+
+            if "attribute" not in utt:
+                utt["attribute"] = {}
+
+            utt["attribute"]["speaker"] = speaker
 
         # =========================
         # 4. 保存 JSON
         # =========================
-        with open(output_path["json"], "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
 
-        print(f"✅ 原始JSON已保存: {output_path['json']}")
+        with open(
+                output_path["json"],
+                "w",
+                encoding="utf-8"
+        ) as f:
+
+            json.dump(
+                cloud_json,
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
+
+        print(
+            f"✅ JSON saved: {output_path['json']}"
+        )
 
         # =========================
-        # 5. 写 SRT
+        # 5. 输出 SRT
         # =========================
-        segments = result["segments"]
 
-        with open(output_path["srt"], "w", encoding="utf-8") as f:
+        with open(
+                output_path["srt"],
+                "w",
+                encoding="utf-8"
+        ) as f:
 
-            for i, seg in enumerate(segments, 1):
+            for i, utt in enumerate(cloud_json["utterances"], start=1):
 
-                start = ms_to_srt_time(int(seg["start"] * 1000))
-                end = ms_to_srt_time(int(seg["end"] * 1000))
+                start = ms_to_srt_time(utt["start_time"])
+                end = ms_to_srt_time(utt["end_time"])
+                text = utt["text"].strip()
 
-                text = seg["text"].strip().replace("\n", " ")
+                speaker = utt["attribute"].get("speaker", "UNKNOWN")
 
-                # speaker 标注
-                if speaker_info:
-                    speaker = seg.get("speaker")
-                    if speaker is not None:
-                        text = f"[Speaker {speaker}] {text}"
+                text = f"[{speaker}] {text}"
 
                 f.write(f"{i}\n")
                 f.write(f"{start} --> {end}\n")
                 f.write(f"{text}\n\n")
 
-        print(f"✅ 字幕生成完成: {output_path['srt']}")
+        print(
+            f"✅ Subtitle generated: "
+            f"{output_path['srt']}"
+        )
