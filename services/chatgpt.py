@@ -55,7 +55,7 @@ class ChatGPT:
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = f"""
         根据剧情概要，将字幕文件中speaker标签替换为具体的角色名称，输出格式仍为srt字幕格式。
-        角色名称需要根据剧情内容进行推断，不能直接使用speaker标签中的数字，而是要结合剧情内容分析每个角色的身份后进行替换。
+        角色名称需要根据剧情内容进行推断，并且参考speaker标签中的数字。
         speaker信息是通过声音特征分析得出的，虽然不一定完全准确，但通常同一个speaker标签对应的台词是同一个角色说的。请根据这个线索结合剧情概要进行推断。
         剧情概要：{BRIEF}
         字幕内容：{subtitles}"""
