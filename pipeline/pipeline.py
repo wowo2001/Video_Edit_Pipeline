@@ -2,12 +2,13 @@
 import shutil
 
 from core.path import ProjectPaths
-from core.utils import safe_filename, clear_workdir
+from core.utils import safe_filename, clear_workdir, strip_srt, apply_speaker_mapping
 from core.whisper import Whisper
 from pipeline.audio import export_audio,mix_audio
 from pipeline.download import download_video
 from pipeline.video import add_gif_overlay, add_subtitles, change_resolution, cut_video, concat_videos, mask_sub, speed_up, add_text_overlay
 from services.chatgpt import ChatGPT
+from services.ali import Ali
 from services.volcengine import Volcengine
 from services.google_drive import upload_to_drive
 from pathlib import Path
@@ -35,12 +36,14 @@ class AutoVideoPipeline:
         Whisper().diarize(self.project_paths.audio, self.project_paths.subtitles)
 
         print("========== 3.2 人物识别 ==========")
-        ChatGPT().recognise_speaker(self.project_paths.subtitles['srt'])
+        strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_timeline=False)
+        ChatGPT().recognise_speaker(self.project_paths.subtitles['stripped_srt'], self.project_paths.speaker_mapping)
+        apply_speaker_mapping(self.project_paths.subtitles['srt'], self.project_paths.speaker_mapping)
         
 
         print("========== 4. GPT 脚本 ==========")
-
-        ChatGPT().generate_script(self.project_paths.subtitles['srt'], self.project_paths.script)
+        strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_timeline=True)
+        ChatGPT().generate_script(self.project_paths.subtitles['stripped_srt'], self.project_paths.script)
 
         print("========== 5. TTS ==========")
 
@@ -77,14 +80,14 @@ class AutoVideoPipeline:
         Volcengine().transcribe_audio(self.project_paths.final_audio, self.project_paths.final_subtitles)
 
         print("========== 14. AI修正字幕 ==========")
-        ChatGPT().fix_subtitles(self.project_paths.final_subtitles['srt'], self.project_paths.final_subtitles['srt'])
+        Ali().fix_subtitles(self.project_paths.final_subtitles['srt'], self.project_paths.final_subtitles['srt'])
 
         print("========== 15. 添加字幕 ==========")
         add_subtitles(self.project_paths.masked_video, self.project_paths.final_subtitles['srt'], self.project_paths.subtitle_video, y=110)
 
         print("========== 16. 添加标题和副标题 ==========")
         if subtitle is None:
-            subtitle = ChatGPT().get_subtitle(self.project_paths.final_subtitles['srt'])
+            subtitle = Ali().get_subtitle(self.project_paths.final_subtitles['srt'])
 
         add_text_overlay(
             self.project_paths.subtitle_video,
