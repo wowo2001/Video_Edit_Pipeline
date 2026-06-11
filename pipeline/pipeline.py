@@ -18,11 +18,11 @@ class AutoVideoPipeline:
     def __init__(self):
         self.project_paths = ProjectPaths()
 
-    def run(self, url, title, subtitle = None, upload=False):
+    def run(self, urls, title, subtitle = None, upload=False):
 
         print("========== 1. 下载视频 ==========")
 
-        download_video(url, self.project_paths.video)
+        download_video(urls, self.project_paths.video)
 
         print("========== 2. 提取音频 ==========")
 
@@ -31,8 +31,10 @@ class AutoVideoPipeline:
         print("========== 3. 字幕识别 ==========")
         Volcengine().transcribe_audio(self.project_paths.audio, self.project_paths.subtitles)
 
+        print("========== 3.1 语音分类 ==========")
         Whisper().diarize(self.project_paths.audio, self.project_paths.subtitles)
 
+        print("========== 3.2 人物识别 ==========")
         ChatGPT().recognise_speaker(self.project_paths.subtitles['srt'])
         
 
