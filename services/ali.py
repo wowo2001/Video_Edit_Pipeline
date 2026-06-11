@@ -78,7 +78,7 @@ class Ali:
             {subtitles}
             """
         response = self.client.chat.completions.create(
-            model="gpt-5.5",
+            model="qwen3.7-max",
             messages=[
                 {"role": "user", "content": prompt}
             ]

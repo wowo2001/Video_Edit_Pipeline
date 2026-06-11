@@ -116,7 +116,9 @@ def concat_videos(filelist, output):
         "-safe", "0",
         "-i", str(filelist),
 
-        "-c", "copy",
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-c:a", "aac",
         output
     ]
 
