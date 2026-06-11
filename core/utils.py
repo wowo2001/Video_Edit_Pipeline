@@ -62,8 +62,8 @@ def strip_srt(input_file, output_file, keep_timeline):
 
         # 跳过时间轴
         if time_pattern.match(line):
-            if keep_timeline:
-                result.append(line)
+            if not keep_timeline:
+                continue
 
         result.append(line)
 
