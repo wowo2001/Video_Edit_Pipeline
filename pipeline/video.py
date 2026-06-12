@@ -245,5 +245,8 @@ def _sort_key(p: Path):
         if name.startswith("clip"):
             num = re.findall(r"\d+", name)
             return int(num[0]) if num else 999
+        
+        else:
+            return int(name)
 
         return 9999
