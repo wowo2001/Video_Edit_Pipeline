@@ -2,6 +2,7 @@ from uuid import uuid4
 
 from core.cmd import run_cmd
 from pipeline.video import concat_videos
+from core.ffmpeg import encode_to_standard
 from core.path import ProjectPaths
 
 def download_video(urls, output_path):
@@ -13,12 +14,11 @@ def download_video(urls, output_path):
         urls = [urls]
 
     root_path = ProjectPaths()
-    
-    downloaded_files = []
 
     for index, url in enumerate(urls):
 
-        temp_video = root_path.root / f"{index:03d}.mp4"
+        temp_video = root_path.root / f"temp_{index:03d}.mp4"
+        video = root_path.root / f"{index:03d}.mp4"
 
         cmd = [
             "yt-dlp",
@@ -30,7 +30,8 @@ def download_video(urls, output_path):
 
         run_cmd(cmd)
 
-        downloaded_files.append(temp_video)
+        encode_to_standard(temp_video, video)
+        temp_video.unlink(missing_ok=True)
 
     concat_videos(root_path.root, output_path)
 
