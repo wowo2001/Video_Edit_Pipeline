@@ -2,7 +2,7 @@
 import shutil
 
 from core.path import ProjectPaths
-from core.utils import safe_filename, clear_workdir, strip_srt, apply_speaker_mapping
+from core.utils import safe_filename, clear_workdir, strip_srt, apply_speaker_mapping, apply_timeline
 from core.whisper import Whisper
 from pipeline.audio import export_audio,mix_audio
 from pipeline.download import download_video
@@ -12,6 +12,7 @@ from services.ali import Ali
 from services.volcengine import Volcengine
 from services.google_drive import upload_to_drive
 from pathlib import Path
+from core.demucs import extract_vocals_demucs
 
 
 class AutoVideoPipeline:
@@ -36,14 +37,15 @@ class AutoVideoPipeline:
         Whisper().diarize(self.project_paths.audio, self.project_paths.subtitles)
 
         print("========== 3.2 人物识别 ==========")
-        strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_timeline=False)
-        ChatGPT().recognise_speaker(self.project_paths.subtitles['stripped_srt'], self.project_paths.speaker_mapping)
+        strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=False)
+        Ali().recognise_speaker(self.project_paths.subtitles['stripped_srt'], self.project_paths.speaker_mapping)
         apply_speaker_mapping(self.project_paths.subtitles['srt'], self.project_paths.speaker_mapping)
         
 
         print("========== 4. GPT 脚本 ==========")
-        strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_timeline=True)
-        ChatGPT().generate_script(self.project_paths.subtitles['stripped_srt'], self.project_paths.script)
+        strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=True)
+        Ali().generate_script(self.project_paths.subtitles['stripped_srt'], self.project_paths.script)
+        apply_timeline(self.project_paths.script, self.project_paths.subtitles['json'])
 
         print("========== 5. TTS ==========")
 

@@ -148,7 +148,7 @@ class Volcengine:
         audio = AudioSegment.from_file(audio_path)
         duration_ms = len(audio)
 
-        data["hook"]["narrative"]["length"] = ms_to_srt_time(duration_ms)
+        data["hook"]["narrative"]["length"] = duration_ms
 
         for item in data["clips"]:
             text = item["narrative"]["content"]
@@ -162,7 +162,7 @@ class Volcengine:
             audio = AudioSegment.from_file(audio_path)
             duration_ms = len(audio)
 
-            item["narrative"]["length"] = ms_to_srt_time(duration_ms)
+            item["narrative"]["length"] = duration_ms
 
         with open(script_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)

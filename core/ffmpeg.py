@@ -108,6 +108,27 @@ def mix_start_aligned(
 
     run_cmd(cmd)
 
+def encode_to_standard(input_path, output_path):
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", str(input_path),
+
+        # 统一视频规格（关键）
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-r", "25",
+        "-preset", "fast",
+
+        # 统一音频
+        "-c:a", "aac",
+        "-ar", "48000",
+        "-ac", "2",
+
+        output_path
+    ]
+
+    run_cmd(cmd)
+
 def concat_videos(filelist, output):
 
     cmd = [
@@ -116,9 +137,7 @@ def concat_videos(filelist, output):
         "-safe", "0",
         "-i", str(filelist),
 
-        "-c:v", "libx264",
-        "-preset", "fast",
-        "-c:a", "aac",
+        "-c", "copy",
         output
     ]
 

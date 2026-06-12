@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 import re
 
-from core.utils import srt_to_seconds
+from core.utils import ms_to_seconds
 
 
 def cut_video(input_path, output_path, script_path):
@@ -23,7 +23,7 @@ def _cut_hook_video(input_path, output_path, script_path):
     with open(script_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    narration_duration = srt_to_seconds(
+    narration_duration = ms_to_seconds(
         data["hook"]["narrative"]["length"]
     )
 
@@ -36,8 +36,8 @@ def _cut_hook_video(input_path, output_path, script_path):
     # =========================
     for idx, clip in enumerate(clips):
 
-        start = srt_to_seconds(clip["start"])
-        end = srt_to_seconds(clip["end"])
+        start = ms_to_seconds(clip["start"])
+        end = ms_to_seconds(clip["end"])
 
         # 最后一段后面补旁白时间
         if idx == len(clips) - 1:
@@ -92,7 +92,7 @@ def _cut_clip_video(input_path, output_path, script_path):
 
         place = item["place"]
 
-        narration_duration = srt_to_seconds(
+        narration_duration = ms_to_seconds(
             item["narrative"]["length"]
         )
 
@@ -105,8 +105,8 @@ def _cut_clip_video(input_path, output_path, script_path):
         # =========================
         for idx, clip in enumerate(clips):
 
-            start = srt_to_seconds(clip["start"])
-            end = srt_to_seconds(clip["end"])
+            start = ms_to_seconds(clip["start"])
+            end = ms_to_seconds(clip["end"])
 
             # 第一段前面预留旁白时间
             if idx == 0:
