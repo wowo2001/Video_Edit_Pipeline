@@ -57,14 +57,20 @@ def mix_end_aligned(
     delay = int(narration_start_time * 1000)
 
     filter_complex = (
-        "[0:a]asplit=2[a0][a1];"
-        f"[a0]volume=0.01:enable='between(t,{narration_start_time},{video_duration})'[a0_low];"
-        "[a1]volume=1.0[a1_norm];"
-        "[a0_low][a1_norm]amix=inputs=2[aout];"
-        f"[1:a]adelay={delay}|{delay}[a1v];"
-        "[aout][a1v]amix=inputs=2:normalize=0[outa]"
-    )
+    "[0:a]loudnorm=I=-20:LRA=7:TP=-2[vnorm];"
+    "[1:a]loudnorm=I=-14:LRA=7:TP=-2[anorm];"
 
+    "[vnorm]asplit=2[a0][a1];"
+
+    f"[a0]volume=0.01:enable='between(t,{narration_start_time},{video_duration})'[a0_low];"
+    "[a1]volume=1.0[a1_norm];"
+
+    "[a0_low][a1_norm]amix=inputs=2[aout];"
+
+    f"[anorm]adelay={delay}|{delay}[a1v];"
+
+    "[aout][a1v]amix=inputs=2:normalize=0[outa]"
+)
     cmd = [
         "ffmpeg", "-y",
         "-i", str(video),
@@ -86,13 +92,22 @@ def mix_start_aligned(
     narration_duration
 ):
     filter_complex = (
-        "[0:a]asplit=2[a0][a1];"
-        f"[a0]volume=0.01:enable='between(t,0,{narration_duration})'[a0_low];"
-        "[a1]volume=1.0[a1_norm];"
-        "[a0_low][a1_norm]amix=inputs=2[aout];"
-        f"[1:a]adelay=0|0[a1v];"
-        "[aout][a1v]amix=inputs=2:normalize=0[outa]"
-    )
+    # 归一化视频原声
+    "[0:a]loudnorm=I=-20:LRA=7:TP=-2[vnorm];"
+
+    # 归一化配音
+    "[1:a]loudnorm=I=-14:LRA=7:TP=-2[anorm];"
+
+    # 你的原逻辑
+    "[vnorm]asplit=2[a0][a1];"
+    f"[a0]volume=0.01:enable='between(t,0,{narration_duration})'[a0_low];"
+    "[a1]volume=1.0[a1_norm];"
+    "[a0_low][a1_norm]amix=inputs=2[aout];"
+
+    "[anorm]adelay=0|0[a1v];"
+
+    "[aout][a1v]amix=inputs=2:normalize=0[outa]"
+)
 
     cmd = [
         "ffmpeg", "-y",
@@ -332,6 +347,18 @@ def add_gif_overlay(
         "-c:a", "copy",
 
         str(output_video)
+    ]
+
+    run_cmd(cmd)
+
+def wav_to_map3(wav_path, mp3_path):
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i", str(wav_path),
+        "-codec:a", "libmp3lame",
+        "-q:a", "2",
+        str(mp3_path)
     ]
 
     run_cmd(cmd)

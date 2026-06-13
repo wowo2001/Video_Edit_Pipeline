@@ -38,9 +38,11 @@ def safe_json_parse(text: str):
 def safe_filename(name: str):
     return re.sub(r'[\\/:*?"<>|()]', "_", name)
 
-def clear_workdir(workdir: Path):
+def clear_workdir(workdir: Path, demucs_path: Path):
     if workdir.exists():
         shutil.rmtree(workdir)
+    if demucs_path.exists():
+        shutil.rmtree(demucs_path)
     workdir.mkdir(parents=True, exist_ok=True)
 
 def strip_srt(input_file, output_file, keep_index):

@@ -16,6 +16,7 @@ class ProjectPaths:
         self.final_subtitles = {"srt": self.root / "final_subtitles.srt", "json": self.root / "final_subtitles.json"}
 
         self.script = self.root / "script.json"
+        self.vocals_path = Path("separated/htdemucs/audio")
 
         self.clips = self.root / "clips"
         self.final_clips = self.root / "final_clips"
