@@ -1,5 +1,5 @@
 work/
 __pycache__/
 token.pickle
-venv/
+*venv/
 separated/
