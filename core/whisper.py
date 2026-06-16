@@ -2,6 +2,7 @@ import json
 
 from config import HF_TOKEN
 from core.utils import ms_to_srt_time
+from core.path import ProjectPaths
 from pyannote.audio import Pipeline
 import torchaudio
 from pyannote.audio.pipelines.utils.hook import ProgressHook
@@ -71,6 +72,26 @@ class Whisper:
 
         diarization = result.speaker_diarization
         embeddings = result.speaker_embeddings
+
+        print(type(embeddings))
+        print(embeddings.shape)
+
+        segments = []
+
+        for segment, _, speaker in diarization.itertracks(yield_label=True):
+            segments.append({
+                "start": round(segment.start, 3),
+                "end": round(segment.end, 3),
+                "speaker": speaker
+            })
+
+        with open(ProjectPaths().root / "segments.json", "w") as f:
+            json.dump(
+                segments,
+                f,
+                indent=2,
+                ensure_ascii=False
+            )
 
 
 
