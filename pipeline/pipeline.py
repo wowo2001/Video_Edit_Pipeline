@@ -4,7 +4,7 @@ import shutil
 from core.path import ProjectPaths
 from core.utils import safe_filename, clear_workdir, strip_srt, apply_speaker_mapping, apply_timeline
 from core.whisper import Whisper
-from pipeline.audio import export_audio,mix_audio
+from pipeline.audio import export_audio,mix_audio, export_all_audio
 from pipeline.download import download_video
 from pipeline.video import add_gif_overlay, add_subtitles, change_resolution, cut_video, concat_videos, mask_sub, speed_up, add_text_overlay
 from services.chatgpt import ChatGPT
@@ -28,7 +28,7 @@ class AutoVideoPipeline:
 
         print("========== 2. 提取音频 ==========")
 
-        export_audio(self.project_paths.video, self.project_paths.audio)
+        export_all_audio(self.project_paths.origin, self.project_paths.audio)
 
         print("========== 3. 字幕识别 ==========")
         Volcengine().transcribe_audio(self.project_paths.audio, self.project_paths.subtitles)

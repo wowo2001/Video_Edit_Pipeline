@@ -10,13 +10,14 @@ class ProjectPaths:
         self.task_file = Path("tasks.json")
 
         self.video = self.root / "video.mp4"
+        self.origin = self.root / "origin"
         self.audio = self.root / "audio.mp3"
         self.subtitles = {"srt": self.root / "subtitles.srt", "json": self.root / "subtitles.json", "stripped_srt": self.root / "subtitles_stripped.srt"}
         self.speaker_mapping = self.root / "speaker_mapping.json"
         self.final_subtitles = {"srt": self.root / "final_subtitles.srt", "json": self.root / "final_subtitles.json"}
 
         self.script = self.root / "script.json"
-        self.vocals_path = Path("separated/htdemucs/audio")
+        self.vocals_path = Path("separated/htdemucs")
 
         self.clips = self.root / "clips"
         self.final_clips = self.root / "final_clips"
@@ -35,3 +36,4 @@ class ProjectPaths:
         self.clips.mkdir(parents=True, exist_ok=True)
         self.final_clips.mkdir(parents=True, exist_ok=True)
         self.narration_audios.mkdir(parents=True, exist_ok=True)
+        self.origin.mkdir(parents=True, exist_ok=True)

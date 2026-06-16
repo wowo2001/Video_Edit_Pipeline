@@ -132,7 +132,7 @@ def encode_to_standard(input_path, output_path):
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
         "-r", "25",
-        "-preset", "fast",
+        "-preset", "ultrafast",
 
         # 统一音频
         "-c:a", "aac",
@@ -154,6 +154,19 @@ def concat_videos(filelist, output):
 
         "-c", "copy",
         output
+    ]
+
+    run_cmd(cmd)
+
+def concat_mp3s(filelist, output):
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", str(filelist),
+        "-c", "copy",
+        str(output),
     ]
 
     run_cmd(cmd)

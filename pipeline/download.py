@@ -17,8 +17,8 @@ def download_video(urls, output_path):
 
     for index, url in enumerate(urls):
 
-        temp_video = root_path.root / f"temp_{index:03d}.mp4"
-        video = root_path.root / f"{index:03d}.mp4"
+        temp_video = root_path.origin / f"temp_{index:03d}.mp4"
+        video = root_path.origin / f"{index:03d}.mp4"
 
         cmd = [
             "yt-dlp",
@@ -33,7 +33,7 @@ def download_video(urls, output_path):
         encode_to_standard(temp_video, video)
         temp_video.unlink(missing_ok=True)
 
-    concat_videos(root_path.root, output_path)
+    concat_videos(root_path.origin, output_path)
 
 
     print(f"下载完成: {output_path}")

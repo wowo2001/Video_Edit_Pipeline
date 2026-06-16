@@ -53,7 +53,7 @@ class ChatGPT:
     def recognise_speaker(self, subtitles_path, mapping_path):
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = f"""
-            你是字幕角色识别助手。
+            你是电视剧字幕角色识别助手。
 
             任务：
             根据剧情内容 + speaker标签，推断每个 speaker 对应的角色名称。
