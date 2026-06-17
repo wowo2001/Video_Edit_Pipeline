@@ -174,17 +174,20 @@ class SpeechBrain:
 
         # SRT
         with open(
-        output_path["srt"],
-        "w",
-        encoding="utf-8"
-        )as f:
+                output_path["srt"],
+                "w",
+                encoding="utf-8"
+        ) as f:
 
             for i, utt in enumerate(cloud_json["utterances"], start=1):
 
                 start = ms_to_srt_time(utt["start_time"])
                 end = ms_to_srt_time(utt["end_time"])
-
                 text = utt["text"].strip()
+
+                speaker = utt["attribute"].get("speaker", "UNKNOWN")
+
+                text = f"[{speaker}] {text}"
 
                 f.write(f"{i}\n")
                 f.write(f"{start} --> {end}\n")
