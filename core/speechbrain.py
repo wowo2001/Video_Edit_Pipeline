@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import torchaudio
 from collections import Counter
-from speechbrain.pretrained import EncoderClassifier
+from speechbrain.inference.speaker import EncoderClassifier
 from sklearn.cluster import AgglomerativeClustering
 import json
 from core.utils import ms_to_srt_time
