@@ -36,7 +36,7 @@ class AutoVideoPipeline:
         # Whisper().transcribe(self.project_paths.audio, self.project_paths.subtitles)
 
         print("========== 3.1 语音分类 ==========")
-        SpeechBrain().diarize(self.project_paths.audio, self.project_paths.subtitles)
+        SpeechBrain().diarize(self.project_paths.audio, self.project_paths.subtitles,threshold=0.7,min_cluster_ratio=0.01)
 
         print("========== 3.2 人物识别 ==========")
         strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=False)
