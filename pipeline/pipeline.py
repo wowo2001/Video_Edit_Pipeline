@@ -13,6 +13,7 @@ from services.volcengine import Volcengine
 from services.google_drive import upload_to_drive
 from pathlib import Path
 from core.demucs import extract_vocals_demucs
+from core.speechbrain import SpeechBrain
 
 
 class AutoVideoPipeline:
@@ -35,7 +36,7 @@ class AutoVideoPipeline:
         # Whisper().transcribe(self.project_paths.audio, self.project_paths.subtitles)
 
         print("========== 3.1 语音分类 ==========")
-        Whisper().diarize(self.project_paths.audio, self.project_paths.subtitles)
+        SpeechBrain().diarize(self.project_paths.audio, self.project_paths.subtitles)
 
         print("========== 3.2 人物识别 ==========")
         strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=False)
