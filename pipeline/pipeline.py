@@ -32,6 +32,7 @@ class AutoVideoPipeline:
 
         print("========== 3. 字幕识别 ==========")
         Volcengine().transcribe_audio(self.project_paths.audio, self.project_paths.subtitles)
+        # Whisper().transcribe(self.project_paths.audio, self.project_paths.subtitles)
 
         print("========== 3.1 语音分类 ==========")
         Whisper().diarize(self.project_paths.audio, self.project_paths.subtitles)
@@ -73,7 +74,7 @@ class AutoVideoPipeline:
         speed_up(self.project_paths.changed_resolution_video, self.project_paths.speed_up_video, speed=1.3)
 
         print("========== 11. 掩码字幕 ==========")
-        mask_sub(self.project_paths.speed_up_video, self.project_paths.masked_video, y_offset=770, mask_height=50)
+        mask_sub(self.project_paths.speed_up_video, self.project_paths.masked_video, y_offset=750, mask_height=70)
 
         print("========== 12. 导出成片音频 ==========")
         export_audio(self.project_paths.speed_up_video, self.project_paths.final_audio)
@@ -85,7 +86,7 @@ class AutoVideoPipeline:
         Ali().fix_subtitles(self.project_paths.final_subtitles['srt'], self.project_paths.final_subtitles['srt'])
 
         print("========== 15. 添加字幕 ==========")
-        add_subtitles(self.project_paths.masked_video, self.project_paths.final_subtitles['srt'], self.project_paths.subtitle_video, y=110)
+        add_subtitles(self.project_paths.masked_video, self.project_paths.final_subtitles['srt'], self.project_paths.subtitle_video, y=105)
 
         print("========== 16. 添加标题和副标题 ==========")
         if subtitle is None:
