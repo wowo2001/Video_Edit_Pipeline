@@ -5,6 +5,7 @@ from collections import Counter
 from speechbrain.pretrained import EncoderClassifier
 from sklearn.cluster import AgglomerativeClustering
 import json
+from core.utils import ms_to_srt_time
 
 
 class SpeechBrain:
@@ -109,8 +110,6 @@ class SpeechBrain:
 
         embeddings = np.vstack(embeddings)
 
-        print("embedding shape:", embeddings.shape)
-
         # =========================
         # clustering
         # =========================
@@ -123,7 +122,6 @@ class SpeechBrain:
 
         labels = clusterer.fit_predict(embeddings)
 
-        print("cluster distribution:", Counter(labels))
 
         # =========================
         # filter small clusters
@@ -160,6 +158,39 @@ class SpeechBrain:
 
             utt["attribute"]["speaker"] = label
 
-            print(label, utt["text"])
 
-        return cloud_json
+        # JSON
+        with open(output_path["json"], "w", encoding="utf-8") as f:
+            json.dump(
+                cloud_json,
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
+        print(
+            f"✅ Subtitle generated: "
+            f"{output_path['json']}"
+        )
+
+        # SRT
+        with open(
+        output_path["srt"],
+        "w",
+        encoding="utf-8"
+        )as f:
+
+            for i, utt in enumerate(cloud_json["utterances"], start=1):
+
+                start = ms_to_srt_time(utt["start_time"])
+                end = ms_to_srt_time(utt["end_time"])
+
+                text = utt["text"].strip()
+
+                f.write(f"{i}\n")
+                f.write(f"{start} --> {end}\n")
+                f.write(f"{text}\n\n")
+
+        print(
+            f"✅ Subtitle generated: "
+            f"{output_path['srt']}"
+        )
