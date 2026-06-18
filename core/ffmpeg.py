@@ -259,6 +259,85 @@ def mask_sub(
 
     run_cmd(cmd)
 
+def mosaic_regions(
+    input_video,
+    output_video,
+    regions,
+):
+    """
+    regions:
+    [
+        {
+            "x": 10,
+            "y": 10,
+            "width": 120,
+            "height": 60,
+            "mosaic_size": 8,
+        },
+        {
+            "x": 1700,
+            "y": 20,
+            "width": 180,
+            "height": 80,
+            "mosaic_size": 10,
+        }
+    ]
+    """
+
+    filter_parts = []
+
+    current = "[0:v]"
+
+    for i, region in enumerate(regions):
+
+        x = region["x"]
+        y = region["y"]
+        w = region["width"]
+        h = region["height"]
+        mosaic_size = region.get("mosaic_size", 20)
+
+        down_w = max(1, w // mosaic_size)
+        down_h = max(1, h // mosaic_size)
+
+        crop_label = f"m{i}"
+        out_label = f"v{i}"
+
+        filter_parts.append(
+            f"[0:v]"
+            f"crop={w}:{h}:{x}:{y},"
+            f"scale={down_w}:{down_h},"
+            f"scale={w}:{h}:flags=neighbor"
+            f"[{crop_label}]"
+        )
+
+        filter_parts.append(
+            f"{current}[{crop_label}]"
+            f"overlay={x}:{y}"
+            f"[{out_label}]"
+        )
+
+        current = f"[{out_label}]"
+
+    filter_complex = ";".join(filter_parts)
+
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i", str(input_video),
+
+        "-filter_complex", filter_complex,
+
+        "-map", current,
+        "-map", "0:a?",
+
+        "-c:v", "libx264",
+        "-c:a", "copy",
+
+        str(output_video)
+    ]
+
+    run_cmd(cmd)
+
 def add_subtitles(input_video, srt_file, output_video, y):
     srt_path = str(srt_file).replace("\\", "/")
     cmd = [

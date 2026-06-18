@@ -7,6 +7,7 @@ from core.ffmpeg import mask_sub as mask_sub_ffmpeg
 from core.ffmpeg import add_subtitles as add_subtitles_ffmpeg
 from core.ffmpeg import add_text_overlay as add_text_overlay_ffmpeg
 from core.ffmpeg import add_gif_overlay as add_gif_overlay_ffmpeg
+from core.ffmpeg import mosaic_regions as mosaic_regions_ffmpeg
 import json
 from pathlib import Path
 import re
@@ -190,6 +191,14 @@ def mask_sub(
         y_offset,
         mask_height
     )
+def mosaic_regions(
+    input_video,
+    output_video,
+    regions):
+    mosaic_regions_ffmpeg(input_video,
+    output_video,
+    regions)
+
 
 def add_subtitles(input_video, srt_file, output_video, y):
     add_subtitles_ffmpeg(input_video, srt_file, output_video, y=y)
