@@ -54,29 +54,43 @@ class Ali:
     def recognise_speaker(self, subtitles_path, mapping_path):
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = f"""
-            你是字幕角色识别助手。
+你是字幕角色识别助手。
 
-            任务：
-            根据剧情内容 + speaker标签，推断每个 speaker 对应的角色名称。
-            出现每个speaker必须分配名字，speaker和角色名字可以是多对一的
+任务：
+根据剧情概要和字幕内容，推断每个 speaker 对应的角色名称。
 
-            规则：
-            1. 结合剧情内容判断角色身份
-            2. speaker只是帮助你辅助判断，不是绝对的。
-            3. 只输出 JSON，不要输出任何解释或字幕内容
+要求：
+1. 所有出现过的 speaker 都必须出现在结果中。
+2. speaker 和角色名称允许多对一。
+3. 如果无法确定角色，使用最可能的角色名。
+4. 不允许遗漏 speaker。
+5. speaker 标签仅作为参考，不代表角色身份。
+6. 输出必须是合法 JSON。
 
-            输出格式：
-            {
-                "SPEAKER_18": "包拯",
-                "SPEAKER_02": "公孙策"
-            }
+严格输出规则：
+- 只输出 JSON 对象
+- 不要使用 markdown
+- 不要输出 ```json
+- 不要输出解释
+- 不要输出分析过程
+- 不要输出任何 JSON 之外的字符
+- key 必须保持原 speaker 名称
+- value 必须是角色名称字符串
 
-            剧情概要：
-            {BRIEF}
+输出示例：
 
-            字幕内容：
-            {subtitles}
-            """
+{{
+    "SPEAKER_00": "包拯",
+    "SPEAKER_01": "公孙策",
+    "SPEAKER_02": "包拯"
+}}
+
+剧情概要：
+{BRIEF}
+
+字幕内容：
+{subtitles}
+"""
         response = self.client.chat.completions.create(
             model="qwen3.7-max",
             messages=[
