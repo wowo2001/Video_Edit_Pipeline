@@ -8,6 +8,7 @@ from prompts.get_title import GET_TITLE_PROMPT
 from prompts.script_schema import OUTPUT_SCHEMA
 from prompts.task_rules import TASK_RULES
 from prompts.brief import BRIEF
+from prompts.recognise_speaker import RECOGNISE_SPEAKER_PROMPT
 import json
 class Ali:
     def __init__(self):
@@ -54,43 +55,14 @@ class Ali:
     def recognise_speaker(self, subtitles_path, mapping_path):
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = f"""
-你是字幕角色识别助手。
+            {RECOGNISE_SPEAKER_PROMPT}
 
-任务：
-根据剧情概要和字幕内容，推断每个 speaker 对应的角色名称。
+            剧情概要：
+            {BRIEF}
 
-要求：
-1. 所有出现过的 speaker 都必须出现在结果中。
-2. speaker 和角色名称允许多对一。
-3. 如果无法确定角色，使用最可能的角色名。
-4. 不允许遗漏 speaker。
-5. speaker 标签仅作为参考，不代表角色身份。
-6. 输出必须是合法 JSON。
-
-严格输出规则：
-- 只输出 JSON 对象
-- 不要使用 markdown
-- 不要输出 ```json
-- 不要输出解释
-- 不要输出分析过程
-- 不要输出任何 JSON 之外的字符
-- key 必须保持原 speaker 名称
-- value 必须是角色名称字符串
-
-输出示例：
-
-{{
-    "SPEAKER_00": "包拯",
-    "SPEAKER_01": "公孙策",
-    "SPEAKER_02": "包拯"
-}}
-
-剧情概要：
-{BRIEF}
-
-字幕内容：
-{subtitles}
-"""
+            字幕内容：
+            {subtitles}
+        """
         response = self.client.chat.completions.create(
             model="qwen3.7-max",
             messages=[
