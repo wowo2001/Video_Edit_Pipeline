@@ -57,14 +57,20 @@ def mix_end_aligned(
     delay = int(narration_start_time * 1000)
 
     filter_complex = (
-        "[0:a]asplit=2[a0][a1];"
-        f"[a0]volume=0.01:enable='between(t,{narration_start_time},{video_duration})'[a0_low];"
-        "[a1]volume=1.0[a1_norm];"
-        "[a0_low][a1_norm]amix=inputs=2[aout];"
-        f"[1:a]adelay={delay}|{delay}[a1v];"
-        "[aout][a1v]amix=inputs=2:normalize=0[outa]"
-    )
+    "[0:a]loudnorm=I=-20:LRA=7:TP=-2[vnorm];"
+    "[1:a]loudnorm=I=-14:LRA=7:TP=-2[anorm];"
 
+    "[vnorm]asplit=2[a0][a1];"
+
+    f"[a0]volume=0.01:enable='between(t,{narration_start_time},{video_duration})'[a0_low];"
+    "[a1]volume=1.0[a1_norm];"
+
+    "[a0_low][a1_norm]amix=inputs=2[aout];"
+
+    f"[anorm]adelay={delay}|{delay}[a1v];"
+
+    "[aout][a1v]amix=inputs=2:normalize=0[outa]"
+)
     cmd = [
         "ffmpeg", "-y",
         "-i", str(video),
@@ -86,13 +92,22 @@ def mix_start_aligned(
     narration_duration
 ):
     filter_complex = (
-        "[0:a]asplit=2[a0][a1];"
-        f"[a0]volume=0.01:enable='between(t,0,{narration_duration})'[a0_low];"
-        "[a1]volume=1.0[a1_norm];"
-        "[a0_low][a1_norm]amix=inputs=2[aout];"
-        f"[1:a]adelay=0|0[a1v];"
-        "[aout][a1v]amix=inputs=2:normalize=0[outa]"
-    )
+    # 归一化视频原声
+    "[0:a]loudnorm=I=-20:LRA=7:TP=-2[vnorm];"
+
+    # 归一化配音
+    "[1:a]loudnorm=I=-14:LRA=7:TP=-2[anorm];"
+
+    # 你的原逻辑
+    "[vnorm]asplit=2[a0][a1];"
+    f"[a0]volume=0.01:enable='between(t,0,{narration_duration})'[a0_low];"
+    "[a1]volume=1.0[a1_norm];"
+    "[a0_low][a1_norm]amix=inputs=2[aout];"
+
+    "[anorm]adelay=0|0[a1v];"
+
+    "[aout][a1v]amix=inputs=2:normalize=0[outa]"
+)
 
     cmd = [
         "ffmpeg", "-y",
@@ -108,6 +123,27 @@ def mix_start_aligned(
 
     run_cmd(cmd)
 
+def encode_to_standard(input_path, output_path):
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", str(input_path),
+
+        # 统一视频规格（关键）
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-r", "25",
+        "-preset", "ultrafast",
+
+        # 统一音频
+        "-c:a", "aac",
+        "-ar", "48000",
+        "-ac", "2",
+
+        output_path
+    ]
+
+    run_cmd(cmd)
+
 def concat_videos(filelist, output):
 
     cmd = [
@@ -118,6 +154,19 @@ def concat_videos(filelist, output):
 
         "-c", "copy",
         output
+    ]
+
+    run_cmd(cmd)
+
+def concat_mp3s(filelist, output):
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", str(filelist),
+        "-c", "copy",
+        str(output),
     ]
 
     run_cmd(cmd)
@@ -201,6 +250,85 @@ def mask_sub(
             f"color=black:"
             f"t=fill"
         ),
+
+        "-c:v", "libx264",
+        "-c:a", "copy",
+
+        str(output_video)
+    ]
+
+    run_cmd(cmd)
+
+def mosaic_regions(
+    input_video,
+    output_video,
+    regions,
+):
+    """
+    regions:
+    [
+        {
+            "x": 10,
+            "y": 10,
+            "width": 120,
+            "height": 60,
+            "mosaic_size": 8,
+        },
+        {
+            "x": 1700,
+            "y": 20,
+            "width": 180,
+            "height": 80,
+            "mosaic_size": 10,
+        }
+    ]
+    """
+
+    filter_parts = []
+
+    current = "[0:v]"
+
+    for i, region in enumerate(regions):
+
+        x = region["x"]
+        y = region["y"]
+        w = region["width"]
+        h = region["height"]
+        mosaic_size = region.get("mosaic_size", 20)
+
+        down_w = max(1, w // mosaic_size)
+        down_h = max(1, h // mosaic_size)
+
+        crop_label = f"m{i}"
+        out_label = f"v{i}"
+
+        filter_parts.append(
+            f"[0:v]"
+            f"crop={w}:{h}:{x}:{y},"
+            f"scale={down_w}:{down_h},"
+            f"scale={w}:{h}:flags=neighbor"
+            f"[{crop_label}]"
+        )
+
+        filter_parts.append(
+            f"{current}[{crop_label}]"
+            f"overlay={x}:{y}"
+            f"[{out_label}]"
+        )
+
+        current = f"[{out_label}]"
+
+    filter_complex = ";".join(filter_parts)
+
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i", str(input_video),
+
+        "-filter_complex", filter_complex,
+
+        "-map", current,
+        "-map", "0:a?",
 
         "-c:v", "libx264",
         "-c:a", "copy",
@@ -311,6 +439,18 @@ def add_gif_overlay(
         "-c:a", "copy",
 
         str(output_video)
+    ]
+
+    run_cmd(cmd)
+
+def wav_to_map3(wav_path, mp3_path):
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i", str(wav_path),
+        "-codec:a", "libmp3lame",
+        "-q:a", "2",
+        str(mp3_path)
     ]
 
     run_cmd(cmd)

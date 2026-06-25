@@ -19,7 +19,7 @@ class Volcengine:
         }
         self.speaker = SPEAKER
 
-    def transcribe_audio(self, input_path, output_path):
+    def transcribe_audio(self, input_path, output_path, speaker_info=False):
 
     # =========================
     # 提交任务
@@ -121,6 +121,15 @@ class Volcengine:
 
                 text = u["text"].strip().replace("\n", " ")
 
+                if speaker_info:
+                    speaker = (
+                        u.get("attribute", {})
+                        .get("speaker")
+                    )
+
+                    if speaker:
+                        text = f"[Speaker {speaker}] {text}"
+
                 f.write(f"{i}\n")
                 f.write(f"{start} --> {end}\n")
                 f.write(f"{text}\n\n")
@@ -139,7 +148,7 @@ class Volcengine:
         audio = AudioSegment.from_file(audio_path)
         duration_ms = len(audio)
 
-        data["hook"]["narrative"]["length"] = ms_to_srt_time(duration_ms)
+        data["hook"]["narrative"]["length"] = duration_ms
 
         for item in data["clips"]:
             text = item["narrative"]["content"]
@@ -153,7 +162,7 @@ class Volcengine:
             audio = AudioSegment.from_file(audio_path)
             duration_ms = len(audio)
 
-            item["narrative"]["length"] = ms_to_srt_time(duration_ms)
+            item["narrative"]["length"] = duration_ms
 
         with open(script_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)

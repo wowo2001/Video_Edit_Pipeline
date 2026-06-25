@@ -7,11 +7,12 @@ from core.ffmpeg import mask_sub as mask_sub_ffmpeg
 from core.ffmpeg import add_subtitles as add_subtitles_ffmpeg
 from core.ffmpeg import add_text_overlay as add_text_overlay_ffmpeg
 from core.ffmpeg import add_gif_overlay as add_gif_overlay_ffmpeg
+from core.ffmpeg import mosaic_regions as mosaic_regions_ffmpeg
 import json
 from pathlib import Path
 import re
 
-from core.utils import srt_to_seconds
+from core.utils import ms_to_seconds
 
 
 def cut_video(input_path, output_path, script_path):
@@ -23,7 +24,7 @@ def _cut_hook_video(input_path, output_path, script_path):
     with open(script_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    narration_duration = srt_to_seconds(
+    narration_duration = ms_to_seconds(
         data["hook"]["narrative"]["length"]
     )
 
@@ -36,8 +37,8 @@ def _cut_hook_video(input_path, output_path, script_path):
     # =========================
     for idx, clip in enumerate(clips):
 
-        start = srt_to_seconds(clip["start"])
-        end = srt_to_seconds(clip["end"])
+        start = ms_to_seconds(clip["start"])
+        end = ms_to_seconds(clip["end"])
 
         # 最后一段后面补旁白时间
         if idx == len(clips) - 1:
@@ -92,7 +93,7 @@ def _cut_clip_video(input_path, output_path, script_path):
 
         place = item["place"]
 
-        narration_duration = srt_to_seconds(
+        narration_duration = ms_to_seconds(
             item["narrative"]["length"]
         )
 
@@ -105,8 +106,8 @@ def _cut_clip_video(input_path, output_path, script_path):
         # =========================
         for idx, clip in enumerate(clips):
 
-            start = srt_to_seconds(clip["start"])
-            end = srt_to_seconds(clip["end"])
+            start = ms_to_seconds(clip["start"])
+            end = ms_to_seconds(clip["end"])
 
             # 第一段前面预留旁白时间
             if idx == 0:
@@ -190,6 +191,14 @@ def mask_sub(
         y_offset,
         mask_height
     )
+def mosaic_regions(
+    input_video,
+    output_video,
+    regions):
+    mosaic_regions_ffmpeg(input_video,
+    output_video,
+    regions)
+
 
 def add_subtitles(input_video, srt_file, output_video, y):
     add_subtitles_ffmpeg(input_video, srt_file, output_video, y=y)
@@ -245,5 +254,8 @@ def _sort_key(p: Path):
         if name.startswith("clip"):
             num = re.findall(r"\d+", name)
             return int(num[0]) if num else 999
+        
+        else:
+            return int(name)
 
         return 9999

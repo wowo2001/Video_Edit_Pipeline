@@ -14,9 +14,9 @@ def main():
     print(f"📦 Total jobs: {len(jobs)}")
 
     for i, job in enumerate(jobs):
-        clear_workdir(ProjectPaths().root)
+        clear_workdir(ProjectPaths().root,ProjectPaths().vocals_path)
         print(f"\n▶ Job {i+1}/{len(jobs)}")
-        AutoVideoPipeline().run(url=job["url"], title=job["title"], upload = True)
+        AutoVideoPipeline().run(urls=job["urls"], title=job["title"], subtitle=job.get("subtitle"), upload=True)
 
     print("\n🎬 ALL DONE")
 
