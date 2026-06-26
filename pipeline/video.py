@@ -213,7 +213,11 @@ def add_text_overlay(
     title_y,
     sub_y,
     title_color,
-    sub_color
+    sub_color,
+    popup_text,
+    popup_font_size,
+    popup_color,
+    popup_y,
 ):
     add_text_overlay_ffmpeg(
         input_video,
@@ -225,7 +229,11 @@ def add_text_overlay(
         title_y,
         sub_y,
         title_color,
-        sub_color
+        sub_color,
+        popup_text,
+        popup_font_size,
+        popup_color,
+        popup_y,
     )
 
 def add_gif_overlay(

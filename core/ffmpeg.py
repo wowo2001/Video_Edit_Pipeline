@@ -370,40 +370,61 @@ def add_text_overlay(
     title_y,
     sub_y,
     title_color,
-    sub_color
+    sub_color,
+    popup_text,
+    popup_font_size,
+    popup_color,
+    popup_y
 ):
 
     font_path = "C\\:/Windows/Fonts/msyh.ttc"
 
+    filters = [] 
+
+    # 标题
+    filters.append(
+    f"drawtext="
+    f"fontfile='{font_path}':"
+    f"text='{title}':"
+    f"fontcolor={title_color}:"
+    f"fontsize={font_size_title}:"
+    f"x=(w-text_w)/2:"
+    f"y={title_y}"
+    )
+
+# 副标题
+    filters.append(
+    f"drawtext="
+    f"fontfile='{font_path}':"
+    f"text='{subtitle}':"
+    f"fontcolor={sub_color}:"
+    f"fontsize={font_size_sub}:"
+    f"x=(w-text_w)/2:"
+    f"y=h-{sub_y}"
+    )
+
+# 可选弹幕
+    if popup_text:
+        filters.append(
+        f"drawtext="
+        f"fontfile='{font_path}':"
+        f"text='{popup_text}':"
+        f"fontcolor={popup_color}:"
+        f"fontsize={popup_font_size}:"
+        f"x=w-t*200:"
+        f"y={popup_y}"
+        )
+
+    vf = ",".join(filters)
     cmd = [
-        "ffmpeg", "-y",
-        "-i", str(input_video),
-
-        "-vf",
-        (
-            f"drawtext="
-            f"fontfile='{font_path}':"
-            f"text='{title}':"
-            f"fontcolor={title_color}:"
-            f"fontsize={font_size_title}:"
-            f"x=(w-text_w)/2:"
-            f"y={title_y},"
-            
-            f"drawtext="
-            f"fontfile='{font_path}':"
-            f"text='{subtitle}':"
-            f"fontcolor={sub_color}:"
-            f"fontsize={font_size_sub}:"
-            f"x=(w-text_w)/2:"
-            f"y=h-{sub_y}"
-        ),
-
-        "-c:v", "libx264",
-        "-crf", "23",
-        "-preset", "fast",
-        "-c:a", "copy",
-
-        str(output_video)
+    "ffmpeg", "-y",
+    "-i", str(input_video),
+    "-vf", vf,
+    "-c:v", "libx264",
+    "-crf", "23",
+    "-preset", "fast",
+    "-c:a", "copy",
+    str(output_video)
     ]
 
     run_cmd(cmd)

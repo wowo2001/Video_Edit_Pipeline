@@ -44,13 +44,18 @@ class Ali:
                 {"role": "user", "content": prompt}
             ]
         )
-        fixed_subtitles = response.choices[0].message.content
+
+        result = json.loads(response.choices[0].message.content)
+
+        fixed_subtitles = result["subtitle"]
+        popup_text = result["popup_text"]
         fixed_subtitles = re.sub(r"^```srt\s*", "", fixed_subtitles)
         fixed_subtitles = re.sub(r"^```\s*", "", fixed_subtitles)
         fixed_subtitles = re.sub(r"\s*```$", "", fixed_subtitles)
         with open(fixed_subtitles_path, "w", encoding="utf-8") as f:
             f.write(fixed_subtitles)
         print(f"\n✅ 修正后的字幕已保存: {fixed_subtitles_path}")
+        return popup_text
     
     def recognise_speaker(self, subtitles_path, mapping_path):
         subtitles = subtitles_path.read_text(encoding="utf-8")

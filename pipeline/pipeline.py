@@ -98,7 +98,7 @@ class AutoVideoPipeline:
             "mosaic_size": 8,
         }]
         mosaic_regions(self.project_paths.speed_up_video,self.project_paths.masked_video,region)
-        # mask_sub(self.project_paths.speed_up_video, self.project_paths.masked_video, y_offset=700, mask_height=70)
+
 
         print("========== 12. 导出成片音频 ==========")
         export_audio(self.project_paths.speed_up_video, self.project_paths.final_audio)
@@ -107,7 +107,7 @@ class AutoVideoPipeline:
         Volcengine().transcribe_audio(self.project_paths.final_audio, self.project_paths.final_subtitles)
 
         print("========== 14. AI修正字幕 ==========")
-        Ali().fix_subtitles(self.project_paths.final_subtitles['srt'], self.project_paths.final_subtitles['srt'])
+        popup_text = Ali().fix_subtitles(self.project_paths.final_subtitles['srt'], self.project_paths.final_subtitles['srt'])
 
         print("========== 15. 添加字幕 ==========")
         add_subtitles(self.project_paths.masked_video, self.project_paths.final_subtitles['srt'], self.project_paths.subtitle_video, y=95)
@@ -126,7 +126,11 @@ class AutoVideoPipeline:
             title_y=400,
             sub_y=450,
             title_color="#FFCC00",
-            sub_color="#FFCC00"
+            sub_color="#FFCC00",
+            popup_text=popup_text,
+            popup_font_size=36,
+            popup_color="#FFFFFF",
+            popup_y=600
         )
 
         print("========== 17. 添加 GIF 动画 ==========")
