@@ -371,7 +371,7 @@ def add_text_overlay(
     sub_y,
     title_color,
     sub_color,
-    popup_text,
+    popup_comments,
     popup_font_size,
     popup_color,
     popup_y
@@ -402,20 +402,29 @@ def add_text_overlay(
     f"x=(w-text_w)/2:"
     f"y=h-{sub_y}"
     )
-
 # 可选弹幕
-    if popup_text:
-        filters.append(
-        f"drawtext="
-        f"fontfile='{font_path}':"
-        f"text='{popup_text}':"
-        f"fontcolor={popup_color}:"
-        f"fontsize={popup_font_size}:"
-        f"x=w-t*200:"
-        f"y={popup_y}"
-        )
+    if popup_comments:
+        for item in popup_comments:
+
+            text = item["text"]
+            start_time = item["start_time"]
+
+            filters.append(
+            f"drawtext="
+            f"fontfile='{font_path}':"
+            f"text='{text}':"
+            f"fontcolor={popup_color}:"
+            f"fontsize={popup_font_size}:"
+            f"borderw=3:"
+            f"bordercolor=black:"
+            f"x=w-(t-{start_time})*200:"
+            f"y={popup_y}:"
+            f"enable='gte(t,{start_time})'"
+            )
 
     vf = ",".join(filters)
+    print(vf)
+
     cmd = [
     "ffmpeg", "-y",
     "-i", str(input_video),

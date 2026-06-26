@@ -1,7 +1,7 @@
 from openai import OpenAI
 import re
 from config import ALI_API_KEY, OPENAI_API_KEY
-from core.utils import safe_json_parse
+from core.utils import safe_json_parse, srt_to_seconds
 from prompts.editing_rules import EDITING_RULES
 from prompts.fix_subtitles import FIX_SUBTITLE_PROMPT
 from prompts.get_title import GET_TITLE_PROMPT
@@ -48,14 +48,18 @@ class Ali:
         result = json.loads(response.choices[0].message.content)
 
         fixed_subtitles = result["subtitle"]
-        popup_text = result["popup_text"]
+        popup_comments = result["popup_comments"]
+        for item in popup_comments:
+            item["start_time"] = srt_to_seconds(item["start_time"])
+        
+        print(popup_comments)
         fixed_subtitles = re.sub(r"^```srt\s*", "", fixed_subtitles)
         fixed_subtitles = re.sub(r"^```\s*", "", fixed_subtitles)
         fixed_subtitles = re.sub(r"\s*```$", "", fixed_subtitles)
         with open(fixed_subtitles_path, "w", encoding="utf-8") as f:
             f.write(fixed_subtitles)
         print(f"\n✅ 修正后的字幕已保存: {fixed_subtitles_path}")
-        return popup_text
+        return popup_comments
     
     def recognise_speaker(self, subtitles_path, mapping_path):
         subtitles = subtitles_path.read_text(encoding="utf-8")
