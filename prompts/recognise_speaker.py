@@ -11,6 +11,7 @@ RECOGNISE_SPEAKER_PROMPT = f"""
 4. 不允许遗漏 speaker。
 5. speaker 标签仅作为参考，不代表角色身份。
 6. 输出必须是合法 JSON。
+7. UNKNOWN 无需推断
 
 严格输出规则：
 - 只输出 JSON 对象
