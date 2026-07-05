@@ -107,15 +107,12 @@ class AutoVideoPipeline:
         Volcengine().transcribe_audio(self.project_paths.final_audio, self.project_paths.final_subtitles)
 
         print("========== 14. AI修正字幕 ==========")
-        popup_text = Ali().fix_subtitles(self.project_paths.final_subtitles['srt'], self.project_paths.final_subtitles['srt'])
+        popup_text, subtitle = Ali().fix_subtitles(self.project_paths.final_subtitles['srt'], self.project_paths.final_subtitles['srt'])
 
         print("========== 15. 添加字幕 ==========")
         add_subtitles(self.project_paths.masked_video, self.project_paths.final_subtitles['srt'], self.project_paths.subtitle_video, y=95)
 
         print("========== 16. 添加标题和副标题 ==========")
-        if subtitle is None:
-            subtitle = Ali().get_subtitle(self.project_paths.final_subtitles['srt'])
-
         add_text_overlay(
             self.project_paths.subtitle_video,
             self.project_paths.text_overlay_video,
@@ -128,7 +125,7 @@ class AutoVideoPipeline:
             title_color="#FFCC00",
             sub_color="#FFCC00",
             popup_text=popup_text,
-            popup_font_size=36,
+            popup_font_size=42,
             popup_color="#FFFFFF",
             popup_y=600
         )

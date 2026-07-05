@@ -13,7 +13,9 @@ import json
 class Ali:
     def __init__(self):
         self.client = OpenAI(api_key=ALI_API_KEY,
-                             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1")
+                            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                            timeout=600.0,
+                            max_retries=2)
     def generate_script(self, subtitles_path, script_path):
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = f"{TASK_RULES}\n\n{EDITING_RULES}\n\n{OUTPUT_SCHEMA}\n\n字幕内容：{subtitles}"
@@ -53,13 +55,14 @@ class Ali:
             item["start_time"] = srt_to_seconds(item["start_time"])
         
         print(popup_comments)
+        title = result["title"]
         fixed_subtitles = re.sub(r"^```srt\s*", "", fixed_subtitles)
         fixed_subtitles = re.sub(r"^```\s*", "", fixed_subtitles)
         fixed_subtitles = re.sub(r"\s*```$", "", fixed_subtitles)
         with open(fixed_subtitles_path, "w", encoding="utf-8") as f:
             f.write(fixed_subtitles)
         print(f"\n✅ 修正后的字幕已保存: {fixed_subtitles_path}")
-        return popup_comments
+        return popup_comments, title
     
     def recognise_speaker(self, subtitles_path, mapping_path):
         subtitles = subtitles_path.read_text(encoding="utf-8")
