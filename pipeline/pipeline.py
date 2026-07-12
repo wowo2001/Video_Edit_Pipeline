@@ -2,7 +2,7 @@
 import shutil
 
 from core.path import ProjectPaths
-from core.utils import safe_filename, clear_workdir, strip_srt, apply_speaker_mapping, apply_timeline
+from core.utils import safe_filename, clear_workdir, strip_srt, apply_speaker_mapping, apply_timeline,apply_speaker_mapping_to_script
 from core.whisper import Whisper
 from pipeline.audio import export_audio,mix_audio, export_all_audio
 from pipeline.download import download_video
