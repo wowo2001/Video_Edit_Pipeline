@@ -49,6 +49,10 @@ class AutoVideoPipeline:
         Ali().generate_script(self.project_paths.subtitles['stripped_srt'], self.project_paths.script)
         apply_timeline(self.project_paths.script, self.project_paths.subtitles['json'])
 
+        print("========== 4.1 AI 脚本改进 ==========")
+        apply_speaker_mapping_to_script(self.project_paths.script, self.project_paths.speaker_mapping)
+        Ali().review_script(self.project_paths.script)
+
         print("========== 5. TTS ==========")
 
         Volcengine().generate_tts(self.project_paths.script, self.project_paths.narration_audios)

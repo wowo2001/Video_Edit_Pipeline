@@ -5,6 +5,7 @@ from core.utils import safe_json_parse, srt_to_seconds
 from prompts.editing_rules import EDITING_RULES
 from prompts.fix_subtitles import FIX_SUBTITLE_PROMPT
 from prompts.get_title import GET_TITLE_PROMPT
+from prompts.review_script import REVIEW_SCRIPT_PROMPT
 from prompts.script_schema import OUTPUT_SCHEMA
 from prompts.task_rules import TASK_RULES
 from prompts.brief import BRIEF
@@ -101,3 +102,36 @@ class Ali:
         result = response.choices[0].message.content.strip()
         result = re.sub(r'["“”\n\r]', '', result)
         return result
+
+    def review_script(self, script_path):
+    # 读取原始脚本 JSON
+        with open(script_path, "r", encoding="utf-8") as f:
+            script_json = json.load(f)
+
+        prompt = f"""{REVIEW_SCRIPT_PROMPT}
+
+脚本内容：
+{json.dumps(script_json, ensure_ascii=False, indent=2)}
+"""
+
+        response = self.client.chat.completions.create(
+        model="qwen3.7-max",
+        messages=[
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+        content = response.choices[0].message.content
+
+        try:
+            result = safe_json_parse(content)
+        except Exception:
+            print("\n❌ GPT 输出 JSON 解析失败：\n")
+            print(content)
+            raise
+
+    # 覆盖保存到原路径
+        with open(script_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+
+        print(f"\n✅ GPT 审核后的脚本已保存: {script_path}")
