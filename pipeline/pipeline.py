@@ -175,7 +175,7 @@ class AutoVideoPipeline:
         PostCutService().save_transcription_to_db(
             subtitles_path=self.project_paths.subtitles['json'],
             speaker_mapping_path=self.project_paths.speaker_mapping,
-            video_url="s3://video-867344466664-ap-southeast-2-an/videos/5ca3c39b-9de6-483b-8a72-995041d9d54b.mp4",
+            video_url=s3_url,
             episode=title
         )
         
