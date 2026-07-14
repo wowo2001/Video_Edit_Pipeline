@@ -150,3 +150,11 @@ class AutoVideoPipeline:
             output_path = self.project_paths.root / f"{safe_file_name}.mp4"
             shutil.copy2(self.project_paths.gif_overlay_video, output_path)
             upload_to_drive(output_path, folder_name=title)
+        # print("========== 19. 上传S3 ==========")
+        # uuid_value = uuid.uuid4()    
+        # video_key = f"videos/{uuid_value}.mp4"
+        # s3_url = S3().upload_file(
+        #     self.project_paths.video,
+        #     video_key
+        # )
+        # print(f"视频已上传到 S3: {s3_url}")
