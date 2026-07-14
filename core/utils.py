@@ -89,8 +89,6 @@ def apply_speaker_mapping(subtitles_path, mapping_path):
 
     subtitles_path.write_text(text, encoding="utf-8")
 
-import json
-
 
 def apply_speaker_mapping_to_script(script_path, mapping_path):
     with open(script_path, "r", encoding="utf-8") as f:

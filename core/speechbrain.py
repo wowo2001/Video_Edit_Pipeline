@@ -1,3 +1,5 @@
+import pickle
+
 import torch
 import numpy as np
 import torchaudio
@@ -5,6 +7,7 @@ from collections import Counter
 from speechbrain.inference.speaker import EncoderClassifier
 from sklearn.cluster import AgglomerativeClustering
 import json
+from core.path import ProjectPaths
 from core.utils import ms_to_srt_time
 
 
@@ -79,6 +82,7 @@ class SpeechBrain:
 
         embeddings = []
         valid_utts = []
+        embedding_records = []
 
         # =========================
         # build embeddings
@@ -107,7 +111,13 @@ class SpeechBrain:
 
             embeddings.append(emb)
             valid_utts.append(i)
-
+            embedding_records.append({
+                "utt_idx": i,         
+                "start": utt["start_time"],
+                "end": utt["end_time"],
+                "text": utt["text"],   
+                "embedding": emb,
+            })
         embeddings = np.vstack(embeddings)
 
         # =========================
@@ -147,6 +157,14 @@ class SpeechBrain:
                 full_labels[idx] = f"SPEAKER_{label:02d}"
             else:
                 full_labels[idx] = "UNKNOWN"
+
+        speaker_map = dict(zip(valid_utts, full_labels))
+
+        for record in embedding_records:
+            record["speaker"] = speaker_map[record["utt_idx"]]
+        
+        with open(ProjectPaths().embeddings, "wb") as f:
+            pickle.dump(embedding_records, f)
 
         # =========================
         # write back

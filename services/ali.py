@@ -21,7 +21,7 @@ class Ali:
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = f"{TASK_RULES}\n\n{EDITING_RULES}\n\n{OUTPUT_SCHEMA}\n\n字幕内容：{subtitles}"
         response = self.client.chat.completions.create(
-            model="qwen3.7-plus",
+            model="qwen3.7-max",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -42,7 +42,7 @@ class Ali:
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = f"{FIX_SUBTITLE_PROMPT}\n\n{subtitles}"
         response = self.client.chat.completions.create(
-            model="qwen3.7-plus",
+            model="qwen3.7-max",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -77,7 +77,7 @@ class Ali:
             {subtitles}
         """
         response = self.client.chat.completions.create(
-            model="qwen3.7-plus",
+            model="qwen3.7-max",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -94,7 +94,7 @@ class Ali:
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = f"{GET_TITLE_PROMPT}\n\n{subtitles}"
         response = self.client.chat.completions.create(
-            model="qwen3.7-plus",
+            model="qwen3.7-max",
             messages=[
                 {"role": "user", "content": prompt}
             ]

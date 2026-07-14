@@ -1,5 +1,6 @@
 
 import shutil
+import uuid
 
 from core.path import ProjectPaths
 from core.utils import safe_filename, clear_workdir, strip_srt, apply_speaker_mapping, apply_timeline,apply_speaker_mapping_to_script
@@ -7,6 +8,7 @@ from core.whisper import Whisper
 from pipeline.audio import export_audio,mix_audio, export_all_audio
 from pipeline.download import download_video
 from pipeline.video import add_gif_overlay, add_subtitles, change_resolution, cut_video, concat_videos, mask_sub, speed_up, add_text_overlay, mosaic_regions
+from services.post_cut_service import PostCutService
 from services.chatgpt import ChatGPT
 from services.ali import Ali
 from services.volcengine import Volcengine
@@ -14,6 +16,7 @@ from services.google_drive import upload_to_drive
 from pathlib import Path
 from core.demucs import extract_vocals_demucs
 from core.speechbrain import SpeechBrain
+from services.s3 import S3
 
 
 class AutoVideoPipeline:
@@ -36,7 +39,7 @@ class AutoVideoPipeline:
         # Whisper().transcribe(self.project_paths.audio, self.project_paths.subtitles)
 
         print("========== 3.1 语音分类 ==========")
-        SpeechBrain().diarize(self.project_paths.audio, self.project_paths.subtitles,threshold=0.75,min_cluster_ratio=0.01)
+        SpeechBrain().diarize(self.project_paths.audio, self.project_paths.subtitles,threshold=0.7,min_cluster_ratio=0.01)
 
         print("========== 3.2 人物识别 ==========")
         strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=False)
@@ -76,31 +79,39 @@ class AutoVideoPipeline:
 
         print("========== 10. 加速 ==========")
 
-        speed_up(self.project_paths.changed_resolution_video, self.project_paths.speed_up_video, speed=1.3)
+        speed_up(self.project_paths.changed_resolution_video, self.project_paths.speed_up_video, speed=1.2)
 
         print("========== 11. 掩码字幕 ==========")
         region = [
         {
             "x": 100,
-            "y": 500,
+            "y": 600,
             "width": 200,
-            "height": 200,
+            "height": 100,
             "mosaic_size": 8,
         },
         {
             "x": 800,
-            "y": 500,
+            "y": 600,
             "width": 200,
-            "height": 200,
+            "height": 100,
             "mosaic_size": 8,
         },
         {
             "x": 0,
-            "y": 1250,
+            "y": 1200,
             "width": 1080,
-            "height": 50,
+            "height": 70,
             "mosaic_size": 8,
         }]
+        # region = [
+        # {
+        #     "x": 0,
+        #     "y": 1150,
+        #     "width": 1080,
+        #     "height": 50,
+        #     "mosaic_size": 8,
+        # }]
         mosaic_regions(self.project_paths.speed_up_video,self.project_paths.masked_video,region)
 
 
@@ -131,7 +142,7 @@ class AutoVideoPipeline:
             popup_text=popup_text,
             popup_font_size=42,
             popup_color="#FFFFFF",
-            popup_y=600
+            popup_y=750
         )
 
         print("========== 17. 添加 GIF 动画 ==========")
@@ -150,11 +161,22 @@ class AutoVideoPipeline:
             output_path = self.project_paths.root / f"{safe_file_name}.mp4"
             shutil.copy2(self.project_paths.gif_overlay_video, output_path)
             upload_to_drive(output_path, folder_name=title)
-        # print("========== 19. 上传S3 ==========")
-        # uuid_value = uuid.uuid4()    
-        # video_key = f"videos/{uuid_value}.mp4"
-        # s3_url = S3().upload_file(
-        #     self.project_paths.video,
-        #     video_key
-        # )
-        # print(f"视频已上传到 S3: {s3_url}")
+    
+        print("========== 19. 上传S3 ==========")
+        uuid_value = uuid.uuid4()    
+        video_key = f"videos/{uuid_value}.mp4"
+        s3_url = S3().upload_file(
+            self.project_paths.video,
+            video_key
+        )
+        print(f"视频已上传到 S3: {s3_url}")
+
+        print("========== 20. 写入数据库 ==========")
+        PostCutService().save_transcription_to_db(
+            subtitles_path=self.project_paths.subtitles['json'],
+            speaker_mapping_path=self.project_paths.speaker_mapping,
+            video_url="s3://video-867344466664-ap-southeast-2-an/videos/5ca3c39b-9de6-483b-8a72-995041d9d54b.mp4",
+            episode=title
+        )
+        
+    
