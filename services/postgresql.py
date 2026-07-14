@@ -1,6 +1,7 @@
 import psycopg
 from pgvector.psycopg import register_vector
 from config import POSTGRESQL_USER, POSTGRESQL_PASSWORD
+from services.text_embedding_service import TextEmbeddingService
 
 
 class PostgresClient:
@@ -60,6 +61,30 @@ class PostgresClient:
         self.conn.commit()
 
         return row_id
+    
+    def search_video_transcripts(
+    self,
+    text,
+    limit=5
+    ):
+        text_embedding = TextEmbeddingService().encode(text)
+        with self.conn.cursor() as cur:
+            cur.execute(
+            """
+            SELECT *
+            FROM search_video_transcripts(
+                %s::vector,
+                %s
+            )
+            """,
+            (
+                str(text_embedding),
+                limit
+            )
+        )
+            rows = cur.fetchall()
+
+        return rows
 
 
     def close(self):
