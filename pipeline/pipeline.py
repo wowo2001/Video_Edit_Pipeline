@@ -51,12 +51,12 @@ class AutoVideoPipeline:
 
         print("========== 4. GPT 脚本 ==========")
         strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=True)
-        Ali().generate_script(self.project_paths.subtitles['stripped_srt'], self.project_paths.script)
+        Ali().generate_script(self.project_paths.subtitles['stripped_srt'], self.project_paths.script, self.project_paths.story)
         apply_timeline(self.project_paths.script, self.project_paths.subtitles['json'])
 
-        print("========== 4.1 AI 脚本改进 ==========")
-        apply_speaker_mapping_to_script(self.project_paths.script, self.project_paths.speaker_mapping)
-        Ali().review_script(self.project_paths.script)
+        # print("========== 4.1 AI 脚本改进 ==========")
+        # apply_speaker_mapping_to_script(self.project_paths.script, self.project_paths.speaker_mapping)
+        # Ali().review_script(self.project_paths.script)
 
         print("========== 5. TTS ==========")
 
