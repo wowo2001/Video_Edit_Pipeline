@@ -16,6 +16,7 @@ class ProjectPaths:
         self.speaker_mapping = self.root / "speaker_mapping.json"
         self.final_subtitles = {"srt": self.root / "final_subtitles.srt", "json": self.root / "final_subtitles.json"}
         self.embeddings = self.root / "embedding_records.pkl"
+        self.story = self.root / "story.json"
 
         self.script = self.root / "script.json"
         self.vocals_path = Path("separated/htdemucs")

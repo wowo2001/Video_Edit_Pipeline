@@ -58,3 +58,37 @@ class PostCutService:
                 embedding=item["text_embedding"]
             )
         self.postgres_client.close()
+
+    def save_story_to_db(self, story_path, video_url, episode):
+        with open(story_path, "r", encoding="utf-8") as f:
+            story = json.load(f)
+
+        results = []
+
+        for item in story.get("人物故事", []):
+            person = item.get("人物")
+            content = item.get("故事")
+
+            if not person or not content:
+                continue
+
+            results.append(
+                {
+                "story": content,
+                "person": person,
+                "url": video_url,
+                "episode": episode,
+                "text_embedding": self.text_embedding_service.encode(content),
+                }
+         )
+
+        for item in results:
+            self.postgres_client.insert_story(
+            story=item["story"],
+            url=item["url"],
+            episode=item["episode"],
+            person=item["person"],
+            embedding=item["text_embedding"],
+            )
+
+        self.postgres_client.close()

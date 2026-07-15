@@ -7,6 +7,7 @@ from prompts.fix_subtitles import FIX_SUBTITLE_PROMPT
 from prompts.get_title import GET_TITLE_PROMPT
 from prompts.review_script import REVIEW_SCRIPT_PROMPT
 from prompts.script_schema import OUTPUT_SCHEMA
+from prompts.summerize_story import SUMMARY_STORY_PROMPT
 from prompts.task_rules import TASK_RULES
 from prompts.brief import BRIEF
 from prompts.recognise_speaker import RECOGNISE_SPEAKER_PROMPT
@@ -17,9 +18,11 @@ class Ali:
                             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
                             timeout=600.0,
                             max_retries=2)
-    def generate_script(self, subtitles_path, script_path):
+    def generate_script(self, subtitles_path, script_path, story_path):
         subtitles = subtitles_path.read_text(encoding="utf-8")
-        prompt = f"{TASK_RULES}\n\n{EDITING_RULES}\n\n{OUTPUT_SCHEMA}\n\n字幕内容：{subtitles}"
+        with open(story_path, "r", encoding="utf-8") as f:
+            story = json.load(f)["总故事"]
+        prompt = f"{TASK_RULES}\n\n{EDITING_RULES}\n\n{OUTPUT_SCHEMA}\n\n字幕内容：{subtitles}\n\n故事内容：{story}"
         response = self.client.chat.completions.create(
             model="qwen3.7-max",
             messages=[
@@ -135,3 +138,27 @@ class Ali:
             json.dump(result, f, ensure_ascii=False, indent=2)
 
         print(f"\n✅ GPT 审核后的脚本已保存: {script_path}")
+    
+    def generate_story(self, subtitles_path, story_path):
+        subtitles = subtitles_path.read_text(encoding="utf-8")
+        prompt = f"""
+            {SUMMARY_STORY_PROMPT}
+
+            剧情概要：
+            {BRIEF}
+
+            字幕内容：
+            {subtitles}
+        """
+        response = self.client.chat.completions.create(
+            model="qwen3.7-max",
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        content = response.choices[0].message.content.strip()
+        story = json.loads(content)
+        with open(story_path, "w", encoding="utf-8") as f:
+            json.dump(story, f, ensure_ascii=False, indent=2)
+
+        print(f"\n✅ 故事已保存: {story_path}")

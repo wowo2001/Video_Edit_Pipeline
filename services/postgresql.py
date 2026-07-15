@@ -62,6 +62,41 @@ class PostgresClient:
 
         return row_id
     
+    def insert_story(
+    self,
+    story,
+    url,
+    episode,
+    person,
+    embedding
+    ):
+        with self.conn.cursor() as cur:
+
+            cur.execute(
+            """
+            SELECT insert_story(
+                %s,
+                %s,
+                %s,
+                %s,
+                %s
+            )
+            """,
+            (
+                story,
+                url,
+                episode,
+                person,
+                str(embedding)
+            )
+            )
+
+            row_id = cur.fetchone()[0]
+
+        self.conn.commit()
+
+        return row_id
+    
     def search_video_transcripts(
     self,
     text,

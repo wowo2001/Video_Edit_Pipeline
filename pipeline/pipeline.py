@@ -45,6 +45,8 @@ class AutoVideoPipeline:
         strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=False)
         Ali().recognise_speaker(self.project_paths.subtitles['stripped_srt'], self.project_paths.speaker_mapping)
         apply_speaker_mapping(self.project_paths.subtitles['srt'], self.project_paths.speaker_mapping)
+        print("========== 3.3 生成故事 ==========")
+        Ali().generate_story(self.project_paths.subtitles['stripped_srt'], self.project_paths.story)
         
 
         print("========== 4. GPT 脚本 ==========")
@@ -178,5 +180,8 @@ class AutoVideoPipeline:
             video_url=s3_url,
             episode=title
         )
-        
-    
+        PostCutService().save_story_to_db(
+            story_path=self.project_paths.story,
+            video_url=s3_url,
+            episode=title
+        )
