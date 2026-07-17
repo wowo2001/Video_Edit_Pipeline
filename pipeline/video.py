@@ -267,3 +267,75 @@ def _sort_key(p: Path):
             return int(name)
 
         return 9999
+
+
+def cut_clips_temp(script_path, output_path):
+
+    output_path.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    with open(script_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+
+    for item in data:
+
+        place = item["place"]
+
+        clip = item["clip"]
+        narrative = item["narrative"]
+
+
+        input_path = Path(
+            clip["local_path"]
+        )
+
+
+        if not input_path.exists():
+            print(
+                f"[ERROR] 找不到视频: {input_path}"
+            )
+            continue
+
+
+        # 毫秒转秒
+        start = ms_to_seconds(
+            clip["start_time"]
+        )
+
+        end = ms_to_seconds(
+            clip["end_time"]
+        )
+
+
+        narration_duration = ms_to_seconds(
+            narrative["length"]
+        )
+
+
+        # 给旁白预留空间
+        start = max(
+            0,
+            start - narration_duration
+        )
+
+
+        output_file = (
+            output_path /
+            f"clip_{place}.mp4"
+        )
+
+
+        cut_video_ffmpeg(
+            input_path,
+            output_file,
+            start,
+            end
+        )
+
+
+        print(
+            f"完成: {output_file}"
+        )

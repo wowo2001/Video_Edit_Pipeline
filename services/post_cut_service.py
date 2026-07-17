@@ -31,9 +31,6 @@ class PostCutService:
                 raw_speaker
             )
 
-            if speaker == "UNKNOWN":
-                continue
-
 
             results.append(
                 {

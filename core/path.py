@@ -19,6 +19,8 @@ class ProjectPaths:
         self.story = self.root / "story.json"
 
         self.script = self.root / "script.json"
+        self.story = self.root / "story.json"
+        self.candidate_metadata = self.root / "candidate_metadata.json"
         self.vocals_path = Path("separated/htdemucs")
 
         self.clips = self.root / "clips"

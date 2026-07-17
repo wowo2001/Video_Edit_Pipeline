@@ -81,3 +81,40 @@ def _mix_clip_audio(video_path, narration_audio_path, output_path):
     voice_dur = get_duration(narration_audio_path)
     print(f"视频路径: {video_path}, 旁白路径: {narration_audio_path}, 输出路径: {output_path}, 旁白时长: {voice_dur}")
     mix_start_aligned(video_path, narration_audio_path, output_path, voice_dur)
+
+def mix_audio_temp(video_path, narration_audio_path, script_path, output_path):
+
+    with open(script_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+
+    for item in data:
+
+        place = item["place"]
+
+        clip_video_path = (
+            video_path /
+            f"clip_{place}.mp4"
+        )
+
+        clip_audio = (
+            narration_audio_path /
+            f"clip_{place}.mp3"
+        )
+
+        clip_output = (
+            output_path /
+            f"clip_{place}_final.mp4"
+        )
+
+
+        print(
+            f"正在混音: {clip_video_path}"
+        )
+
+
+        _mix_clip_audio(
+            clip_video_path,
+            clip_audio,
+            clip_output
+        )

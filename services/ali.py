@@ -11,6 +11,8 @@ from prompts.summerize_story import SUMMARY_STORY_PROMPT
 from prompts.task_rules import TASK_RULES
 from prompts.brief import BRIEF
 from prompts.recognise_speaker import RECOGNISE_SPEAKER_PROMPT
+from prompts.select_conversation import SELECT_CONVERSATION
+from prompts.story_draft import STORY_DRAFT
 import json
 class Ali:
     def __init__(self):
@@ -162,3 +164,118 @@ class Ali:
             json.dump(story, f, ensure_ascii=False, indent=2)
 
         print(f"\n✅ 故事已保存: {story_path}")
+
+    
+    def generate_script_temp(self, script_path, story_path):
+
+
+        # 读取 search_story 返回的故事
+        with open(story_path, "r", encoding="utf-8") as f:
+            stories = json.load(f)
+
+        story_text = "\n\n".join(
+    [
+        f"""
+故事片段ID:{i}
+剧情:
+{item['story']}
+
+对应视频资源:
+{item['url']}
+"""
+        for i, item in enumerate(stories)
+    ]
+)
+
+        prompt = f"""
+
+{STORY_DRAFT}
+{story_text}
+"""
+
+        response = self.client.chat.completions.create(
+        model="qwen3.7-max",
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    )
+
+        script = response.choices[0].message.content
+
+        try:
+            result = safe_json_parse(script)
+
+        except Exception:
+            print("\n❌ GPT 输出 JSON 解析失败：\n")
+            print(script)
+            raise
+
+
+        with open(script_path, "w", encoding="utf-8") as f:
+            json.dump(
+            result,
+            f,
+            ensure_ascii=False,
+            indent=2
+            )
+
+        print(f"\n✅ GPT 解说脚本已保存: {script_path}")
+
+    def generate_script_final(self, script_path):
+
+        with open(script_path, "r", encoding="utf-8") as f:
+            script = json.load(f)
+
+        for item in script:
+
+        # 只保留 AI 需要的信息
+            llm_input = {
+            "place": item["place"],
+            "narrative": item["narrative"],
+            "clip": {
+                "search_content": item["clip"]["search_content"],
+                "candidates": item["clip"]["candidates"],
+            },
+        }
+
+            prompt = f"""
+{SELECT_CONVERSATION}
+{json.dumps(llm_input, ensure_ascii=False, indent=2)}
+"""
+
+            response = self.client.chat.completions.create(
+                model="qwen3.7-max",
+                messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+            )
+
+            result = safe_json_parse(
+                response.choices[0].message.content
+            )
+
+        # 更新解说
+            item["narrative"] = result["narrative"]
+
+        # 保存选择结果
+            item["clip"]["candidate_id"] = result["candidate_id"]
+            item["clip"]["keep_range"] = result["keep_range"]
+
+        # 删除候选，避免 script 过大
+            del item["clip"]["candidates"]
+
+        with open(script_path, "w", encoding="utf-8") as f:
+            json.dump(
+            script,
+            f,
+            ensure_ascii=False,
+            indent=2
+            )
+
+        print(f"\n✅ 最终脚本已保存: {script_path}")

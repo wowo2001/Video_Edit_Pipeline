@@ -208,3 +208,48 @@ class Volcengine:
                 chunks.append(obj["data"])
 
         return base64.b64decode("".join(chunks))
+    
+    def generate_tts_temp(self, script_path, output_path):
+        """
+        根据 script 生成解说TTS
+        回写 narrative.length 和 audio路径
+        """
+
+        output_path.mkdir(
+        parents=True,
+        exist_ok=True
+        )
+
+        with open(script_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+
+        for item in data:
+
+            place = item["place"]
+
+            text = item["narrative"]["content"]
+
+            audio_bytes = self._tts_stream(text)
+
+
+            audio_path = output_path / f"clip_{place}.mp3"
+
+            audio_path.write_bytes(audio_bytes)
+
+
+            audio = AudioSegment.from_file(audio_path)
+
+            duration_ms = len(audio)
+
+
+            item["narrative"]["length"] = duration_ms
+
+
+        with open(script_path, "w", encoding="utf-8") as f:
+            json.dump(
+            data,
+            f,
+            ensure_ascii=False,
+            indent=2
+        )

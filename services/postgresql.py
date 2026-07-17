@@ -1,3 +1,4 @@
+from matplotlib import text
 import psycopg
 from pgvector.psycopg import register_vector
 from config import POSTGRESQL_USER, POSTGRESQL_PASSWORD
@@ -100,27 +101,98 @@ class PostgresClient:
     def search_video_transcripts(
     self,
     text,
-    limit=5
-    ):
+    limit=5,
+    episode=None,
+    speaker=None,
+    url=None,
+):
         text_embedding = TextEmbeddingService().encode(text)
+
         with self.conn.cursor() as cur:
             cur.execute(
             """
             SELECT *
             FROM search_video_transcripts(
                 %s::vector,
+                %s,
+                %s,
+                %s,
                 %s
             )
             """,
             (
                 str(text_embedding),
-                limit
+                limit,
+                episode,
+                speaker,
+                url,
+            ),
+        )
+            rows = cur.fetchall()
+
+        return rows
+    
+
+    def search_story(
+        self,
+        person,
+        episode=None,
+        limit=5
+    ):
+        with self.conn.cursor() as cur:
+            cur.execute(
+            """
+            SELECT *
+            FROM search_story(
+                %s,
+                %s,
+                %s
+            )
+            """,
+            (
+                person,
+                episode,
+                limit,
+            ),
+        )
+
+            rows = cur.fetchall()
+
+        return rows
+    
+    def get_context_transcripts(
+    self,
+    url,
+    text,
+    context=10
+):
+        with self.conn.cursor() as cur:
+            cur.execute(
+            """
+            SELECT *
+            FROM search_context_transcripts(
+                %s,
+                %s,
+                %s
+            )
+            ORDER BY id ASC
+            """,
+            (
+                url,
+                text,
+                context,
             )
         )
+
             rows = cur.fetchall()
 
         return rows
 
 
+def close(self):
+    self.conn.close()
+
+
     def close(self):
         self.conn.close()
+    
