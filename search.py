@@ -19,13 +19,13 @@ project_paths = ProjectPaths()
 client = PostgresClient()
 s3_client = S3()
 
-# clear_workdir(ProjectPaths().root,ProjectPaths().vocals_path)
-# print("====1. 导出故事====")
-# rows = client.search_story(person="高俅", episode="水浒传")
-# convert_row_data_to_json(rows, project_paths.story)
+clear_workdir(ProjectPaths().root,ProjectPaths().vocals_path)
+print("====1. 导出故事====")
+rows = client.search_story(person="高俅", episode="水浒传")
+convert_row_data_to_json(rows, project_paths.story)
 
-# print("====2. 故事大纲====")
-# Ali().generate_script_temp(project_paths.script, project_paths.story)
+print("====2. 故事大纲====")
+Ali().generate_script_temp(project_paths.script, project_paths.story)
 generate_cadidate_script(project_paths.script, project_paths.candidate_metadata, 20, client)
 
 print("====3. 选定脚本====")
@@ -95,7 +95,7 @@ add_subtitles(project_paths.masked_video, project_paths.final_subtitles['srt'], 
 
 print("========== 17. 添加 GIF 动画 ==========")
 add_gif_overlay(
-    project_paths.text_overlay_video,
+    project_paths.masked_video,
     project_paths.gif_overlay_video,
     Path("assets") / "like.gif",
     x=500,
