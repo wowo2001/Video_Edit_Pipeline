@@ -189,9 +189,6 @@ class PostgresClient:
         return rows
 
 
-def close(self):
-    self.conn.close()
-
 
     def close(self):
         self.conn.close()
