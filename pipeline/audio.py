@@ -83,6 +83,10 @@ def _mix_clip_audio(video_path, narration_audio_path, output_path):
     mix_start_aligned(video_path, narration_audio_path, output_path, voice_dur)
 
 def mix_audio_temp(video_path, narration_audio_path, script_path, output_path):
+    output_path.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
     with open(script_path, "r", encoding="utf-8") as f:
         data = json.load(f)

@@ -196,12 +196,12 @@ def generate_final_script(script_path, cadidate_metadata_path, clips_path, s3_cl
                 local_path
             )
 
-    # 写回 script
-    clip["local_path"] = local_path
-    clip["start_time"] = selected_segments[0]["start_time"]
-    clip["end_time"] = selected_segments[-1]["end_time"]
-    clip["speaker"] = meta["speaker"]
-    clip["episode"] = meta["episode"]
+        # 写回 script
+        clip["local_path"] = local_path
+        clip["start_time"] = selected_segments[0]["start_time"]
+        clip["end_time"] = selected_segments[-1]["end_time"]
+        clip["speaker"] = meta["speaker"]
+        clip["episode"] = meta["episode"]
 
 
     # 保存更新后的 script
