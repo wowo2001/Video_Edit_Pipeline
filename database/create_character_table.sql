@@ -1,0 +1,9 @@
+CREATE TABLE character (
+    id BIGSERIAL PRIMARY KEY,
+
+    drama_title TEXT NOT NULL,
+
+    name TEXT NOT NULL,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

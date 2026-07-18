@@ -153,3 +153,155 @@ def apply_timeline(script_path, subtitles_path):
     # 写回
     with open(script_path, "w", encoding="utf-8") as f:
         json.dump(script, f, ensure_ascii=False, indent=2)
+
+def chunk_srt_by_scenes(
+        srt_file,
+        story_file,
+        output_file
+):
+
+    with open(story_file, "r", encoding="utf-8") as f:
+        story = json.load(f)
+
+
+    # 推荐场景
+    recommend_ids = set(
+        story["推荐解说场景"]
+    )
+
+
+    # 收集需要的字幕编号范围
+    keep_ids = set()
+
+    for scene in story["场景"]:
+
+        if scene["编号"] in recommend_ids:
+
+            start = scene["开始SRT"]
+            end = scene["结束SRT"]
+
+            for i in range(start, end + 1):
+                keep_ids.add(i)
+
+
+    result = []
+
+
+    pattern = re.compile(r"^\[(\d+)\]")
+
+
+    with open(
+        srt_file,
+        "r",
+        encoding="utf-8"
+    ) as f:
+
+        for line in f:
+
+            line = line.rstrip()
+
+            if not line:
+                continue
+
+            match = pattern.match(line)
+
+            if not match:
+                continue
+
+            index = int(match.group(1))
+
+            if index in keep_ids:
+                result.append(line)
+
+
+    with open(
+        output_file,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        f.write(
+            "\n".join(result)
+        )
+
+
+    print(
+        f"✅ 解说字幕生成: {output_file}"
+    )
+
+def apply_character_scene_mapping(
+        subtitle_json_path,
+        speaker_mapping_path,
+        story_path,
+        scene_mapping,
+        output_path
+):
+
+    with open(subtitle_json_path, "r", encoding="utf-8") as f:
+        subtitles = json.load(f)
+
+    with open(speaker_mapping_path, "r", encoding="utf-8") as f:
+        speaker_mapping = json.load(f)
+
+    with open(story_path, "r", encoding="utf-8") as f:
+        story = json.load(f)
+
+
+    scenes = story.get("场景", [])
+
+
+    for srt_index, utterance in enumerate(
+        subtitles.get("utterances", [])
+    ):
+
+        # 人物映射
+        raw_speaker = (
+            utterance
+            .get("attribute", {})
+            .get("speaker")
+        )
+
+        utterance["speaker"] = speaker_mapping.get(
+            raw_speaker,
+            raw_speaker
+        )
+
+
+        # 根据SRT编号找到AI场景编号
+        scene_no = None
+
+        for scene in scenes:
+            if (
+                scene["开始SRT"] <= srt_index <= scene["结束SRT"]
+            ):
+                scene_no = scene["编号"]
+                break
+
+
+        # AI场景编号转换成数据库scene id
+        utterance["scene_id"] = (
+            scene_mapping.get(scene_no)
+            if scene_no is not None
+            else None
+        )
+        utterance.pop("words", None)
+        utterance.pop("attribute", None)
+
+
+        # 删除无用字段
+    subtitles.pop("attribute", None)
+    subtitles.pop("code", None)
+    subtitles.pop("message", None)
+    subtitles.pop("id", None)
+    subtitles.pop("duration", None)
+
+    
+
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(
+            subtitles,
+            f,
+            ensure_ascii=False,
+            indent=2
+        )

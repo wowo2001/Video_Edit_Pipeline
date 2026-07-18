@@ -13,6 +13,7 @@ from prompts.brief import BRIEF
 from prompts.recognise_speaker import RECOGNISE_SPEAKER_PROMPT
 from prompts.select_conversation import SELECT_CONVERSATION
 from prompts.story_draft import STORY_DRAFT
+from prompts.scene_draft import SCENE_DRAFT
 import json
 class Ali:
     def __init__(self):
@@ -23,7 +24,18 @@ class Ali:
     def generate_script(self, subtitles_path, script_path, story_path):
         subtitles = subtitles_path.read_text(encoding="utf-8")
         with open(story_path, "r", encoding="utf-8") as f:
-            story = json.load(f)["总故事"]
+            story_json = json.load(f)
+        recommend_ids = set(
+            story_json.get("推荐解说场景", [])
+        )
+        stories = []
+        for scene in story_json.get("场景", []):
+
+            if scene["编号"] in recommend_ids:
+                stories.append(
+                    scene["剧情"]
+                )
+        story = "\n".join(stories)
         prompt = f"{TASK_RULES}\n\n{EDITING_RULES}\n\n{OUTPUT_SCHEMA}\n\n字幕内容：{subtitles}\n\n故事内容：{story}"
         response = self.client.chat.completions.create(
             model="qwen3.7-max",
@@ -176,22 +188,22 @@ class Ali:
         story_text = "\n\n".join(
     [
         f"""
-故事片段ID:{i}
-剧情:
-{item['story']}
+        视频资源ID:{i}
+        该视频资源包含的剧情：:
+        {item['story']}
 
-对应视频资源:
-{item['url']}
-"""
+        对应视频资源:
+        {item['url']}
+        """
         for i, item in enumerate(stories)
     ]
-)
+    )
 
         prompt = f"""
 
-{STORY_DRAFT}
-{story_text}
-"""
+        {STORY_DRAFT}
+        {story_text}
+        """
 
         response = self.client.chat.completions.create(
         model="qwen3.7-max",
@@ -223,6 +235,64 @@ class Ali:
             )
 
         print(f"\n✅ GPT 解说脚本已保存: {script_path}")
+    
+    def generate_scene(self, scene_path, story_path):
+
+
+        # 读取 search_story 返回的故事
+        with open(story_path, "r", encoding="utf-8") as f:
+            stories = json.load(f)
+
+        story_text = "\n\n".join(
+    [
+        f"""
+        视频资源ID:{i}
+        该视频资源包含的剧情：:
+        {item['story']}
+
+        对应视频资源:
+        {item['url']}
+        """
+        for i, item in enumerate(stories)
+    ]
+    )
+
+        prompt = f"""
+
+        {SCENE_DRAFT}
+        {story_text}
+        """
+
+        response = self.client.chat.completions.create(
+        model="qwen3.7-max",
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    )
+
+        script = response.choices[0].message.content
+
+        try:
+            result = safe_json_parse(script)
+
+        except Exception:
+            print("\n❌ GPT 输出 JSON 解析失败：\n")
+            print(script)
+            raise
+
+
+        with open(scene_path, "w", encoding="utf-8") as f:
+            json.dump(
+            result,
+            f,
+            ensure_ascii=False,
+            indent=2
+            )
+
+        print(f"\n✅ 场景拆分结果已保存: {scene_path}")
 
     def generate_script_final(self, script_path):
 
@@ -242,9 +312,9 @@ class Ali:
         }
 
             prompt = f"""
-{SELECT_CONVERSATION}
-{json.dumps(llm_input, ensure_ascii=False, indent=2)}
-"""
+            {SELECT_CONVERSATION}
+            {json.dumps(llm_input, ensure_ascii=False, indent=2)}
+            """
 
             response = self.client.chat.completions.create(
                 model="qwen3.7-max",

@@ -12,13 +12,15 @@ class ProjectPaths:
         self.video = self.root / "video.mp4"
         self.origin = self.root / "origin"
         self.audio = self.root / "audio.mp3"
-        self.subtitles = {"srt": self.root / "subtitles.srt", "json": self.root / "subtitles.json", "stripped_srt": self.root / "subtitles_stripped.srt"}
+        self.subtitles = {"srt": self.root / "subtitles.srt", "json": self.root / "subtitles.json", "stripped_srt": self.root / "subtitles_stripped.srt", "chunked_srt": self.root / "subtitles_chunked.srt"}
+        self.subtitles_to_db = self.root / "subtitles_to_db.json"
         self.speaker_mapping = self.root / "speaker_mapping.json"
         self.final_subtitles = {"srt": self.root / "final_subtitles.srt", "json": self.root / "final_subtitles.json"}
         self.embeddings = self.root / "embedding_records.pkl"
         self.story = self.root / "story.json"
 
         self.script = self.root / "script.json"
+        self.scene = self.root / "scene.json"
         self.story = self.root / "story.json"
         self.candidate_metadata = self.root / "candidate_metadata.json"
         self.vocals_path = Path("separated/htdemucs")

@@ -3,7 +3,7 @@ import shutil
 import uuid
 
 from core.path import ProjectPaths
-from core.utils import safe_filename, clear_workdir, strip_srt, apply_speaker_mapping, apply_timeline,apply_speaker_mapping_to_script
+from core.utils import safe_filename, clear_workdir, strip_srt, apply_speaker_mapping, apply_timeline,apply_speaker_mapping_to_script,chunk_srt_by_scenes,apply_character_scene_mapping
 from core.whisper import Whisper
 from pipeline.audio import export_audio,mix_audio, export_all_audio
 from pipeline.download import download_video
@@ -45,13 +45,15 @@ class AutoVideoPipeline:
         strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=False)
         Ali().recognise_speaker(self.project_paths.subtitles['stripped_srt'], self.project_paths.speaker_mapping)
         apply_speaker_mapping(self.project_paths.subtitles['srt'], self.project_paths.speaker_mapping)
-        print("========== 3.3 生成故事 ==========")
+        
+        print("========== 3.3 生成故事 拆分场景 ==========")
+        strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=True)
         Ali().generate_story(self.project_paths.subtitles['stripped_srt'], self.project_paths.story)
         
 
-        print("========== 4. GPT 脚本 ==========")
-        strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=True)
-        Ali().generate_script(self.project_paths.subtitles['stripped_srt'], self.project_paths.script, self.project_paths.story)
+        print("========== 4. AI 脚本 ==========")
+        chunk_srt_by_scenes(self.project_paths.subtitles['stripped_srt'], self.project_paths.story,self.project_paths.subtitles['chunked_srt'])
+        Ali().generate_script(self.project_paths.subtitles['chunked_srt'], self.project_paths.script, self.project_paths.story)
         apply_timeline(self.project_paths.script, self.project_paths.subtitles['json'])
 
         # print("========== 4.1 AI 脚本改进 ==========")
@@ -174,14 +176,12 @@ class AutoVideoPipeline:
         print(f"视频已上传到 S3: {s3_url}")
 
         print("========== 20. 写入数据库 ==========")
-        PostCutService().save_transcription_to_db(
-            subtitles_path=self.project_paths.subtitles['json'],
-            speaker_mapping_path=self.project_paths.speaker_mapping,
-            video_url=s3_url,
-            episode=title
-        )
-        PostCutService().save_story_to_db(
+        scene_mapping = PostCutService().save_scene_to_db(
             story_path=self.project_paths.story,
             video_url=s3_url,
-            episode=title
+            drama_title=title
         )
+
+        apply_character_scene_mapping(self.project_paths.subtitles['json'],self.project_paths.speaker_mapping,self.project_paths.story,scene_mapping,self.project_paths.subtitles_to_db)
+        PostCutService().save_subtitle_to_db(self.project_paths.subtitles_to_db,s3_url,drama_title=title)
+

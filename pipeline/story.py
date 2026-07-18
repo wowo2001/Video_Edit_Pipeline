@@ -13,38 +13,68 @@ def convert_row_data_to_json(rows, story_path):
     with open(story_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-def generate_cadidate_script(script_path, cadidate_metadata_path, context, client):
-    # 读取 script
-    with open(script_path, "r", encoding="utf-8") as f:
-        script = json.load(f)
-    candidate_metadata = []
-    for item in script:
+def generate_cadidate_script(scene_path, cadidate_metadata_path, context, client, speaker=None):
 
-        search_content = item["clip"]["search_content"]
+    # 读取 scene
+    with open(scene_path, "r", encoding="utf-8") as f:
+        scenes = json.load(f)
+
+    candidate_metadata = []
+
+
+    for item in scenes:
+
+        scene_id = item["scene_id"]
+        queries = item["scene"].get("search_queries", [])
         url = item["clip"]["url"]
 
 
-        results = client.search_video_transcripts(
-        text=search_content,
-        limit=3,
-        url=url
-        )
+        all_results = []
+
+
+        # 多关键词搜索
+        for query in queries:
+
+            results = client.search_video_transcripts(
+                text=query,
+                limit=1,
+                url=url,
+                speaker=speaker
+            )
+
+
+            print(
+                f"[Scene {scene_id}] query={query} -> {len(results)} 条结果"
+            )
+
+
+            for row in results:
+                all_results.append(
+                    {
+                        "query": query,
+                        "result": row
+                    }
+                )
 
 
         print(
-            f"{search_content} 搜索结果: {len(results)} 条"
+            f"[Scene {scene_id}] 总候选: {len(all_results)}"
         )
-
 
         candidates = []
 
 
-        for row in results:
+        # 生成候选字幕
+        for item_result in all_results:
+
+            row = item_result["result"]
+            matched_query = item_result["query"]
+
 
             context_rows = client.get_context_transcripts(
                 url=row[4],
                 text=row[3],
-                context=10
+                context=context
             )
 
 
@@ -52,59 +82,64 @@ def generate_cadidate_script(script_path, cadidate_metadata_path, context, clien
                 continue
 
 
-            segments  = [
+
+            segments = [
                 transcript_to_dict(x)
                 for x in context_rows
             ]
 
 
-            candidate_id = f'{item["place"]}_{len(candidates)}'
+            candidate_id = f"{scene_id}_{len(candidates)}"
 
 
-        # 给 LLM
+
             candidates.append(
                 {
                     "candidate_id": candidate_id,
+                    "matched_query": matched_query,
                     "content": [
                         f"[{i}] [{x['speaker'] or '未知'}] {x['text']}"
-                        for i, x in enumerate(segments , start=1)
-                    ]   
+                        for i, x in enumerate(segments, start=1)
+                    ]
                 }
-)
+            )
 
 
-        # 给程序定位
+
             candidate_metadata.append(
                 {
+                    "scene_id": scene_id,
                     "candidate_id": candidate_id,
                     "url": row[4],
                     "start_time": segments[0]["start_time"],
                     "end_time": segments[-1]["end_time"],
                     "speaker": row[6],
                     "episode": row[5],
-                    "segments": segments ,
+                    "segments": segments,
                 }
-        )
+            )
 
 
-        # 一个 clip 对应多个候选
+
+        # 保存候选到 scene
         item["clip"]["candidates"] = candidates
 
 
 
-    # 更新 script
+    # 更新 scene 文件
     with open(
-        script_path,
+        scene_path,
         "w",
         encoding="utf-8"
     ) as f:
 
         json.dump(
-            script,
+            scenes,
             f,
             ensure_ascii=False,
             indent=2
         )
+
 
 
     # 保存 metadata

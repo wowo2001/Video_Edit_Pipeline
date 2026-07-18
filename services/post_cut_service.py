@@ -89,3 +89,96 @@ class PostCutService:
             )
 
         self.postgres_client.close()
+    
+    def save_scene_to_db(self, story_path, video_url, drama_title):
+
+        with open(story_path, "r", encoding="utf-8") as f:
+            story = json.load(f)
+        
+        scene_mapping = {}
+
+        for scene_item in story.get("场景", []):
+            old_scene_no = scene_item.get("编号")
+
+            # 1. 写入 scene
+            scene_id = self.postgres_client.insert_scene(
+                drama_title=drama_title,
+                video_url=video_url,
+                title=scene_item.get("标题"),
+                event=scene_item.get("事件"),
+                summary=scene_item.get("剧情"),
+                embedding=self.text_embedding_service.encode(
+                    scene_item.get("剧情")
+                )
+            )
+
+            scene_mapping[old_scene_no] = scene_id
+
+
+            # 2. 写入人物
+            for person in scene_item.get("人物", []):
+
+                name = person.get("姓名")
+                summary = person.get("剧情")
+
+                if not name or not summary:
+                    continue
+
+
+                # 先获取 character
+                character_id = self.postgres_client.get_or_create_character(
+                    drama_title=drama_title,
+                    name=name
+                )
+
+
+                # 3. 写入 scene_character
+                self.postgres_client.insert_scene_character(
+                    drama_title=drama_title,
+                    scene_id=scene_id,
+                    character_id=character_id,
+                    character_summary=summary
+                )
+
+
+        self.postgres_client.close()
+        return scene_mapping
+    
+    def save_subtitle_to_db(
+        self,
+        subtitle_json_path,
+        video_url,
+        drama_title
+    ):
+
+        with open(
+            subtitle_json_path,
+            "r",
+            encoding="utf-8"
+        ) as f:
+            subtitles = json.load(f)
+
+
+        for item in subtitles.get("utterances", []):
+
+            content = item.get("text")
+
+            if not content:
+                continue
+
+
+            self.postgres_client.insert_subtitle(
+                drama_title=drama_title,
+                video_url=video_url,
+                start_time=int(item["start_time"]),
+                end_time=int(item["end_time"]),
+                content=content,
+                speaker=item.get("speaker"),
+                scene_id=item.get("scene_id"),
+                embedding=self.text_embedding_service.encode(
+                    content
+                )
+        )
+
+
+        self.postgres_client.close()

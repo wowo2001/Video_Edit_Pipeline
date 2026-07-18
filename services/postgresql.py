@@ -192,4 +192,178 @@ class PostgresClient:
 
     def close(self):
         self.conn.close()
+
+    def insert_scene(
+        self,
+        drama_title,
+        video_url,
+        title,
+        event,
+        summary,
+        embedding
+    ):
+        sql = """
+        INSERT INTO scene (
+            drama_title,
+            video_url,
+            title,
+            event,
+            summary,
+            summary_embedding
+        )
+        VALUES (
+            %s,%s,%s,%s,%s,%s
+        )
+        RETURNING id;
+        """
+
+        with self.conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (
+                    drama_title,
+                    video_url,
+                    title,
+                    event,
+                    summary,
+                    embedding
+                )
+            )
+
+            scene_id = cur.fetchone()[0]
+
+        self.conn.commit()
+
+        return scene_id
+    
+    def get_or_create_character(
+        self,
+        drama_title,
+        name
+    ):
+        # 先查询
+        sql = """
+        SELECT id
+        FROM character
+        WHERE drama_title = %s
+        AND name = %s;
+        """
+
+        with self.conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (
+                    drama_title,
+                    name
+                )
+            )
+
+            row = cur.fetchone()
+
+            if row:
+                return row[0]
+
+
+        # 不存在，创建
+        sql = """
+        INSERT INTO character (
+            drama_title,
+            name
+        )
+        VALUES (
+            %s,%s
+        )
+        RETURNING id;
+        """
+
+        with self.conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (
+                    drama_title,
+                    name
+                )
+            )
+
+            character_id = cur.fetchone()[0]
+
+        self.conn.commit()
+
+        return character_id
+    
+    def insert_scene_character(
+        self,
+        scene_id,
+        drama_title,
+        character_id,
+        character_summary
+    ):
+        sql = """
+        INSERT INTO scene_character (
+            scene_id,
+            drama_title,
+            character_id,
+            character_summary
+        )
+        VALUES (
+            %s,%s,%s,%s
+        );
+        """
+
+        with self.conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (
+                    scene_id,
+                    drama_title,
+                    character_id,
+                    character_summary
+                )
+            )
+
+        self.conn.commit()
+
+    def insert_subtitle(
+        self,
+        drama_title,
+        video_url,
+        start_time,
+        end_time,
+        content,
+        speaker,
+        scene_id,
+        embedding
+    ):
+        sql = """
+        INSERT INTO subtitle (
+            drama_title,
+            video_url,
+            start_time,
+            end_time,
+            content,
+            speaker,
+            scene_id,
+            embedding
+        )
+        VALUES (
+            %s,%s,%s,%s,%s,%s,%s,%s
+        );
+        """
+
+        with self.conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (
+                drama_title,
+                video_url,
+                start_time,
+                end_time,
+                content,
+                speaker,
+                scene_id,
+                embedding
+                )
+            )
+
+        self.conn.commit()
     
