@@ -366,4 +366,111 @@ class PostgresClient:
             )
 
         self.conn.commit()
-    
+
+    def search_scene(
+        self,
+        query_embedding,
+        drama_title=None,
+        limit=10,
+    ):
+        sql = """
+        SELECT
+            id,
+            drama_title,
+            video_url,
+            title,
+            event,
+            summary
+        FROM scene
+        WHERE
+            (%s::TEXT IS NULL OR drama_title = %s::TEXT)
+        ORDER BY
+            summary_embedding <=> %s::vector
+        LIMIT %s;
+        """
+
+        with self.conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (
+                    drama_title,
+                    drama_title,
+                    query_embedding,
+                    limit,
+                ),
+            )
+
+            return cur.fetchall()
+        
+    def get_subtitles_by_scene_id(
+        self,
+        scene_id
+    ):
+        sql = """
+        SELECT
+            start_time,
+            end_time,
+            content,
+            speaker
+        FROM subtitle
+        WHERE scene_id = %s
+        ORDER BY start_time ASC;
+        """
+
+        with self.conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (
+                    scene_id,
+                )
+            )
+
+            return cur.fetchall()
+        
+
+
+    def search_scene_transcripts(
+        self,
+        text,
+            scene_id,
+    limit=5
+    ):
+
+        text_embedding = TextEmbeddingService().encode(
+            text
+        )
+
+
+        with self.conn.cursor() as cur:
+
+            cur.execute(
+                """
+                SELECT
+                    id,
+                    scene_id,
+                    start_time,
+                    end_time,
+                    content,
+                    speaker,
+                    1 - (embedding <=> %s::vector) AS similarity
+
+                FROM subtitle
+
+                WHERE scene_id = %s
+
+                ORDER BY embedding <=> %s::vector
+
+                LIMIT %s
+                """,
+                (
+                    str(text_embedding),
+                    scene_id,
+                    str(text_embedding),
+                    limit
+                )
+            )
+
+            rows = cur.fetchall()
+
+
+        return rows

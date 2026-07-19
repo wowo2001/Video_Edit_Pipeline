@@ -183,5 +183,7 @@ class AutoVideoPipeline:
         )
 
         apply_character_scene_mapping(self.project_paths.subtitles['json'],self.project_paths.speaker_mapping,self.project_paths.story,scene_mapping,self.project_paths.subtitles_to_db)
-        PostCutService().save_subtitle_to_db(self.project_paths.subtitles_to_db,s3_url,drama_title=title)
+        PostCutService().save_subtitle_to_db(self.project_paths.subtitles_to_db,
+                                             s3_url,
+                                             drama_title=title)
 

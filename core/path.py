@@ -21,6 +21,15 @@ class ProjectPaths:
 
         self.script = self.root / "script.json"
         self.scene = self.root / "scene.json"
+        self.scene_candidate = self.root / "scene_candidate.json"
+        self.selected_scene = self.root / "selected_scene.json"
+        self.scene_with_subtitle = self.root / "scene_with_subtitle.json"
+        self.scene_clips = self.root / "scene_clips.json"
+        self.scene_segmented_clips = self.root / "scene_segmented_clips.json"
+        self.scene_selected_subtitle = self.root / "scene_selected_subtitle.json"
+        self.hook = self.root / "hook.json"
+        self.scene_narration = self.root / "scene_narration.json"
+        self.download = self.root / "download"
         self.story = self.root / "story.json"
         self.candidate_metadata = self.root / "candidate_metadata.json"
         self.vocals_path = Path("separated/htdemucs")

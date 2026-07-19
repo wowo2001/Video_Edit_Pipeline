@@ -349,3 +349,701 @@ class Ali:
             )
 
         print(f"\n✅ 最终脚本已保存: {script_path}")
+
+    def select_scene(
+    self,
+        candidate_path,
+        theme,
+        output_path
+    ):
+
+        with open(
+            candidate_path,
+            "r",
+            encoding="utf-8"
+        ) as f:
+            scenes = json.load(f)
+
+
+        candidates = []
+
+        for scene in scenes:
+            candidates.append(
+                {
+                    "scene_id": scene["scene_id"],
+                    "title": scene["title"],
+                    "event": scene["event"],
+                    "summary": scene["summary"],
+                }
+            )
+
+
+        prompt = f"""
+    你是一个视频选题策划。
+
+    主题：
+    {theme}
+
+    候选场景：
+
+    {json.dumps(
+        candidates,
+        ensure_ascii=False,
+        indent=2
+    )}
+
+    请筛选真正符合主题的场景。
+
+    要求：
+    1. 只保留相关场景
+    2. 按相关程度排序
+
+    只输出JSON：
+
+    [
+    {{
+        "scene_id": 1
+    }}
+    ]
+    """
+
+
+        response = self.client.chat.completions.create(
+                model="qwen3.7-max",
+                messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+            )
+
+        result = safe_json_parse(
+            response.choices[0].message.content
+        )
+
+        with open(
+            output_path,
+            "w",
+            encoding="utf-8"
+        ) as f:
+            json.dump(
+                result,
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
+
+
+
+    def select_scene_clip(
+        self,
+        theme,
+        scene
+    ):
+
+        prompt = f"""
+你的任务：
+从一个剧情场景中，选择最有价值的原剧对白，作为后续视频剪辑素材。
+
+
+========================
+【主题】
+========================
+
+{theme}
+
+
+========================
+【当前场景】
+========================
+
+标题：
+{scene["title"]}
+
+剧情简介：
+{scene["summary"]}
+
+
+========================
+【原始对白】
+========================
+
+{scene["subtitles_plain_text"]}
+
+
+========================
+【字幕编号规则】
+========================
+
+- 每句对白前面的 [i] 是唯一字幕编号
+- 返回的 clip 必须使用这些 index
+- 不允许修改 index
+- 不允许返回对白文本
+
+
+========================
+【选择规则】
+========================
+
+1. 只选择当前 scene 内的对白。
+
+2. 选择能够体现当前剧情发展的关键对白：
+   - 人物冲突
+   - 重要信息
+   - 情绪爆发
+   - 剧情转折
+
+3. 删除：
+   - 寒暄
+   - 重复对白
+   - 无剧情推进内容
+
+
+========================
+【顺序约束】
+========================
+
+1. clip 内 index 必须按照剧情时间递增排列。
+
+2. 不允许倒序。
+
+3. 可以跳过无关对白。
+
+4. 所选对白必须属于同一个剧情事件。
+
+
+========================
+【输出格式】
+========================
+
+只输出 JSON：
+
+{{
+    "scene_id": {scene["scene_id"]},
+    "clip": [1,2,3]
+}}
+
+"""
+
+
+        response = self.client.chat.completions.create(
+            model="qwen3.7-max",
+            messages=[
+                {
+                    "role":"user",
+                    "content":prompt
+                }
+            ]
+        )
+
+
+        return safe_json_parse(
+            response.choices[0].message.content
+        )
+    
+    def generate_scene_narration(
+        self,
+        theme,
+        scene_path,
+        output_path
+    ):
+
+        with open(
+            scene_path,
+            "r",
+            encoding="utf-8"
+        ) as f:
+            scenes = json.load(f)
+
+
+        scene_list = []
+
+        for scene in scenes:
+
+            scene_list.append(
+                {
+                    "scene_id": scene["scene_id"],
+                    "title": scene["title"],
+                    "summary": scene["summary"]
+                }
+            )
+
+
+        prompt = f"""
+        你是短视频剧解说作者。
+
+        根据下面的剧情场景，为每个scene生成旁白。
+
+        这个短视频的主题是： {theme}
+        要求：
+
+        结合解说主题，把场景之间自然流畅的串联起来
+
+
+        输入：
+
+        {json.dumps(
+            scene_list,
+            ensure_ascii=False,
+            indent=2
+        )}
+
+
+        只输出JSON：
+
+        [
+        {{
+        "scene_id":1,
+        "narration":"..."
+        }}
+        ]
+
+        """
+
+
+        response = self.client.chat.completions.create(
+            model="qwen3.7-max",
+            messages=[
+                {
+                    "role":"user",
+                    "content":prompt
+                }
+            ]
+        )
+
+
+        result = safe_json_parse(
+            response.choices[0].message.content
+        )
+
+
+        with open(
+            output_path,
+            "w",
+        encoding="utf-8"
+        ) as f:
+            json.dump(
+                result,
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
+
+
+        return result
+
+    def split_scene_segment(
+        self,
+        theme,
+        scene
+    ):
+
+        prompt = f"""
+
+        你的任务：
+        把一个剧情场景拆解成多个适合短视频解说的叙事片段。
+
+        每个片段必须由：
+
+        【解说旁白】+【原剧对白】组成。
+
+        ========================
+        【主题】
+        ========================
+
+        {theme}
+
+
+        ========================
+        【当前场景】
+        ========================
+
+        标题：
+        {scene["title"]}
+
+        剧情简介：
+        {scene["summary"]}
+
+
+        ========================
+        【原始对白】
+        ========================
+
+        {scene["subtitles_plain_text"]}
+
+
+========================
+【字幕编号规则】
+========================
+
+- 每句对白前面的 [i] 是唯一字幕编号。
+- subtitle_ids 必须引用已有编号。
+- 不允许修改编号。
+- 不返回对白文本。
+
+
+========================
+【segment划分规则】
+========================
+
+根据剧情发展拆分segment。
+
+每个segment表达一个独立的小剧情节点，例如：
+
+- 一段完整的对话
+
+只保留与主题相关segment。
+
+========================
+【对白选择规则】
+========================
+
+原剧对白不是用来完整讲述剧情。选取的对白必须是连续的。
+
+对白只用于：
+- 展示人物冲突
+- 强化关键情绪
+- 保留代表性台词
+
+每个segment选择少量关键对白。
+
+
+
+        ========================
+        【输出格式】
+        ========================
+
+        只输出 JSON：
+
+{{
+  "segments":[
+    {{
+      "segment_id":1,
+      "purpose":"交代晁盖被官府追捕",
+      "narration":"...",
+      "subtitle_ids":[1,2,3]
+    }},
+    {{
+      "segment_id":2,
+      "purpose":"晁盖投奔梁山",
+      "narration":"...",
+      "subtitle_ids":[20,21]
+    }}
+  ]
+}}
+
+    """
+
+
+        response = self.client.chat.completions.create(
+            model="qwen3.7-max",
+            messages=[
+                {
+                    "role":"user",
+                    "content":prompt
+                }
+            ]
+        )
+
+
+        return safe_json_parse(
+            response.choices[0].message.content
+        )
+    
+    def refine_narration(
+        self,
+        scene_path
+    ):
+
+        with open(
+            scene_path,
+            "r",
+            encoding="utf-8"
+        ) as f:
+            scenes = json.load(f)
+
+
+        # 给AI的数据
+        ai_input = []
+
+        for scene in scenes:
+
+            ai_scene = {
+                "scene_id": scene["scene_id"],
+                "title": scene["title"],
+                "segments": []
+            }
+
+            for segment in scene["segments"]:
+
+                ai_scene["segments"].append(
+                    {
+                        "segment_id": segment["segment_id"],
+                        "purpose": segment["purpose"],
+                        "narration": segment["narration"]
+                    }
+                )
+
+            ai_input.append(
+                ai_scene
+            )
+
+
+        prompt = f"""
+你是一名专业影视解说编剧。
+
+下面是一条已经规划好的短视频。
+
+每个segment已经确定：
+
+- 剧情顺序
+- purpose
+- narration
+
+你的任务不是重新写剧情。
+
+而是把整条视频的解说词润色得更加连贯。
+
+
+========================
+要求
+========================
+
+1. 保持所有segment顺序不变。
+
+2. 不新增剧情。
+
+3. 不删除剧情。
+
+4. 不改变purpose。
+
+5. 每段仍然对应原来的segment。
+
+6. 可以修改 narration。
+
+7. 优化目标：
+
+- 上下段衔接自然
+- 避免重复介绍人物
+- 避免重复背景
+- 增强故事连续感
+- 更符合短视频解说节奏
+
+8. narration长度不要变化太大。
+
+9. 返回scene数量、segment数量必须完全一致。
+
+
+========================
+当前视频
+========================
+
+{json.dumps(
+    ai_input,
+    ensure_ascii=False,
+    indent=2
+)}
+
+
+========================
+输出
+========================
+
+只输出JSON：
+
+[
+  {{
+    "scene_id":5,
+    "segments":[
+      {{
+        "segment_id":1,
+        "narration":"..."
+      }},
+      {{
+        "segment_id":2,
+        "narration":"..."
+      }}
+    ]
+  }}
+]
+"""
+
+
+        response = self.client.chat.completions.create(
+            model="qwen3.7-max",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+
+
+        refined = safe_json_parse(
+            response.choices[0].message.content
+        )
+
+        # 建立索引
+        refine_map = {
+            scene["scene_id"]: {
+                seg["segment_id"]: seg["narration"]
+                for seg in scene["segments"]
+            }
+            for scene in refined
+        }
+
+
+        # 回填
+        for scene in scenes:
+
+            scene_map = refine_map.get(
+                scene["scene_id"],
+                {}
+            )
+
+            for segment in scene["segments"]:
+
+                narration = scene_map.get(
+                    segment["segment_id"]
+                )
+
+                if narration:
+
+                    segment["narration"] = narration
+
+
+        with open(
+            scene_path,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
+            json.dump(
+                scenes,
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
+
+
+        return scenes
+    
+
+    def generate_hook(
+    self,
+    theme,
+    scene_path,
+    output_path
+    ):
+
+        with open(
+            scene_path,
+            "r",
+            encoding="utf-8"
+        ) as f:
+            scenes = json.load(f)
+
+
+        ai_input = []
+
+
+        for scene in scenes:
+
+            segments = []
+
+            for seg in scene["segments"]:
+
+                segments.append(
+                    {
+                        "segment_id": seg["segment_id"],
+                        "purpose": seg["purpose"]
+                    }
+                )
+
+
+            ai_input.append(
+                {
+                    "scene_id": scene["scene_id"],
+                    "title": scene["title"],
+                    "segments": segments
+                }
+            )
+
+
+        prompt = f"""
+你是一名短视频影视解说编剧。
+
+你的任务：
+从已有剧情segment中选择最适合作为视频开头hook的部分。
+
+主题：
+{theme}
+
+
+选择规则：
+
+1. hook必须和主题高度相关。
+
+2. 优先选择：
+- 最大冲突
+- 最大反转
+- 最大情绪爆点
+- 最能引起观看兴趣的剧情
+
+3. hook只是吸引观众继续观看。
+4. 你选了hook之后还需要为hook配上解说,解说需要吸引观众继续观看
+
+
+
+====================
+
+输入剧情：
+
+{json.dumps(
+    ai_input,
+    ensure_ascii=False,
+    indent=2
+)}
+
+
+====================
+
+输出JSON：
+
+  {{
+    "scene_id":8,
+    "segment_id":2,
+    "hook_narration":"..."
+  }}
+
+只输出JSON。
+"""
+
+
+        response = self.client.chat.completions.create(
+            model="qwen3.7-max",
+            messages=[
+                {
+                    "role":"user",
+                    "content":prompt
+                }
+            ]
+        )
+
+        result = safe_json_parse(
+            response.choices[0].message.content
+        )
+        with open(
+            output_path,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
+            json.dump(
+                result,
+                f,
+                ensure_ascii=False,
+                indent=2
+            )

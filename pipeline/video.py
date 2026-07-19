@@ -269,73 +269,431 @@ def _sort_key(p: Path):
         return 9999
 
 
-def cut_clips_temp(script_path, output_path):
+def cut_segment_video_temp(
+    scene_path,
+    output_path
+):
 
     output_path.mkdir(
         parents=True,
         exist_ok=True
     )
 
-    with open(script_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+
+    with open(
+        scene_path,
+        "r",
+        encoding="utf-8"
+    ) as f:
+        scenes = json.load(f)
 
 
-    for item in data:
 
-        place = item["place"]
+    for scene in scenes:
 
-        clip = item["clip"]
-        narrative = item["narrative"]
+        scene_id = scene["scene_id"]
 
 
         input_path = Path(
-            clip["local_path"]
+            scene["local_video_path"]
         )
 
 
         if not input_path.exists():
+
             print(
                 f"[ERROR] 找不到视频: {input_path}"
             )
+
             continue
 
 
-        # 毫秒转秒
-        start = ms_to_seconds(
-            clip["start_time"]
+
+        for segment in scene.get(
+            "segments",
+            []
+        ):
+
+            segment_id = segment["segment_id"]
+
+
+            subtitles = segment.get(
+                "subtitles",
+                []
+            )
+
+
+            if not subtitles:
+                continue
+
+
+
+            narration_length = segment.get(
+                "narration_length",
+                0
+            )
+
+
+            narration_duration = ms_to_seconds(
+                narration_length
+            )
+
+
+            temp_files = []
+
+
+
+            for index, subtitle in enumerate(subtitles):
+
+                start = ms_to_seconds(
+                    subtitle["start_time"]
+                )
+
+                end = ms_to_seconds(
+                    subtitle["end_time"]
+                )
+
+
+                # 第一句对白之前放解说
+                if index == 0:
+
+                    start = max(
+                        0,
+                        start - narration_duration
+                    )
+
+
+                temp_path = (
+                    output_path /
+                    f"temp_{scene_id}_{segment_id}_{index}.mp4"
+                )
+
+
+                cut_video_ffmpeg(
+                    input_path,
+                    temp_path,
+                    start,
+                    end
+                )
+
+
+                temp_files.append(
+                    temp_path
+                )
+
+
+
+            concat_file = (
+                output_path /
+                f"concat_{scene_id}_{segment_id}.txt"
+            )
+
+
+            with open(
+                concat_file,
+                "w",
+                encoding="utf-8"
+            ) as f:
+
+                for temp in temp_files:
+                    f.write(
+                        f"file '{temp.name}'\n"
+                    )
+
+
+
+            final_output = (
+                output_path /
+                f"scene_{scene_id}_segment_{segment_id}.mp4"
+            )
+
+
+            concat_videos_ffmpeg(
+                concat_file,
+                str(final_output)
+            )
+
+
+            segment["clip_video"] = str(
+                final_output
+            )
+
+
+            print(
+                f"完成 scene {scene_id} segment {segment_id}"
+            )
+
+
+
+            for temp in temp_files:
+
+                if temp.exists():
+
+                    temp.unlink()
+
+
+
+    with open(
+        scene_path,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            scenes,
+            f,
+            ensure_ascii=False,
+            indent=2
+        )
+    
+def concat_segment_videos(
+    scene_path,
+    hook_path,
+    output_path
+):
+
+    with open(
+        scene_path,
+        "r",
+        encoding="utf-8"
+    ) as f:
+        scenes = json.load(f)
+
+
+    with open(
+        hook_path,
+        "r",
+        encoding="utf-8"
+    ) as f:
+        hook = json.load(f)
+
+
+
+    list_file = (
+        Path(output_path).parent /
+        "segment_concat_list.txt"
+    )
+
+
+
+    with open(
+        list_file,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+
+        # =====================
+        # 1. 先加入hook
+        # =====================
+
+        hook_video = hook.get(
+            "final_video_path"
         )
 
-        end = ms_to_seconds(
-            clip["end_time"]
+
+        if hook_video:
+
+            hook_path_obj = Path(
+                hook_video
+            )
+
+            if hook_path_obj.exists():
+
+                f.write(
+                    f"file '{hook_path_obj.resolve()}'\n"
+                )
+
+            else:
+
+                print(
+                    f"[WARN] hook不存在: {hook_path_obj}"
+                )
+
+
+
+        # =====================
+        # 2. 再加入正文segment
+        # =====================
+
+        scenes.sort(
+            key=lambda x: x["scene_id"]
         )
 
 
-        narration_duration = ms_to_seconds(
-            narrative["length"]
+        for scene in scenes:
+
+
+            segments = scene.get(
+                "segments",
+                []
+            )
+
+
+            segments.sort(
+                key=lambda x: x["segment_id"]
+            )
+
+
+
+            for segment in segments:
+
+
+                video_path = segment.get(
+                    "final_video_path"
+                )
+
+
+                if not video_path:
+                    continue
+
+
+
+                path = Path(
+                    video_path
+                )
+
+
+                if not path.exists():
+
+                    print(
+                        f"[WARN] 不存在: {path}"
+                    )
+
+                    continue
+
+
+
+                f.write(
+                    f"file '{path.resolve()}'\n"
+                )
+
+
+
+    concat_videos_ffmpeg(
+        list_file,
+        output_path
+    )
+
+
+    list_file.unlink(
+        missing_ok=True
+    )
+
+def cut_hook_video_temp(
+    hook_path,
+    output_path
+):
+
+    output_path.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+
+    with open(
+        hook_path,
+        "r",
+        encoding="utf-8"
+    ) as f:
+        hook = json.load(f)
+
+
+
+    input_path = Path(
+        hook["local_video_path"]
+    )
+
+
+    if not input_path.exists():
+
+        raise Exception(
+            f"找不到视频: {input_path}"
         )
 
 
-        # 给旁白预留空间
-        start = max(
-            0,
-            start - narration_duration
+    subtitles = hook.get(
+        "subtitles",
+        []
+    )
+
+
+    if not subtitles:
+
+        raise Exception(
+            "hook没有字幕"
         )
 
 
-        output_file = (
-            output_path /
-            f"clip_{place}.mp4"
+
+    # 原片开始
+    start = ms_to_seconds(
+        subtitles[0]["start_time"]
+    )
+
+
+    # 原片结束
+    end = ms_to_seconds(
+        subtitles[-1]["end_time"]
+    )
+
+
+    # 后面留hook旁白空间
+    hook_length = ms_to_seconds(
+        hook.get(
+            "narration_length",
+            0
+        )
+    )
+
+
+    end = end + hook_length
+
+
+
+    print(
+        f"""
+剪辑hook:
+start={start}
+end={end}
+原片结束={end-hook_length}
+旁白空间={hook_length}
+"""
+    )
+
+
+
+    final_output = (
+        output_path /
+        "hook.mp4"
+    )
+
+
+    cut_video_ffmpeg(
+        input_path,
+        final_output,
+        start,
+        end
+    )
+
+
+    hook["hook_video"] = str(
+        final_output
+    )
+
+
+    with open(
+        hook_path,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            hook,
+            f,
+            ensure_ascii=False,
+            indent=2
         )
 
 
-        cut_video_ffmpeg(
-            input_path,
-            output_file,
-            start,
-            end
-        )
-
-
-        print(
-            f"完成: {output_file}"
-        )
+    return hook

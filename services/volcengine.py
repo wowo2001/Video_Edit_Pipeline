@@ -209,47 +209,190 @@ class Volcengine:
 
         return base64.b64decode("".join(chunks))
     
-    def generate_tts_temp(self, script_path, output_path):
+    def generate_tts_temp(
+        self,
+        script_path,
+        output_path
+    ):
         """
-        根据 script 生成解说TTS
-        回写 narrative.length 和 audio路径
+        根据 segment narration 生成TTS
+        回写 segment:
+        - narration_audio
+        - narration_length
         """
 
         output_path.mkdir(
-        parents=True,
-        exist_ok=True
+            parents=True,
+            exist_ok=True
         )
 
-        with open(script_path, "r", encoding="utf-8") as f:
+
+        with open(
+            script_path,
+            "r",
+            encoding="utf-8"
+        ) as f:
             data = json.load(f)
 
 
-        for item in data:
+        for scene in data:
 
-            place = item["place"]
-
-            text = item["narrative"]["content"]
-
-            audio_bytes = self._tts_stream(text)
+            scene_id = scene["scene_id"]
 
 
-            audio_path = output_path / f"clip_{place}.mp3"
+            for segment in scene.get(
+                "segments",
+                []
+            ):
 
-            audio_path.write_bytes(audio_bytes)
-
-
-            audio = AudioSegment.from_file(audio_path)
-
-            duration_ms = len(audio)
+                segment_id = segment["segment_id"]
 
 
-            item["narrative"]["length"] = duration_ms
+                text = segment.get(
+                    "narration",
+                    ""
+                )
 
 
-        with open(script_path, "w", encoding="utf-8") as f:
+                if not text:
+                    continue
+
+
+                print(
+                    f"TTS scene:{scene_id} segment:{segment_id}"
+                )
+
+
+                audio_bytes = self._tts_stream(
+                    text
+                )
+
+
+                audio_path = (
+                    output_path /
+                    f"scene_{scene_id}_segment_{segment_id}.mp3"
+                )
+
+
+                audio_path.write_bytes(
+                    audio_bytes
+                )
+
+
+                audio = AudioSegment.from_file(
+                    audio_path
+                )
+
+
+                duration_ms = len(audio)
+
+
+                segment["narration_audio"] = str(
+                    audio_path
+                )
+
+                segment["narration_length"] = duration_ms
+
+
+
+        with open(
+            script_path,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
             json.dump(
-            data,
-            f,
-            ensure_ascii=False,
-            indent=2
+                data,
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
+
+    def generate_hook_tts(
+        self,
+        hook_path,
+        output_path
+    ):
+        """
+        根据 hook_narration 生成开场钩子TTS
+        回写 hook_audio 和 hook_length
+        """
+
+        output_path.mkdir(
+            parents=True,
+            exist_ok=True
         )
+
+
+        with open(
+            hook_path,
+            "r",
+            encoding="utf-8"
+        ) as f:
+            hook = json.load(f)
+
+
+        text = hook.get(
+            "hook_narration",
+            ""
+        )
+
+
+        if not text:
+            raise Exception(
+                "hook_narration为空"
+            )
+
+
+        print(
+            f"TTS hook scene: hook"
+        )
+
+
+        audio_bytes = self._tts_stream(
+            text
+        )
+
+
+        audio_path = (
+            output_path /
+            f"hook.mp3"
+        )
+
+
+        audio_path.write_bytes(
+            audio_bytes
+        )
+
+
+        audio = AudioSegment.from_file(
+            audio_path
+        )
+
+
+        duration_ms = len(audio)
+
+
+        hook["hook_audio"] = str(
+            audio_path
+        )
+
+        hook["hook_length"] = duration_ms
+
+
+
+        with open(
+            hook_path,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
+            json.dump(
+                hook,
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
+
+
+        return hook

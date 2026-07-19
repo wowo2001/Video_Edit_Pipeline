@@ -4,6 +4,7 @@ from core.ffmpeg import mix_end_aligned,concat_mp3s
 from core.demucs import extract_vocals_demucs
 from core.path import ProjectPaths
 import json
+from pathlib import Path
 
 
 from pipeline import video
@@ -82,43 +83,195 @@ def _mix_clip_audio(video_path, narration_audio_path, output_path):
     print(f"视频路径: {video_path}, 旁白路径: {narration_audio_path}, 输出路径: {output_path}, 旁白时长: {voice_dur}")
     mix_start_aligned(video_path, narration_audio_path, output_path, voice_dur)
 
-def mix_audio_temp(video_path, narration_audio_path, script_path, output_path):
+def mix_audio_segment_temp(
+    scene_path,
+    output_path
+):
+
     output_path.mkdir(
         parents=True,
         exist_ok=True
     )
 
-    with open(script_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+
+    with open(
+        scene_path,
+        "r",
+        encoding="utf-8"
+    ) as f:
+        scenes = json.load(f)
 
 
-    for item in data:
 
-        place = item["place"]
+    for scene in scenes:
 
-        clip_video_path = (
-            video_path /
-            f"clip_{place}.mp4"
+        scene_id = scene["scene_id"]
+
+
+        for segment in scene.get(
+            "segments",
+            []
+        ):
+
+            segment_id = segment["segment_id"]
+
+
+            clip_video_path = Path(
+                segment["clip_video"]
+            )
+
+
+            clip_audio_path = Path(
+                segment["narration_audio"]
+            )
+
+
+            clip_output = (
+                output_path /
+                f"scene_{scene_id}_segment_{segment_id}_final.mp4"
+            )
+
+
+
+            if not clip_video_path.exists():
+
+                print(
+                    f"[ERROR] 找不到视频: {clip_video_path}"
+                )
+
+                continue
+
+
+
+            if not clip_audio_path.exists():
+
+                print(
+                    f"[ERROR] 找不到旁白: {clip_audio_path}"
+                )
+
+                continue
+
+
+
+            print(
+                f"正在混音 scene:{scene_id} segment:{segment_id}"
+            )
+
+
+            _mix_clip_audio(
+                clip_video_path,
+                clip_audio_path,
+                clip_output
+            )
+
+
+
+            segment["final_video_path"] = str(
+                clip_output
+            )
+
+
+
+    with open(
+        scene_path,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            scenes,
+            f,
+            ensure_ascii=False,
+            indent=2
         )
+def mix_audio_hook_temp(
+    hook_path,
+    output_path
+):
 
-        clip_audio = (
-            narration_audio_path /
-            f"clip_{place}.mp3"
-        )
+    output_path.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
-        clip_output = (
-            output_path /
-            f"clip_{place}_final.mp4"
-        )
 
+    with open(
+        hook_path,
+        "r",
+        encoding="utf-8"
+    ) as f:
+        hook = json.load(f)
+
+
+
+    clip_video_path = Path(
+        hook["hook_video"]
+    )
+
+
+    clip_audio_path = Path(
+        hook["hook_audio"]
+    )
+
+
+    output_file = (
+        output_path /
+        "hook_final.mp4"
+    )
+
+
+
+    if not clip_video_path.exists():
 
         print(
-            f"正在混音: {clip_video_path}"
+            f"[ERROR] 找不到hook视频: {clip_video_path}"
+        )
+
+        return
+
+
+
+    if not clip_audio_path.exists():
+
+        print(
+            f"[ERROR] 找不到hook音频: {clip_audio_path}"
+        )
+
+        return
+
+
+
+    print(
+        "正在混音 hook"
+    )
+
+
+    _mix_hook_audio(
+        clip_video_path,
+        clip_audio_path,
+        output_file
+    )
+
+
+
+    hook["final_video_path"] = str(
+        output_file
+    )
+
+
+
+    with open(
+        hook_path,
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            hook,
+            f,
+            ensure_ascii=False,
+            indent=2
         )
 
 
-        _mix_clip_audio(
-            clip_video_path,
-            clip_audio,
-            clip_output
-        )
+    return hook
