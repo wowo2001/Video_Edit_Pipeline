@@ -23,13 +23,15 @@ text_embedding_service = TextEmbeddingService()
 s3_client = S3()
 
 clear_workdir(ProjectPaths().root,ProjectPaths().vocals_path)
-
+search = "武松故事线"
 theme = "解析武松怎么一步步被逼上梁山"
+drama_title = "水浒传"
 print("====1. 召回场景故事====")
-embedding = text_embedding_service.encode(theme)
+embedding = text_embedding_service.encode(search)
 rows = client.search_scene(
     query_embedding=embedding,
-    drama_title="水浒传"
+    drama_title=drama_title,
+    limit = 50
 )
 save_scene_candidates(rows,project_paths.scene_candidate)
 
@@ -159,7 +161,7 @@ print("========== 16. 添加标题和副标题 ==========")
 add_text_overlay(
     project_paths.subtitle_video,
     project_paths.text_overlay_video,
-    "水浒传",
+    drama_title,
     subtitle,
     font_size_title=80,
     font_size_sub=80,
@@ -187,7 +189,7 @@ print("========== 18. 上传 ==========")
 safe_file_name = safe_filename(subtitle)
 output_path = project_paths.root / f"{safe_file_name}.mp4"
 shutil.copy2(project_paths.gif_overlay_video, output_path)
-upload_to_drive(output_path, folder_name="Test")
+upload_to_drive(output_path, folder_name="水浒人物志")
 
 
 
