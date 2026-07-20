@@ -381,6 +381,8 @@ def restore_scene_subtitle(
         if not scene:
             continue
 
+        scene["task"] = item["task"]
+
 
         subtitles = []
 

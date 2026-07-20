@@ -24,7 +24,7 @@ s3_client = S3()
 
 clear_workdir(ProjectPaths().root,ProjectPaths().vocals_path)
 
-theme = "宋江为什么杀阎婆惜"
+theme = "解析武松怎么一步步被逼上梁山"
 print("====1. 召回场景故事====")
 embedding = text_embedding_service.encode(theme)
 rows = client.search_scene(

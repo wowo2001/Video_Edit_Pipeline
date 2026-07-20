@@ -371,7 +371,7 @@ class PostgresClient:
         self,
         query_embedding,
         drama_title=None,
-        limit=10,
+        limit=30,
     ):
         sql = """
         SELECT
