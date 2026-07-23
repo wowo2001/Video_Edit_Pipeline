@@ -124,20 +124,37 @@ def mix_start_aligned(
     run_cmd(cmd)
 
 def encode_to_standard(input_path, output_path):
+
     cmd = [
-        "ffmpeg", "-y",
-        "-i", str(input_path),
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(input_path),
 
-        # 统一视频规格（关键）
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-r", "25",
-        "-preset", "ultrafast",
+        # 保持比例 + 统一画布
+        "-vf",
+        "scale=-2:720,pad=1280:720:(ow-iw)/2:(oh-ih)/2",
 
-        # 统一音频
-        "-c:a", "aac",
-        "-ar", "48000",
-        "-ac", "2",
+        "-c:v",
+        "libx264",
+
+        "-pix_fmt",
+        "yuv420p",
+
+        "-r",
+        "25",
+
+        "-preset",
+        "ultrafast",
+
+        "-c:a",
+        "aac",
+
+        "-ar",
+        "48000",
+
+        "-ac",
+        "2",
 
         output_path
     ]
@@ -172,9 +189,10 @@ def concat_mp3s(filelist, output):
     run_cmd(cmd)
 
 def change_resolution(input_file, output_file,
-                  width, height, fps):
+                      width, height, fps):
 
     vf = (
+        "crop=960:720:160:0,"
         f"scale={width}:-2,"
         f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,"
         "setsar=1"
@@ -183,18 +201,12 @@ def change_resolution(input_file, output_file,
     cmd = [
         "ffmpeg", "-y",
         "-i", str(input_file),
-
         "-vf", vf,
-
-        "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "23",
-
-        "-c:a", "aac",
-        "-b:a", "192k",
-
         "-r", str(fps),
-
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-movflags", "+faststart",
         str(output_file)
     ]
 
@@ -338,7 +350,7 @@ def mosaic_regions(
 
     run_cmd(cmd)
 
-def add_subtitles(input_video, srt_file, output_video, y):
+def add_subtitles(input_video, srt_file, output_video, y, font_size=10):
     srt_path = str(srt_file).replace("\\", "/")
     cmd = [
         "ffmpeg", "-y",

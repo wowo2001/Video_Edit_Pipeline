@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 from urllib.parse import urlparse
+from core.ffmpeg import encode_to_standard
 
 def ms_to_srt_time(ms: int) -> str:
     ms = int(ms)
@@ -421,9 +422,9 @@ def restore_scene_subtitle(
 
 
     # 按剧情顺序
-    results.sort(
-        key=lambda x: x["scene_id"]
-    )
+    # results.sort(
+    #     key=lambda x: x["scene_id"]
+    # )
 
 
     with open(
@@ -613,7 +614,8 @@ def merge_scene_narration(
 def download_scene_videos(
     scene_path,
     download_dir,
-    s3_client
+    s3_client,
+    standardize=True
 ):
 
     with open(
@@ -652,12 +654,10 @@ def download_scene_videos(
                 s3_url
             )
 
-
             local_path = os.path.join(
                 download_dir,
                 filename
             )
-
 
             downloaded[s3_url] = local_path
 
@@ -686,10 +686,51 @@ def download_scene_videos(
 
 
         # =====================
-        # 3. 写回当前scene
+        # 3. 分辨率标准化
         # =====================
 
-        scene["local_video_path"] = local_path
+        final_path = local_path
+
+        if standardize:
+
+            standard_dir = os.path.join(
+                download_dir,
+                "standard"
+            )
+
+            os.makedirs(
+                standard_dir,
+                exist_ok=True
+            )
+
+
+            standard_path = os.path.join(
+                standard_dir,
+                filename
+            )
+
+
+            if not os.path.exists(standard_path):
+
+                print(
+                    f"标准化视频: {local_path}"
+                )
+
+                encode_to_standard(
+                    local_path,
+                    standard_path
+                )
+
+
+            final_path = standard_path
+
+
+
+        # =====================
+        # 4. 写回scene
+        # =====================
+
+        scene["local_video_path"] = final_path
 
 
 

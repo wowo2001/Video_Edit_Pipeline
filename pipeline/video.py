@@ -200,8 +200,8 @@ def mosaic_regions(
     regions)
 
 
-def add_subtitles(input_video, srt_file, output_video, y):
-    add_subtitles_ffmpeg(input_video, srt_file, output_video, y=y)
+def add_subtitles(input_video, srt_file, output_video, y, font_size):
+    add_subtitles_ffmpeg(input_video, srt_file, output_video, y=y, font_size=font_size)
 
 def add_text_overlay(
     input_video,
@@ -641,7 +641,7 @@ def cut_hook_video_temp(
     # 后面留hook旁白空间
     hook_length = ms_to_seconds(
         hook.get(
-            "narration_length",
+            "hook_length",
             0
         )
     )

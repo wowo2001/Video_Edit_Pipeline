@@ -22,16 +22,16 @@ client = PostgresClient()
 text_embedding_service = TextEmbeddingService()
 s3_client = S3()
 
-clear_workdir(ProjectPaths().root,ProjectPaths().vocals_path)
-search = "武松故事线"
-theme = "解析武松怎么一步步被逼上梁山"
+# clear_workdir(ProjectPaths().root,ProjectPaths().vocals_path)
+search = "吴用 宋江 晁盖"
+theme = "吴用怎么从晁盖马仔条船做了宋江小弟"
 drama_title = "水浒传"
 print("====1. 召回场景故事====")
 embedding = text_embedding_service.encode(search)
 rows = client.search_scene(
     query_embedding=embedding,
     drama_title=drama_title,
-    limit = 50
+    limit = 100
 )
 save_scene_candidates(rows,project_paths.scene_candidate)
 
@@ -109,37 +109,27 @@ print("========== 8. 拼接 ==========")
 
 concat_segment_videos(project_paths.scene_selected_subtitle, project_paths.hook, project_paths.concatenated_video)
 
-print("========== 9. 改变分辨率 ==========")
 
-change_resolution(project_paths.concatenated_video, project_paths.changed_resolution_video
-                          , width=1080, height=1920, fps=30)
 
 print("========== 10. 加速 ==========")
 
-speed_up(project_paths.changed_resolution_video, project_paths.speed_up_video, speed=1.2)
+speed_up(project_paths.concatenated_video, project_paths.speed_up_video, speed=1.2)
 
 print("========== 11. 掩码字幕 ==========")
 region = [
 {
-    "x": 100,
-    "y": 600,
+    "x": 200,
+    "y": 50,
     "width": 200,
     "height": 100,
-    "mosaic_size": 8,
+    "mosaic_size": 10,
 },
 {
-    "x": 800,
-    "y": 600,
+    "x": 850,
+    "y": 50,
     "width": 200,
     "height": 100,
-    "mosaic_size": 8,
-},
-{
-    "x": 0,
-    "y": 1200,
-    "width": 1080,
-    "height": 70,
-    "mosaic_size": 8,
+    "mosaic_size": 10,
 }]
 
 mosaic_regions(project_paths.speed_up_video,project_paths.masked_video,region)
@@ -153,13 +143,21 @@ Volcengine().transcribe_audio(project_paths.final_audio, project_paths.final_sub
 
 print("========== 14. AI修正字幕 ==========")
 popup_text, subtitle = Ali().fix_subtitles(project_paths.final_subtitles['srt'], project_paths.final_subtitles['srt'])
+safe_file_name = safe_filename(subtitle)
 
 print("========== 15. 添加字幕 ==========")
-add_subtitles(project_paths.masked_video, project_paths.final_subtitles['srt'], project_paths.subtitle_video, y=95)
+add_subtitles(project_paths.masked_video, project_paths.final_subtitles['srt'], project_paths.subtitle_video, y=40, font_size=30)
+output_path_origin = project_paths.root / f"{safe_file_name}_origin.mp4"
+shutil.copy(project_paths.subtitle_video, output_path_origin)
+
+print("========== 9. 改变分辨率 ==========")
+
+change_resolution(project_paths.subtitle_video, project_paths.changed_resolution_video
+                          , width=1080, height=1920, fps=30)
 
 print("========== 16. 添加标题和副标题 ==========")
 add_text_overlay(
-    project_paths.subtitle_video,
+    project_paths.changed_resolution_video,
     project_paths.text_overlay_video,
     drama_title,
     subtitle,
@@ -186,10 +184,10 @@ add_gif_overlay(
 )
 
 print("========== 18. 上传 ==========")
-safe_file_name = safe_filename(subtitle)
 output_path = project_paths.root / f"{safe_file_name}.mp4"
 shutil.copy2(project_paths.gif_overlay_video, output_path)
 upload_to_drive(output_path, folder_name="水浒人物志")
+upload_to_drive(output_path_origin, folder_name="水浒人物志")
 
 
 
