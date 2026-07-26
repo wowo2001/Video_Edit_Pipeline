@@ -16,6 +16,7 @@ from pipeline.audio import export_audio,mix_audio_hook_temp
 from core.utils import safe_filename,clear_workdir, save_scene_candidates, restore_scene_subtitle, restore_selected_subtitles, merge_scene_narration, download_scene_videos, restore_segment_subtitles,extract_hook_segment
 from services.google_drive import upload_to_drive
 from services.text_embedding_service import TextEmbeddingService
+from services.chatgpt import ChatGPT
 
 project_paths = ProjectPaths()
 client = PostgresClient()
@@ -23,15 +24,16 @@ text_embedding_service = TextEmbeddingService()
 s3_client = S3()
 
 # clear_workdir(ProjectPaths().root,ProjectPaths().vocals_path)
-search = "吴用 宋江 晁盖"
-theme = "吴用怎么从晁盖马仔条船做了宋江小弟"
+search = "宋江 方腊 辩论"
+theme = "分析宋江和方腊辩论的场景，专注分析单一场景，其余前因后果一笔带过，结合人物所处位置，点评双方的话，从语言艺术方向分析"
 drama_title = "水浒传"
+ai = ChatGPT()
 print("====1. 召回场景故事====")
 embedding = text_embedding_service.encode(search)
 rows = client.search_scene(
     query_embedding=embedding,
     drama_title=drama_title,
-    limit = 100
+    limit = 20
 )
 save_scene_candidates(rows,project_paths.scene_candidate)
 
@@ -54,7 +56,7 @@ scene_clips = []
 
 for scene in scenes:
 
-    result = Ali().split_scene_segment(
+    result = ai.split_scene_segment(
         theme,
         scene
     )
@@ -88,10 +90,10 @@ restore_segment_subtitles(
 print("====下载资源====")
 download_scene_videos(project_paths.scene_selected_subtitle, project_paths.download, s3_client)
 print("====生成hook====")
-Ali().generate_hook(theme, project_paths.scene_selected_subtitle,project_paths.hook)
+ai.generate_hook(theme, project_paths.scene_selected_subtitle,project_paths.hook)
 extract_hook_segment(project_paths.scene_selected_subtitle, project_paths.hook, project_paths.hook)
 print("====5. AI润色解说词====")
-Ali().refine_narration(project_paths.scene_selected_subtitle)
+ai.refine_narration(project_paths.scene_selected_subtitle)
 
 
  
@@ -142,7 +144,7 @@ print("========== 13. 成片语音识别导出字幕 ==========")
 Volcengine().transcribe_audio(project_paths.final_audio, project_paths.final_subtitles)
 
 print("========== 14. AI修正字幕 ==========")
-popup_text, subtitle = Ali().fix_subtitles(project_paths.final_subtitles['srt'], project_paths.final_subtitles['srt'])
+popup_text, subtitle = ai.fix_subtitles(project_paths.final_subtitles['srt'], project_paths.final_subtitles['srt'])
 safe_file_name = safe_filename(subtitle)
 
 print("========== 15. 添加字幕 ==========")
@@ -188,9 +190,3 @@ output_path = project_paths.root / f"{safe_file_name}.mp4"
 shutil.copy2(project_paths.gif_overlay_video, output_path)
 upload_to_drive(output_path, folder_name="水浒人物志")
 upload_to_drive(output_path_origin, folder_name="水浒人物志")
-
-
-
-
-
-

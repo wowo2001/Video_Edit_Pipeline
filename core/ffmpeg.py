@@ -359,7 +359,7 @@ def add_subtitles(input_video, srt_file, output_video, y, font_size=10):
         "-vf",
         (
             f"subtitles={srt_path}:"
-            f"force_style='Alignment=2,MarginV={y},FontSize=10,PrimaryColour=&H00CCFF&,FontName=Microsoft YaHei'"
+            f"force_style='Alignment=2,MarginV={y},FontSize={font_size},PrimaryColour=&H00CCFF&,FontName=Microsoft YaHei'"
         ),
 
         "-c:v", "libx264",
