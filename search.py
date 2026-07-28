@@ -24,8 +24,8 @@ text_embedding_service = TextEmbeddingService()
 s3_client = S3()
 
 # clear_workdir(ProjectPaths().root,ProjectPaths().vocals_path)
-search = "宋江 方腊 辩论"
-theme = "分析宋江和方腊辩论的场景，专注分析单一场景，其余前因后果一笔带过，结合人物所处位置，点评双方的话，从语言艺术方向分析"
+search = "时知县 审案"
+theme = "根据时知县偏袒宋江的单一场景重点分析，其余前因后果一笔带过，解析语言艺术怎么偏袒"
 drama_title = "水浒传"
 ai = ChatGPT()
 print("====1. 召回场景故事====")
@@ -33,7 +33,7 @@ embedding = text_embedding_service.encode(search)
 rows = client.search_scene(
     query_embedding=embedding,
     drama_title=drama_title,
-    limit = 20
+    limit = 50
 )
 save_scene_candidates(rows,project_paths.scene_candidate)
 
@@ -90,10 +90,10 @@ restore_segment_subtitles(
 print("====下载资源====")
 download_scene_videos(project_paths.scene_selected_subtitle, project_paths.download, s3_client)
 print("====生成hook====")
-ai.generate_hook(theme, project_paths.scene_selected_subtitle,project_paths.hook)
+Ali().generate_hook(theme, project_paths.scene_selected_subtitle,project_paths.hook)
 extract_hook_segment(project_paths.scene_selected_subtitle, project_paths.hook, project_paths.hook)
 print("====5. AI润色解说词====")
-ai.refine_narration(project_paths.scene_selected_subtitle)
+Ali().refine_narration(project_paths.scene_selected_subtitle)
 
 
  
@@ -144,7 +144,7 @@ print("========== 13. 成片语音识别导出字幕 ==========")
 Volcengine().transcribe_audio(project_paths.final_audio, project_paths.final_subtitles)
 
 print("========== 14. AI修正字幕 ==========")
-popup_text, subtitle = ai.fix_subtitles(project_paths.final_subtitles['srt'], project_paths.final_subtitles['srt'])
+popup_text, subtitle = Ali().fix_subtitles(project_paths.final_subtitles['srt'], project_paths.final_subtitles['srt'])
 safe_file_name = safe_filename(subtitle)
 
 print("========== 15. 添加字幕 ==========")

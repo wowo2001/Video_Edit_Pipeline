@@ -516,9 +516,9 @@ def concat_segment_videos(
         # 2. 再加入正文segment
         # =====================
 
-        scenes.sort(
-            key=lambda x: x["scene_id"]
-        )
+        # scenes.sort(
+        #     key=lambda x: x["scene_id"]
+        # )
 
 
         for scene in scenes:
