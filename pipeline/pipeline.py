@@ -53,7 +53,7 @@ class AutoVideoPipeline:
 
         print("========== 4. AI 脚本 ==========")
         chunk_srt_by_scenes(self.project_paths.subtitles['stripped_srt'], self.project_paths.story,self.project_paths.subtitles['chunked_srt'])
-        Ali().generate_script(self.project_paths.subtitles['chunked_srt'], self.project_paths.script, self.project_paths.story)
+        Ali().generate_script(self.project_paths.subtitles['stripped_srt'], self.project_paths.script, self.project_paths.story)
         apply_timeline(self.project_paths.script, self.project_paths.subtitles['json'])
 
         # print("========== 4.1 AI 脚本改进 ==========")
@@ -103,7 +103,7 @@ class AutoVideoPipeline:
         },
         {
             "x": 0,
-            "y": 1200,
+            "y": 1250,
             "width": 1080,
             "height": 70,
             "mosaic_size": 8,
@@ -126,10 +126,10 @@ class AutoVideoPipeline:
         Volcengine().transcribe_audio(self.project_paths.final_audio, self.project_paths.final_subtitles)
 
         print("========== 14. AI修正字幕 ==========")
-        popup_text, subtitle = Ali().fix_subtitles(self.project_paths.final_subtitles['srt'], self.project_paths.final_subtitles['srt'])
+        popup_text, _ = Ali().fix_subtitles(self.project_paths.final_subtitles['srt'], self.project_paths.final_subtitles['srt'])
 
         print("========== 15. 添加字幕 ==========")
-        add_subtitles(self.project_paths.masked_video, self.project_paths.final_subtitles['srt'], self.project_paths.subtitle_video, y=95, font_size=10)
+        add_subtitles(self.project_paths.masked_video, self.project_paths.final_subtitles['srt'], self.project_paths.subtitle_video, y=90, font_size=10)
 
         print("========== 16. 添加标题和副标题 ==========")
         add_text_overlay(

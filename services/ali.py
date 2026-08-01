@@ -28,14 +28,15 @@ class Ali:
         recommend_ids = set(
             story_json.get("推荐解说场景", [])
         )
-        stories = []
-        for scene in story_json.get("场景", []):
+        # stories = []
+        # for scene in story_json.get("场景", []):
 
-            if scene["编号"] in recommend_ids:
-                stories.append(
-                    scene["剧情"]
-                )
-        story = "\n".join(stories)
+        #     if scene["编号"] in recommend_ids:
+        #         stories.append(
+        #             scene["剧情"]
+        #         )
+        # story = "\n".join(stories)
+        story = story_json.get("总故事")
         prompt = f"{TASK_RULES}\n\n{EDITING_RULES}\n\n{OUTPUT_SCHEMA}\n\n字幕内容：{subtitles}\n\n故事内容：{story}"
         response = self.client.chat.completions.create(
             model="qwen3.7-max",
