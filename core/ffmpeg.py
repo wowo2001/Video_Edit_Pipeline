@@ -1,443 +1,96 @@
-from core.cmd import run_cmd
 import json
+
+from core.cmd import run_cmd
+
+
 def extract_audio(input_path, output_path):
+    run_cmd(["ffmpeg", "-y", "-i", str(input_path), "-vn", "-ac", "2", "-ar", "44100", "-b:a", "192k", str(output_path)])
 
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", str(input_path),
 
-        "-vn",
-        "-ac", "2",
-        "-ar", "44100",
-        "-b:a", "192k",
-        str(output_path)
-    ]
-    run_cmd(cmd)
 def cut_video(input_path, output_path, start, end):
-    duration = end - start
+    run_cmd(["ffmpeg", "-y", "-ss", str(start), "-i", str(input_path), "-t", str(end - start), "-c:v", "libx264", "-c:a", "aac", "-avoid_negative_ts", "make_zero", str(output_path)])
 
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-ss", str(start),
-        "-i", str(input_path),
-        "-t", str(duration),
-
-        "-c:v", "libx264",
-        "-c:a", "aac",
-        "-avoid_negative_ts", "make_zero",
-
-        str(output_path)
-    ]
-    run_cmd(cmd)
 
 def get_duration(path):
+    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", str(path)]
+    return round(float(json.loads(run_cmd(cmd, capture_output=True).stdout)["format"]["duration"]), 3)
 
-    cmd = [
-        "ffprobe",
-        "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "json",
-        str(path)
-    ]
-
-    result = run_cmd(cmd, capture_output=True)
-    data = json.loads(result.stdout)
-    return round(float(data["format"]["duration"]),3)
 
 def mix_narration(video, audio, output, alignment="start"):
     """Mix narration at the start or end of a video clip."""
     if alignment not in {"start", "end"}:
         raise ValueError("alignment must be 'start' or 'end'")
-
-    narration_duration = get_duration(audio)
-    video_duration = get_duration(video)
-    narration_start_time = 0 if alignment == "start" else max(0, video_duration - narration_duration)
-    narration_end_time = narration_duration if alignment == "start" else video_duration
-    delay = int(narration_start_time * 1000)
-
+    narration_duration, video_duration = get_duration(audio), get_duration(video)
+    start = 0 if alignment == "start" else max(0, video_duration - narration_duration)
+    end, delay = (narration_duration if alignment == "start" else video_duration), int(start * 1000)
     filter_complex = (
-    "[0:a]loudnorm=I=-20:LRA=7:TP=-2[vnorm];"
-    "[1:a]loudnorm=I=-14:LRA=7:TP=-2[anorm];"
-    "[vnorm]asplit=2[a0][a1];"
-    f"[a0]volume=0.01:enable='between(t,{narration_start_time},{narration_end_time})'[a0_low];"
-    "[a1]volume=1.0[a1_norm];"
-    "[a0_low][a1_norm]amix=inputs=2[aout];"
-    f"[anorm]adelay={delay}|{delay}[a1v];"
-    "[aout][a1v]amix=inputs=2:normalize=0[outa]"
+        "[0:a]loudnorm=I=-20:LRA=7:TP=-2[vnorm];[1:a]loudnorm=I=-14:LRA=7:TP=-2[anorm];"
+        "[vnorm]asplit=2[a0][a1];"
+        f"[a0]volume=0.01:enable='between(t,{start},{end})'[a0_low];[a1]volume=1.0[a1_norm];"
+        "[a0_low][a1_norm]amix=inputs=2[aout];"
+        f"[anorm]adelay={delay}|{delay}[a1v];[aout][a1v]amix=inputs=2:normalize=0[outa]"
     )
+    run_cmd(["ffmpeg", "-y", "-i", str(video), "-i", str(audio), "-filter_complex", filter_complex, "-map", "0:v", "-map", "[outa]", "-c:v", "copy", "-c:a", "aac", str(output)])
 
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", str(video),
-        "-i", str(audio),
-        "-filter_complex", filter_complex,
-        "-map", "0:v",
-        "-map", "[outa]",
-        "-c:v", "copy",
-        "-c:a", "aac",
-        str(output)
-    ]
-
-    run_cmd(cmd)
 
 def encode_to_standard(input_path, output_path):
+    run_cmd(["ffmpeg", "-y", "-i", str(input_path), "-vf", "scale=-2:720,pad=1280:720:(ow-iw)/2:(oh-ih)/2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25", "-preset", "ultrafast", "-c:a", "aac", "-ar", "48000", "-ac", "2", str(output_path)])
 
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        str(input_path),
-
-        # 保持比例 + 统一画布
-        "-vf",
-        "scale=-2:720,pad=1280:720:(ow-iw)/2:(oh-ih)/2",
-
-        "-c:v",
-        "libx264",
-
-        "-pix_fmt",
-        "yuv420p",
-
-        "-r",
-        "25",
-
-        "-preset",
-        "ultrafast",
-
-        "-c:a",
-        "aac",
-
-        "-ar",
-        "48000",
-
-        "-ac",
-        "2",
-
-        output_path
-    ]
-
-    run_cmd(cmd)
 
 def concat_media(filelist, output):
     """Concatenate compatible media files listed in FFmpeg concat format."""
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-f", "concat",
-        "-safe", "0",
-        "-i", str(filelist),
-        "-c", "copy",
-        str(output),
-    ]
+    run_cmd(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(filelist), "-c", "copy", str(output)])
 
-    run_cmd(cmd)
 
-def change_resolution(input_file, output_file,
-                      width, height, fps):
+def change_resolution(input_file, output_file, width, height, fps):
+    vf = f"crop=960:720:160:0,scale={width}:-2,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1"
+    run_cmd(["ffmpeg", "-y", "-i", str(input_file), "-vf", vf, "-r", str(fps), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", str(output_file)])
 
-    vf = (
-        "crop=960:720:160:0,"
-        f"scale={width}:-2,"
-        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,"
-        "setsar=1"
-    )
-
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", str(input_file),
-        "-vf", vf,
-        "-r", str(fps),
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "-movflags", "+faststart",
-        str(output_file)
-    ]
-
-    run_cmd(cmd)
 
 def speed_up(input_path, output_path, speed):
+    filters = f"[0:v]setpts=PTS/{speed}[v];[0:a]atempo={speed}[a]"
+    run_cmd(["ffmpeg", "-y", "-i", str(input_path), "-filter_complex", filters, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-c:a", "aac", "-b:a", "192k", str(output_path)])
 
-    video_filter = f"[0:v]setpts=PTS/{speed}[v]"
 
-    audio_filter = f"[0:a]atempo={speed}[a]"
+def mask_sub(input_video, output_video, y_offset, mask_height):
+    vf = f"drawbox=x=0:y=ih-{y_offset}:w=iw:h={mask_height}:color=black:t=fill"
+    run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-vf", vf, "-c:v", "libx264", "-c:a", "copy", str(output_video)])
 
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", str(input_path),
 
-        "-filter_complex",
-        f"{video_filter};{audio_filter}",
+def mosaic_regions(input_video, output_video, regions):
+    filter_parts, current = [], "[0:v]"
+    for index, region in enumerate(regions):
+        x, y, width, height = region["x"], region["y"], region["width"], region["height"]
+        size = region.get("mosaic_size", 20)
+        down_width, down_height = max(1, width // size), max(1, height // size)
+        crop, output = f"m{index}", f"v{index}"
+        filter_parts.append(f"[0:v]crop={width}:{height}:{x}:{y},scale={down_width}:{down_height},scale={width}:{height}:flags=neighbor[{crop}]")
+        filter_parts.append(f"{current}[{crop}]overlay={x}:{y}[{output}]")
+        current = f"[{output}]"
+    run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-filter_complex", ";".join(filter_parts), "-map", current, "-map", "0:a?", "-c:v", "libx264", "-c:a", "copy", str(output_video)])
 
-        "-map", "[v]",
-        "-map", "[a]",
-
-        "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "23",
-
-        "-c:a", "aac",
-        "-b:a", "192k",
-
-        output_path
-    ]
-
-    run_cmd(cmd)
-
-def mask_sub(
-    input_video,
-    output_video,
-    y_offset,
-    mask_height
-):
-
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-i", str(input_video),
-
-        "-vf",
-        (
-            f"drawbox="
-            f"x=0:"
-            f"y=ih-{y_offset}:"
-            f"w=iw:"
-            f"h={mask_height}:"
-            f"color=black:"
-            f"t=fill"
-        ),
-
-        "-c:v", "libx264",
-        "-c:a", "copy",
-
-        str(output_video)
-    ]
-
-    run_cmd(cmd)
-
-def mosaic_regions(
-    input_video,
-    output_video,
-    regions,
-):
-    """
-    regions:
-    [
-        {
-            "x": 10,
-            "y": 10,
-            "width": 120,
-            "height": 60,
-            "mosaic_size": 8,
-        },
-        {
-            "x": 1700,
-            "y": 20,
-            "width": 180,
-            "height": 80,
-            "mosaic_size": 10,
-        }
-    ]
-    """
-
-    filter_parts = []
-
-    current = "[0:v]"
-
-    for i, region in enumerate(regions):
-
-        x = region["x"]
-        y = region["y"]
-        w = region["width"]
-        h = region["height"]
-        mosaic_size = region.get("mosaic_size", 20)
-
-        down_w = max(1, w // mosaic_size)
-        down_h = max(1, h // mosaic_size)
-
-        crop_label = f"m{i}"
-        out_label = f"v{i}"
-
-        filter_parts.append(
-            f"[0:v]"
-            f"crop={w}:{h}:{x}:{y},"
-            f"scale={down_w}:{down_h},"
-            f"scale={w}:{h}:flags=neighbor"
-            f"[{crop_label}]"
-        )
-
-        filter_parts.append(
-            f"{current}[{crop_label}]"
-            f"overlay={x}:{y}"
-            f"[{out_label}]"
-        )
-
-        current = f"[{out_label}]"
-
-    filter_complex = ";".join(filter_parts)
-
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-i", str(input_video),
-
-        "-filter_complex", filter_complex,
-
-        "-map", current,
-        "-map", "0:a?",
-
-        "-c:v", "libx264",
-        "-c:a", "copy",
-
-        str(output_video)
-    ]
-
-    run_cmd(cmd)
 
 def add_subtitles(input_video, srt_file, output_video, y, font_size=10):
     srt_path = str(srt_file).replace("\\", "/")
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", str(input_video),
+    vf = f"subtitles={srt_path}:force_style='Alignment=2,MarginV={y},FontSize={font_size},PrimaryColour=&H00CCFF&,FontName=Microsoft YaHei'"
+    run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-vf", vf, "-c:v", "libx264", "-crf", "23", "-preset", "fast", "-c:a", "copy", str(output_video)])
 
-        "-vf",
-        (
-            f"subtitles={srt_path}:"
-            f"force_style='Alignment=2,MarginV={y},FontSize={font_size},PrimaryColour=&H00CCFF&,FontName=Microsoft YaHei'"
-        ),
 
-        "-c:v", "libx264",
-        "-crf", "23",
-        "-preset", "fast",
-        "-c:a", "copy",
-
-        str(output_video)
-    ]
-
-    run_cmd(cmd)
-
-def add_text_overlay(
-    input_video,
-    output_video,
-    title,
-    subtitle,
-    font_size_title,
-    font_size_sub,
-    title_y,
-    sub_y,
-    title_color,
-    sub_color,
-    popup_comments,
-    popup_font_size,
-    popup_color,
-    popup_y
-):
-
-    font_path = "C\\:/Windows/Fonts/msyh.ttc"
-
-    filters = [] 
-
-    # 标题
-    filters.append(
-    f"drawtext="
-    f"fontfile='{font_path}':"
-    f"text='{title}':"
-    f"fontcolor={title_color}:"
-    f"fontsize={font_size_title}:"
-    f"x=(w-text_w)/2:"
-    f"y={title_y}"
-    )
-
-# 副标题
-    filters.append(
-    f"drawtext="
-    f"fontfile='{font_path}':"
-    f"text='{subtitle}':"
-    f"fontcolor={sub_color}:"
-    f"fontsize={font_size_sub}:"
-    f"x=(w-text_w)/2:"
-    f"y=h-{sub_y}"
-    )
-# 可选弹幕
-    if popup_comments:
-        for item in popup_comments:
-
-            text = item["text"]
-            start_time = item["start_time"]
-
-            filters.append(
-            f"drawtext="
-            f"fontfile='{font_path}':"
-            f"text='{text}':"
-            f"fontcolor={popup_color}:"
-            f"fontsize={popup_font_size}:"
-            f"borderw=3:"
-            f"bordercolor=black:"
-            f"x=w-(t-{start_time})*200:"
-            f"y={popup_y}:"
-            f"enable='gte(t,{start_time})'"
-            )
-
+def add_text_overlay(input_video, output_video, title, subtitle, font_size_title, font_size_sub, title_y, sub_y, title_color, sub_color, popup_comments, popup_font_size, popup_color, popup_y):
+    font_path, filters = "C\\:/Windows/Fonts/msyh.ttc", []
+    filters.append(f"drawtext=fontfile='{font_path}':text='{title}':fontcolor={title_color}:fontsize={font_size_title}:x=(w-text_w)/2:y={title_y}")
+    filters.append(f"drawtext=fontfile='{font_path}':text='{subtitle}':fontcolor={sub_color}:fontsize={font_size_sub}:x=(w-text_w)/2:y=h-{sub_y}")
+    for item in popup_comments or []:
+        filters.append(f"drawtext=fontfile='{font_path}':text='{item['text']}':fontcolor={popup_color}:fontsize={popup_font_size}:borderw=3:bordercolor=black:x=w-(t-{item['start_time']})*200:y={popup_y}:enable='gte(t,{item['start_time']})'")
     vf = ",".join(filters)
     print(vf)
-
-    cmd = [
-    "ffmpeg", "-y",
-    "-i", str(input_video),
-    "-vf", vf,
-    "-c:v", "libx264",
-    "-crf", "23",
-    "-preset", "fast",
-    "-c:a", "copy",
-    str(output_video)
-    ]
-
-    run_cmd(cmd)
+    run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-vf", vf, "-c:v", "libx264", "-crf", "23", "-preset", "fast", "-c:a", "copy", str(output_video)])
 
 
-def add_gif_overlay(
-    input_video,
-    output_video,
-    gif_path,
-    x,
-    y,
-    scale
-):
-    """
-    在视频上叠加 GIF 动画
-    """
+def add_gif_overlay(input_video, output_video, gif_path, x, y, scale):
+    filters = f"[1:v]scale=iw*{scale}:ih*{scale}[gif];[0:v][gif]overlay={x}:{y}:shortest=1"
+    run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-ignore_loop", "0", "-i", str(gif_path), "-filter_complex", filters, "-c:v", "libx264", "-crf", "23", "-preset", "fast", "-c:a", "copy", str(output_video)])
 
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", str(input_video),
-        "-ignore_loop", "0",
-        "-i", str(gif_path),
-
-        "-filter_complex",
-        (
-            f"[1:v]scale=iw*{scale}:ih*{scale}[gif];"
-            f"[0:v][gif]overlay={x}:{y}:shortest=1"
-        ),
-
-        "-c:v", "libx264",
-        "-crf", "23",
-        "-preset", "fast",
-        "-c:a", "copy",
-
-        str(output_video)
-    ]
-
-    run_cmd(cmd)
 
 def wav_to_map3(wav_path, mp3_path):
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-i", str(wav_path),
-        "-codec:a", "libmp3lame",
-        "-q:a", "2",
-        str(mp3_path)
-    ]
-
-    run_cmd(cmd)
+    run_cmd(["ffmpeg", "-y", "-i", str(wav_path), "-codec:a", "libmp3lame", "-q:a", "2", str(mp3_path)])

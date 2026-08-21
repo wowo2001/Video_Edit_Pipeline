@@ -21,14 +21,14 @@ from services.s3 import S3
 
 class AutoVideoPipeline:
 
-    def __init__(self):
-        self.project_paths = ProjectPaths()
+    def __init__(self, project_paths=None):
+        self.project_paths = project_paths or ProjectPaths()
 
     def run(self, urls, title, subtitle = None, upload=False):
 
         print("========== 1. 下载视频 ==========")
 
-        download_video(urls, self.project_paths.video)
+        download_video(urls, self.project_paths.video, self.project_paths.origin)
 
         print("========== 2. 提取音频 ==========")
 
@@ -43,12 +43,12 @@ class AutoVideoPipeline:
 
         print("========== 3.2 人物识别 ==========")
         strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=False)
-        Ali().recognise_speaker(self.project_paths.subtitles['stripped_srt'], self.project_paths.speaker_mapping)
+        ChatGPT().recognise_speaker(self.project_paths.subtitles['stripped_srt'], self.project_paths.speaker_mapping)
         apply_speaker_mapping(self.project_paths.subtitles['srt'], self.project_paths.speaker_mapping)
         
         print("========== 3.3 生成故事 拆分场景 ==========")
         strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=True)
-        Ali().generate_story(self.project_paths.subtitles['stripped_srt'], self.project_paths.story)
+        ChatGPT().generate_story(self.project_paths.subtitles['stripped_srt'], self.project_paths.story)
         
 
         print("========== 4. AI 脚本 ==========")

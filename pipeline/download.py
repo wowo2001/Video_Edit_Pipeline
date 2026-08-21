@@ -1,11 +1,9 @@
-from uuid import uuid4
-
 from core.cmd import run_cmd
 from pipeline.video import concat_videos
 from core.ffmpeg import encode_to_standard
-from core.path import ProjectPaths
 
-def download_video(urls, output_path):
+
+def download_video(urls, output_path, origin_path):
 
     if output_path.exists():
         output_path.unlink()
@@ -13,15 +11,17 @@ def download_video(urls, output_path):
     if isinstance(urls, str):
         urls = [urls]
 
-    root_path = ProjectPaths()
+    origin_path.mkdir(parents=True, exist_ok=True)
 
     for index, url in enumerate(urls):
 
-        temp_video = root_path.origin / f"temp_{index:03d}.mp4"
-        video = root_path.origin / f"{index:03d}.mp4"
+        temp_video = origin_path / f"temp_{index:03d}.mp4"
+        video = origin_path / f"{index:03d}.mp4"
 
         cmd = [
             "yt-dlp",
+            "--extractor-args", "youtube:player_client=mweb",
+            "--js-runtimes", "node",
             "-f", "bestvideo+bestaudio/best",
             "--merge-output-format", "mp4",
             "-o", str(temp_video),
@@ -33,7 +33,7 @@ def download_video(urls, output_path):
         encode_to_standard(temp_video, video)
         temp_video.unlink(missing_ok=True)
 
-    concat_videos(root_path.origin, output_path)
+    concat_videos(origin_path, output_path)
 
 
     print(f"下载完成: {output_path}")

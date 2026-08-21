@@ -1,8 +1,8 @@
 import json
+from pathlib import Path
 
 from core.path import ProjectPaths
-
-from core.utils import clear_workdir
+from core.utils import safe_filename
 from pipeline.pipeline import AutoVideoPipeline
 
 
@@ -14,9 +14,15 @@ def main():
     print(f"📦 Total jobs: {len(jobs)}")
 
     for i, job in enumerate(jobs):
-        clear_workdir(ProjectPaths().root,ProjectPaths().vocals_path)
+        job_name = safe_filename(job.get("subtitle") or job["title"])
+        project_paths = ProjectPaths(Path("work") / f"{i + 1:03d}_{job_name}")
         print(f"\n▶ Job {i+1}/{len(jobs)}")
-        AutoVideoPipeline().run(urls=job["urls"], title=job["title"], subtitle=job.get("subtitle"), upload=True)
+        AutoVideoPipeline(project_paths).run(
+            urls=job["urls"],
+            title=job["title"],
+            subtitle=job.get("subtitle"),
+            upload=True,
+        )
 
     print("\n🎬 ALL DONE")
 

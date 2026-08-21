@@ -162,7 +162,7 @@ class ChatGPT:
             {subtitles}
         """
         response = self.client.chat.completions.create(
-            model="gpt-5.6-luna",
+            model="gpt-5.6-sol",
             messages=[
                 {"role": "user", "content": prompt}
             ]
