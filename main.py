@@ -1,4 +1,5 @@
 import json
+from core.utils import read_json, write_json
 from pathlib import Path
 
 from core.path import ProjectPaths
@@ -8,9 +9,7 @@ from pipeline.pipeline import AutoVideoPipeline
 
 def main():
 
-    with open(ProjectPaths().task_file, "r", encoding="utf-8") as f:
-        jobs = json.load(f)
-
+    jobs = read_json(ProjectPaths().task_file)
     print(f"📦 Total jobs: {len(jobs)}")
 
     for i, job in enumerate(jobs):

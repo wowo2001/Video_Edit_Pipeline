@@ -1,4 +1,5 @@
 import json
+from core.utils import read_json, write_json
 
 from config import HF_TOKEN
 from core.utils import ms_to_srt_time
@@ -52,9 +53,7 @@ class Whisper:
         # 1. 读取ASR结果
         # =========================
 
-        with open(output_path["json"], "r", encoding="utf-8") as f:
-            cloud_json = json.load(f)
-
+        cloud_json = read_json(output_path["json"])
         # =========================
         # 2. Speaker Diarization
         # =========================
@@ -85,14 +84,12 @@ class Whisper:
                 "speaker": speaker
             })
 
-        with open(ProjectPaths().root / "segments.json", "w") as f:
-            json.dump(
-                segments,
-                f,
-                indent=2,
-                ensure_ascii=False
-            )
-
+        write_json(
+                        segments,
+                        ProjectPaths().root / "segments.json",
+                        indent=2,
+                        ensure_ascii=False
+                    )
 
 
         # =========================
@@ -119,19 +116,12 @@ class Whisper:
         # 4. 保存 JSON
         # =========================
 
-        with open(
-                output_path["json"],
-                "w",
-                encoding="utf-8"
-        ) as f:
-
-            json.dump(
-                cloud_json,
-                f,
-                ensure_ascii=False,
-                indent=2
-            )
-
+        write_json(
+                        cloud_json,
+                        output_path["json"],
+                        ensure_ascii=False,
+                        indent=2
+                    )
         print(
             f"✅ JSON saved: {output_path['json']}"
         )
@@ -194,13 +184,12 @@ class Whisper:
             result["utterances"].append(utterance)    
 
         # JSON
-        with open(output_path["json"], "w", encoding="utf-8") as f:
-            json.dump(
-                result,
-                f,
-                ensure_ascii=False,
-                indent=2
-            )
+        write_json(
+                        result,
+                        output_path["json"],
+                        ensure_ascii=False,
+                        indent=2
+                    )
         print(
             f"✅ Subtitle generated: "
             f"{output_path['json']}"

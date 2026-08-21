@@ -7,6 +7,7 @@ from collections import Counter
 from speechbrain.inference.speaker import EncoderClassifier
 from sklearn.cluster import AgglomerativeClustering
 import json
+from core.utils import read_json, write_json
 from core.path import ProjectPaths
 from core.utils import ms_to_srt_time
 
@@ -69,9 +70,7 @@ class SpeechBrain:
         min_duration=0.5,
         min_cluster_ratio=0.05
     ):
-        with open(output_path["json"], "r", encoding="utf-8") as f:
-            cloud_json = json.load(f)
-
+        cloud_json = read_json(output_path["json"])
         # =========================
         # load audio
         # =========================
@@ -178,13 +177,12 @@ class SpeechBrain:
 
 
         # JSON
-        with open(output_path["json"], "w", encoding="utf-8") as f:
-            json.dump(
-                cloud_json,
-                f,
-                ensure_ascii=False,
-                indent=2
-            )
+        write_json(
+                        cloud_json,
+                        output_path["json"],
+                        ensure_ascii=False,
+                        indent=2
+                    )
         print(
             f"✅ Subtitle generated: "
             f"{output_path['json']}"

@@ -15,13 +15,13 @@ from prompts.select_conversation import SELECT_CONVERSATION
 from prompts.story_draft import STORY_DRAFT
 from prompts.scene_draft import SCENE_DRAFT
 import json
+from core.utils import read_json, write_json
 class ChatGPT:
     def __init__(self):
         self.client = OpenAI(api_key=OPENAI_API_KEY)
     def generate_script(self, subtitles_path, script_path, story_path):
         subtitles = subtitles_path.read_text(encoding="utf-8")
-        with open(story_path, "r", encoding="utf-8") as f:
-            story_json = json.load(f)
+        story_json = read_json(story_path)
         recommend_ids = set(
             story_json.get("推荐解说场景", [])
         )
@@ -48,8 +48,7 @@ class ChatGPT:
             print("\n❌ GPT 输出 JSON 解析失败：\n")
             print(script)
             raise
-        with open(script_path, "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
+        write_json(result, script_path, ensure_ascii=False, indent=2)
         print(f"\n✅ GPT 脚本已保存: {script_path}")
     
     def fix_subtitles(self, subtitles_path, fixed_subtitles_path):
@@ -98,9 +97,7 @@ class ChatGPT:
         )
         content = response.choices[0].message.content.strip()
         mapping = json.loads(content)
-        with open(mapping_path, "w", encoding="utf-8") as f:
-            json.dump(mapping, f, ensure_ascii=False, indent=2)
-
+        write_json(mapping, mapping_path, ensure_ascii=False, indent=2)
         print(f"\n✅ speaker映射已保存: {mapping_path}")
 
 
@@ -119,9 +116,7 @@ class ChatGPT:
 
     def review_script(self, script_path):
     # 读取原始脚本 JSON
-        with open(script_path, "r", encoding="utf-8") as f:
-            script_json = json.load(f)
-
+        script_json = read_json(script_path)
         prompt = f"""{REVIEW_SCRIPT_PROMPT}
 
 脚本内容：
@@ -145,9 +140,7 @@ class ChatGPT:
             raise
 
     # 覆盖保存到原路径
-        with open(script_path, "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
-
+        write_json(result, script_path, ensure_ascii=False, indent=2)
         print(f"\n✅ GPT 审核后的脚本已保存: {script_path}")
     
     def generate_story(self, subtitles_path, story_path):
@@ -169,9 +162,7 @@ class ChatGPT:
         )
         content = response.choices[0].message.content.strip()
         story = json.loads(content)
-        with open(story_path, "w", encoding="utf-8") as f:
-            json.dump(story, f, ensure_ascii=False, indent=2)
-
+        write_json(story, story_path, ensure_ascii=False, indent=2)
         print(f"\n✅ 故事已保存: {story_path}")
 
     
@@ -179,9 +170,7 @@ class ChatGPT:
 
 
         # 读取 search_story 返回的故事
-        with open(story_path, "r", encoding="utf-8") as f:
-            stories = json.load(f)
-
+        stories = read_json(story_path)
         story_text = "\n\n".join(
     [
         f"""
@@ -223,23 +212,19 @@ class ChatGPT:
             raise
 
 
-        with open(script_path, "w", encoding="utf-8") as f:
-            json.dump(
-            result,
-            f,
-            ensure_ascii=False,
-            indent=2
-            )
-
+        write_json(
+                    result,
+                    script_path,
+                    ensure_ascii=False,
+                    indent=2
+                    )
         print(f"\n✅ GPT 解说脚本已保存: {script_path}")
     
     def generate_scene(self, scene_path, story_path):
 
 
         # 读取 search_story 返回的故事
-        with open(story_path, "r", encoding="utf-8") as f:
-            stories = json.load(f)
-
+        stories = read_json(story_path)
         story_text = "\n\n".join(
     [
         f"""
@@ -281,21 +266,17 @@ class ChatGPT:
             raise
 
 
-        with open(scene_path, "w", encoding="utf-8") as f:
-            json.dump(
-            result,
-            f,
-            ensure_ascii=False,
-            indent=2
-            )
-
+        write_json(
+                    result,
+                    scene_path,
+                    ensure_ascii=False,
+                    indent=2
+                    )
         print(f"\n✅ 场景拆分结果已保存: {scene_path}")
 
     def generate_script_final(self, script_path):
 
-        with open(script_path, "r", encoding="utf-8") as f:
-            script = json.load(f)
-
+        script = read_json(script_path)
         for item in script:
 
         # 只保留 AI 需要的信息
@@ -337,14 +318,12 @@ class ChatGPT:
         # 删除候选，避免 script 过大
             del item["clip"]["candidates"]
 
-        with open(script_path, "w", encoding="utf-8") as f:
-            json.dump(
-            script,
-            f,
-            ensure_ascii=False,
-            indent=2
-            )
-
+        write_json(
+                    script,
+                    script_path,
+                    ensure_ascii=False,
+                    indent=2
+                    )
         print(f"\n✅ 最终脚本已保存: {script_path}")
 
     def select_scene(
@@ -355,13 +334,7 @@ class ChatGPT:
         output_path
     ):
 
-        with open(
-            candidate_path,
-            "r",
-            encoding="utf-8"
-        ) as f:
-            scenes = json.load(f)
-
+        scenes = read_json(candidate_path)
 
         candidates = []
 
@@ -568,18 +541,12 @@ task 必须说明：
             response.choices[0].message.content
         )
 
-        with open(
-            output_path,
-            "w",
-            encoding="utf-8"
-        ) as f:
-            json.dump(
-                result,
-                f,
-                ensure_ascii=False,
-                indent=2
-            )
-
+        write_json(
+                        result,
+                        output_path,
+                        ensure_ascii=False,
+                        indent=2
+                    )
 
 
     def select_scene_clip(
@@ -695,13 +662,7 @@ task 必须说明：
         output_path
     ):
 
-        with open(
-            scene_path,
-            "r",
-            encoding="utf-8"
-        ) as f:
-            scenes = json.load(f)
-
+        scenes = read_json(scene_path)
 
         scene_list = []
 
@@ -764,18 +725,12 @@ task 必须说明：
         )
 
 
-        with open(
-            output_path,
-            "w",
-        encoding="utf-8"
-        ) as f:
-            json.dump(
-                result,
-                f,
-                ensure_ascii=False,
-                indent=2
-            )
-
+        write_json(
+                        result,
+                        output_path,
+                        ensure_ascii=False,
+                        indent=2
+                    )
 
         return result
 
@@ -927,13 +882,7 @@ task 必须说明：
         scene_path
     ):
 
-        with open(
-            scene_path,
-            "r",
-            encoding="utf-8"
-        ) as f:
-            scenes = json.load(f)
-
+        scenes = read_json(scene_path)
 
         # 给AI的数据
         ai_input = []
@@ -1089,19 +1038,12 @@ task 必须说明：
                     segment["narration"] = narration
 
 
-        with open(
-            scene_path,
-            "w",
-            encoding="utf-8"
-        ) as f:
-
-            json.dump(
-                scenes,
-                f,
-                ensure_ascii=False,
-                indent=2
-            )
-
+        write_json(
+                        scenes,
+                        scene_path,
+                        ensure_ascii=False,
+                        indent=2
+                    )
 
         return scenes
     
@@ -1113,13 +1055,7 @@ task 必须说明：
     output_path
     ):
 
-        with open(
-            scene_path,
-            "r",
-            encoding="utf-8"
-        ) as f:
-            scenes = json.load(f)
-
+        scenes = read_json(scene_path)
 
         ai_input = []
 
@@ -1226,15 +1162,9 @@ hook解说要求：
         result = safe_json_parse(
             response.choices[0].message.content
         )
-        with open(
-            output_path,
-            "w",
-            encoding="utf-8"
-        ) as f:
-
-            json.dump(
-                result,
-                f,
-                ensure_ascii=False,
-                indent=2
-            )
+        write_json(
+                        result,
+                        output_path,
+                        ensure_ascii=False,
+                        indent=2
+                    )

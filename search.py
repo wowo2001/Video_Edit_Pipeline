@@ -1,6 +1,7 @@
 from pathlib import Path
 import shutil
 import json
+from core.utils import read_json, write_json
 
 from core.path import ProjectPaths
 from services.ali import Ali
@@ -37,8 +38,7 @@ ai = ChatGPT()
 # )
 # save_scene_candidates(rows,project_paths.scene_candidate)
 
-with open(project_paths.questions, "r", encoding="utf-8") as f:
-        questions = json.load(f)
+questions = read_json(project_paths.questions)
 question = questions["问题"]
 scene_ids = questions["场景"]
 subtitle = questions["标题"]
@@ -64,14 +64,12 @@ for scene_id in scene_ids:
     # 输出文件
 output_path = Path(project_paths.scene_candidate)
 
-with open(output_path, "w", encoding="utf-8") as f:
-    json.dump(
+write_json(
         scenes,
-        f,
+        output_path,
         ensure_ascii=False,
         indent=2
     )
-
 print(f"scene candidates saved: {output_path}")
 
 theme = f"{question}从{strategy}角度分析解说词，结合历史背景和人物性格，深入剖析人物的动机和策略。"
@@ -84,13 +82,7 @@ restore_scene_subtitle(project_paths.selected_scene,project_paths.scene_candidat
 
 print("====4. AI选择场景台词====")
 
-with open(
-    project_paths.scene_with_subtitle,
-    "r",
-    encoding="utf-8"
-) as f:
-    scenes = json.load(f)
-
+scenes = read_json(project_paths.scene_with_subtitle)
 scene_clips = []
 
 for scene in scenes:
@@ -108,18 +100,12 @@ for scene in scenes:
 )
 
 
-with open(
-    project_paths.scene_clips,
-    "w",
-    encoding="utf-8"
-) as f:
-    json.dump(
+write_json(
         scene_clips,
-        f,
+        project_paths.scene_clips,
         ensure_ascii=False,
         indent=2
     )
-
 restore_segment_subtitles(
     project_paths.scene_with_subtitle,
     project_paths.scene_clips,

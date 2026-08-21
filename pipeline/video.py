@@ -9,6 +9,7 @@ from core.ffmpeg import add_text_overlay as add_text_overlay_ffmpeg
 from core.ffmpeg import add_gif_overlay as add_gif_overlay_ffmpeg
 from core.ffmpeg import mosaic_regions as mosaic_regions_ffmpeg
 import json
+from core.utils import read_json, write_json
 from pathlib import Path
 import re
 
@@ -22,7 +23,7 @@ def cut_video(input_path, output_path, script_path):
 def _cut_hook_video(input_path, output_path, script_path):
 
     with open(script_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+        data = read_json(f)
 
     narration_duration = ms_to_seconds(
         data["hook"]["narrative"]["length"]
@@ -87,7 +88,7 @@ def _cut_hook_video(input_path, output_path, script_path):
 def _cut_clip_video(input_path, output_path, script_path):
 
     with open(script_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+        data = read_json(f)
 
     for item in data["clips"]:
 
@@ -285,7 +286,7 @@ def cut_segment_video_temp(
         "r",
         encoding="utf-8"
     ) as f:
-        scenes = json.load(f)
+        scenes = read_json(f)
 
 
 
@@ -439,7 +440,7 @@ def cut_segment_video_temp(
         encoding="utf-8"
     ) as f:
 
-        json.dump(
+        write_json(
             scenes,
             f,
             ensure_ascii=False,
@@ -457,7 +458,7 @@ def concat_segment_videos(
         "r",
         encoding="utf-8"
     ) as f:
-        scenes = json.load(f)
+        scenes = read_json(f)
 
 
     with open(
@@ -465,7 +466,7 @@ def concat_segment_videos(
         "r",
         encoding="utf-8"
     ) as f:
-        hook = json.load(f)
+        hook = read_json(f)
 
 
 
@@ -596,7 +597,7 @@ def cut_hook_video_temp(
         "r",
         encoding="utf-8"
     ) as f:
-        hook = json.load(f)
+        hook = read_json(f)
 
 
 
@@ -688,7 +689,7 @@ end={end}
         encoding="utf-8"
     ) as f:
 
-        json.dump(
+        write_json(
             hook,
             f,
             ensure_ascii=False,

@@ -1,5 +1,6 @@
 
 import json
+from core.utils import read_json, write_json
 
 from services.postgresql import PostgresClient
 from services.text_embedding_service import TextEmbeddingService
@@ -12,9 +13,9 @@ class PostCutService:
 
     def save_transcription_to_db(self, subtitles_path, speaker_mapping_path, video_url, episode):
         with open(subtitles_path, "r", encoding="utf-8") as f:
-            subtitles = json.load(f)
+            subtitles = read_json(f)
         with open(speaker_mapping_path, "r", encoding="utf-8") as f:
-            speaker_mapping = json.load(f)
+            speaker_mapping = read_json(f)
 
         results = []
 
@@ -58,7 +59,7 @@ class PostCutService:
 
     def save_story_to_db(self, story_path, video_url, episode):
         with open(story_path, "r", encoding="utf-8") as f:
-            story = json.load(f)
+            story = read_json(f)
 
         results = []
 
@@ -93,7 +94,7 @@ class PostCutService:
     def save_scene_to_db(self, story_path, video_url, drama_title):
 
         with open(story_path, "r", encoding="utf-8") as f:
-            story = json.load(f)
+            story = read_json(f)
         
         scene_mapping = {}
 
@@ -156,7 +157,7 @@ class PostCutService:
             "r",
             encoding="utf-8"
         ) as f:
-            subtitles = json.load(f)
+            subtitles = read_json(f)
 
 
         for item in subtitles.get("utterances", []):

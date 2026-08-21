@@ -2,6 +2,7 @@ from core.cmd import run_cmd
 from core.ffmpeg import concat_media, extract_audio, mix_narration
 from core.demucs import extract_vocals_demucs
 import json
+from core.utils import read_json, write_json
 from pathlib import Path
 
 
@@ -55,8 +56,7 @@ def mix_audio(video_path, narration_audio_path, script_path, output_path):
     final_output_path = output_path / "hook_final.mp4"
     _mix_hook_audio(clip_video_path, audio_path, final_output_path)
 
-    with open(script_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    data = read_json(script_path)
     for item in data["clips"]:
         place = item["place"]
         clip_video_path = video_path / f"clip_{place}.mp4"
@@ -86,13 +86,7 @@ def mix_audio_segment_temp(
     )
 
 
-    with open(
-        scene_path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-        scenes = json.load(f)
-
+    scenes = read_json(scene_path)
 
 
     for scene in scenes:
@@ -164,18 +158,14 @@ def mix_audio_segment_temp(
 
 
 
-    with open(
-        scene_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
+    write_json(
+                scenes,
+                scene_path,
+                ensure_ascii=False,
+                indent=2
+            )
 
-        json.dump(
-            scenes,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
+
 def mix_audio_hook_temp(
     hook_path,
     output_path
@@ -187,13 +177,7 @@ def mix_audio_hook_temp(
     )
 
 
-    with open(
-        hook_path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-        hook = json.load(f)
-
+    hook = read_json(hook_path)
 
 
     clip_video_path = Path(
@@ -252,18 +236,11 @@ def mix_audio_hook_temp(
 
 
 
-    with open(
-        hook_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            hook,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
-
+    write_json(
+                hook,
+                hook_path,
+                ensure_ascii=False,
+                indent=2
+            )
 
     return hook

@@ -3,6 +3,7 @@ from core.utils import ms_to_srt_time
 import requests
 import time
 import json
+from core.utils import read_json, write_json
 import base64
 from pydub import AudioSegment
 
@@ -101,9 +102,7 @@ class Volcengine:
     # 保存完整 response
     # =========================
 
-        with open(output_path["json"], "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
-
+        write_json(result, output_path["json"], ensure_ascii=False, indent=2)
         print(f"✅ 原始JSON已保存: {output_path['json']}")
 
     # =========================
@@ -137,9 +136,7 @@ class Volcengine:
         print(f"\n✅ 字幕生成完成: {output_path['srt']}")  
 
     def generate_tts(self, script_path, output_path):
-        with open(script_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
+        data = read_json(script_path)
         text = data["hook"]["narrative"]["content"]
         audio_bytes = self._tts_stream(text)
         audio_path = output_path / "hook.mp3"
@@ -164,9 +161,7 @@ class Volcengine:
 
             item["narrative"]["length"] = duration_ms
 
-        with open(script_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-
+        write_json(data, script_path, ensure_ascii=False, indent=2)
 
 
     def _tts_stream(self, text: str) -> bytes:
@@ -227,13 +222,7 @@ class Volcengine:
         )
 
 
-        with open(
-            script_path,
-            "r",
-            encoding="utf-8"
-        ) as f:
-            data = json.load(f)
-
+        data = read_json(script_path)
 
         for scene in data:
 
@@ -295,19 +284,12 @@ class Volcengine:
 
 
 
-        with open(
-            script_path,
-            "w",
-            encoding="utf-8"
-        ) as f:
-
-            json.dump(
-                data,
-                f,
-                ensure_ascii=False,
-                indent=2
-            )
-
+        write_json(
+                        data,
+                        script_path,
+                        ensure_ascii=False,
+                        indent=2
+                    )
     def generate_hook_tts(
         self,
         hook_path,
@@ -324,13 +306,7 @@ class Volcengine:
         )
 
 
-        with open(
-            hook_path,
-            "r",
-            encoding="utf-8"
-        ) as f:
-            hook = json.load(f)
-
+        hook = read_json(hook_path)
 
         text = hook.get(
             "hook_narration",
@@ -381,18 +357,11 @@ class Volcengine:
 
 
 
-        with open(
-            hook_path,
-            "w",
-            encoding="utf-8"
-        ) as f:
-
-            json.dump(
-                hook,
-                f,
-                ensure_ascii=False,
-                indent=2
-            )
-
+        write_json(
+                        hook,
+                        hook_path,
+                        ensure_ascii=False,
+                        indent=2
+                    )
 
         return hook

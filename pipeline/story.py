@@ -1,4 +1,5 @@
 import json
+from core.utils import read_json, write_json
 import os
 from urllib.parse import urlparse
 def convert_row_data_to_json(rows, story_path):
@@ -10,15 +11,11 @@ def convert_row_data_to_json(rows, story_path):
             "url": row[1]
         })
 
-    with open(story_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
+    write_json(data, story_path, ensure_ascii=False, indent=2)
 def generate_cadidate_script(scene_path, cadidate_metadata_path, context, client, speaker=None):
 
     # 读取 scene
-    with open(scene_path, "r", encoding="utf-8") as f:
-        scenes = json.load(f)
-
+    scenes = read_json(scene_path)
     candidate_metadata = []
 
 
@@ -127,35 +124,21 @@ def generate_cadidate_script(scene_path, cadidate_metadata_path, context, client
 
 
     # 更新 scene 文件
-    with open(
-        scene_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            scenes,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
-
+    write_json(
+                scenes,
+                scene_path,
+                ensure_ascii=False,
+                indent=2
+            )
 
 
     # 保存 metadata
-    with open(
-        cadidate_metadata_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            candidate_metadata,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
-
+    write_json(
+                candidate_metadata,
+                cadidate_metadata_path,
+                ensure_ascii=False,
+                indent=2
+            )
 
     print(
         f"✅ 候选字幕生成完成: {len(candidate_metadata)} 条"
@@ -163,14 +146,10 @@ def generate_cadidate_script(scene_path, cadidate_metadata_path, context, client
 
 def generate_final_script(script_path, cadidate_metadata_path, clips_path, s3_client):
     # 读取 script
-    with open(script_path, "r", encoding="utf-8") as f:
-        script = json.load(f)
-
+    script = read_json(script_path)
 
     # 读取 metadata
-    with open(cadidate_metadata_path, "r", encoding="utf-8") as f:
-        metadata = json.load(f)
-
+    metadata = read_json(cadidate_metadata_path)
 
     # 建立索引
     metadata_map = {
@@ -240,14 +219,12 @@ def generate_final_script(script_path, cadidate_metadata_path, clips_path, s3_cl
 
 
     # 保存更新后的 script
-    with open(script_path, "w", encoding="utf-8") as f:
-        json.dump(
-            script,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )    
-
+    write_json(
+                script,
+                script_path,
+                ensure_ascii=False,
+                indent=2
+            )
 
 def transcript_to_dict(row):
     """

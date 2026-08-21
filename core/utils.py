@@ -6,6 +6,25 @@ import shutil
 from urllib.parse import urlparse
 from core.ffmpeg import encode_to_standard
 
+
+def read_json(source, **kwargs):
+    """Read JSON from a UTF-8 path or an already-open text stream."""
+    if hasattr(source, "read"):
+        return json.load(source, **kwargs)
+
+    with open(source, "r", encoding="utf-8") as file:
+        return json.load(file, **kwargs)
+
+
+def write_json(data, destination, *, ensure_ascii=False, indent=2, **kwargs):
+    """Write JSON to a UTF-8 path or an already-open text stream."""
+    if hasattr(destination, "write"):
+        json.dump(data, destination, ensure_ascii=ensure_ascii, indent=indent, **kwargs)
+        return
+
+    with open(destination, "w", encoding="utf-8") as file:
+        json.dump(data, file, ensure_ascii=ensure_ascii, indent=indent, **kwargs)
+
 def ms_to_srt_time(ms: int) -> str:
     ms = int(ms)
     h = ms // 3600000
@@ -84,9 +103,7 @@ def strip_srt(input_file, output_file, keep_index):
 def apply_speaker_mapping(subtitles_path, mapping_path):
     text = subtitles_path.read_text(encoding="utf-8")
 
-    with open(mapping_path, "r", encoding="utf-8") as f:
-        mapping = json.load(f)
-
+    mapping = read_json(mapping_path)
     for k, v in mapping.items():
         text = text.replace(f"[{k}]", f"[{v}]")
 
@@ -94,12 +111,8 @@ def apply_speaker_mapping(subtitles_path, mapping_path):
 
 
 def apply_speaker_mapping_to_script(script_path, mapping_path):
-    with open(script_path, "r", encoding="utf-8") as f:
-        script = json.load(f)
-
-    with open(mapping_path, "r", encoding="utf-8") as f:
-        mapping = json.load(f)
-
+    script = read_json(script_path)
+    mapping = read_json(mapping_path)
     def replace_speaker(obj):
         if isinstance(obj, dict):
             for k, v in obj.items():
@@ -113,16 +126,10 @@ def apply_speaker_mapping_to_script(script_path, mapping_path):
 
     replace_speaker(script)
 
-    with open(script_path, "w", encoding="utf-8") as f:
-        json.dump(script, f, ensure_ascii=False, indent=2)
-
+    write_json(script, script_path, ensure_ascii=False, indent=2)
 def apply_timeline(script_path, subtitles_path):
-    with open(script_path, "r", encoding="utf-8") as f:
-        script = json.load(f)
-
-    with open(subtitles_path, "r", encoding="utf-8") as f:
-        subtitles = json.load(f)
-
+    script = read_json(script_path)
+    subtitles = read_json(subtitles_path)
     utterances = subtitles["utterances"]
 
     def build_clip(index_list):
@@ -154,18 +161,14 @@ def apply_timeline(script_path, subtitles_path):
         section["clip"] = build_clip(section.get("clip", []))
 
     # 写回
-    with open(script_path, "w", encoding="utf-8") as f:
-        json.dump(script, f, ensure_ascii=False, indent=2)
-
+    write_json(script, script_path, ensure_ascii=False, indent=2)
 def chunk_srt_by_scenes(
         srt_file,
         story_file,
         output_file
 ):
 
-    with open(story_file, "r", encoding="utf-8") as f:
-        story = json.load(f)
-
+    story = read_json(story_file)
 
     # 推荐场景
     recommend_ids = set(
@@ -240,15 +243,9 @@ def apply_character_scene_mapping(
         output_path
 ):
 
-    with open(subtitle_json_path, "r", encoding="utf-8") as f:
-        subtitles = json.load(f)
-
-    with open(speaker_mapping_path, "r", encoding="utf-8") as f:
-        speaker_mapping = json.load(f)
-
-    with open(story_path, "r", encoding="utf-8") as f:
-        story = json.load(f)
-
+    subtitles = read_json(subtitle_json_path)
+    speaker_mapping = read_json(speaker_mapping_path)
+    story = read_json(story_path)
 
     scenes = story.get("场景", [])
 
@@ -301,14 +298,12 @@ def apply_character_scene_mapping(
     
 
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(
-            subtitles,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
-
+    write_json(
+                subtitles,
+                output_path,
+                ensure_ascii=False,
+                indent=2
+            )
 def save_scene_candidates(rows, output_path):
 
     scenes = []
@@ -326,18 +321,12 @@ def save_scene_candidates(rows, output_path):
         )
 
 
-    with open(
-        output_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
-        json.dump(
-            scenes,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
-
+    write_json(
+                scenes,
+                output_path,
+                ensure_ascii=False,
+                indent=2
+            )
 def restore_scene_subtitle(
     selected_scene_path,
     scene_path,
@@ -345,21 +334,9 @@ def restore_scene_subtitle(
     postgres_client
 ):
 
-    with open(
-        scene_path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-        scenes = json.load(f)
+    scenes = read_json(scene_path)
 
-
-    with open(
-        selected_scene_path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-        selected_scene = json.load(f)
-
+    selected_scene = read_json(selected_scene_path)
 
     # 原scene建立索引
     scene_map = {
@@ -427,18 +404,12 @@ def restore_scene_subtitle(
     # )
 
 
-    with open(
-        output_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
-        json.dump(
-            results,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
-
+    write_json(
+                results,
+                output_path,
+                ensure_ascii=False,
+                indent=2
+            )
 
     return results
 
@@ -448,21 +419,9 @@ def restore_selected_subtitles(
     output_path
 ):
 
-    with open(
-        scene_with_subtitle_path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-        scenes = json.load(f)
+    scenes = read_json(scene_with_subtitle_path)
 
-
-    with open(
-        scene_clips_path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-        scene_clips = json.load(f)
-
+    scene_clips = read_json(scene_clips_path)
 
     # scene_id -> clip index
     clip_mapping = {
@@ -530,19 +489,12 @@ def restore_selected_subtitles(
         results.append(scene)
 
 
-    with open(
-        output_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            results,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
-
+    write_json(
+                results,
+                output_path,
+                ensure_ascii=False,
+                indent=2
+            )
 
     return results
 
@@ -555,21 +507,9 @@ def merge_scene_narration(
     output_path
 ):
 
-    with open(
-        scene_path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-        scenes = json.load(f)
+    scenes = read_json(scene_path)
 
-
-    with open(
-        narration_path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-        narrations = json.load(f)
-
+    narrations = read_json(narration_path)
 
     narration_map = {
         item["scene_id"]: item["narration"]
@@ -595,19 +535,12 @@ def merge_scene_narration(
         results.append(scene)
 
 
-    with open(
-        output_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            results,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
-
+    write_json(
+                results,
+                output_path,
+                ensure_ascii=False,
+                indent=2
+            )
 
     return results
 
@@ -618,13 +551,7 @@ def download_scene_videos(
     standardize=True
 ):
 
-    with open(
-        scene_path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-        scenes = json.load(f)
-
+    scenes = read_json(scene_path)
 
     os.makedirs(
         download_dir,
@@ -734,19 +661,12 @@ def download_scene_videos(
 
 
 
-    with open(
-        scene_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            scenes,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
-
+    write_json(
+                scenes,
+                scene_path,
+                ensure_ascii=False,
+                indent=2
+            )
 
     return scenes
 
@@ -764,21 +684,9 @@ def restore_segment_subtitles(
     output_path
 ):
 
-    with open(
-        scene_path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-        scenes = json.load(f)
+    scenes = read_json(scene_path)
 
-
-    with open(
-        segment_path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-        segments_data = json.load(f)
-
+    segments_data = read_json(segment_path)
 
     # scene_id -> segments
     segment_mapping = {
@@ -860,19 +768,12 @@ def restore_segment_subtitles(
 
 
 
-    with open(
-        output_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            results,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
-
+    write_json(
+                results,
+                output_path,
+                ensure_ascii=False,
+                indent=2
+            )
 
     return results
 
@@ -882,21 +783,9 @@ def extract_hook_segment(
     output_path
 ):
 
-    with open(
-        scene_path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-        scenes = json.load(f)
+    scenes = read_json(scene_path)
 
-
-    with open(
-        hook_path,
-        "r",
-        encoding="utf-8"
-    ) as f:
-        hook = json.load(f)
-
+    hook = read_json(hook_path)
 
     target_scene_id = hook["scene_id"]
     target_segment_id = hook["segment_id"]
@@ -936,18 +825,11 @@ def extract_hook_segment(
         )
 
 
-    with open(
-        output_path,
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            result,
-            f,
-            ensure_ascii=False,
-            indent=2
-        )
-
+    write_json(
+                result,
+                output_path,
+                ensure_ascii=False,
+                indent=2
+            )
 
     return result
