@@ -75,21 +75,6 @@ def restore_selected_subtitles(scene_with_subtitle_path, scene_clips_path, outpu
     return results
 
 
-def merge_scene_narration(scene_path, narration_path, output_path):
-    narration_map = {
-        item["scene_id"]: item["narration"] for item in read_json(narration_path)
-    }
-    results = []
-    for scene in read_json(scene_path):
-        narration = narration_map.get(scene["scene_id"])
-        if narration:
-            scene["narration"] = narration
-        results.append(scene)
-
-    write_json(results, output_path)
-    return results
-
-
 def restore_segment_subtitles(scene_path, segment_path, output_path):
     segment_mapping = {
         item["scene_id"]: item["segments"] for item in read_json(segment_path)

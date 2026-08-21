@@ -17,7 +17,6 @@ from core.utils import safe_filename, clear_workdir
 from pipeline.download import download_scene_videos
 from pipeline.scenes import (
     extract_hook_segment,
-    merge_scene_narration,
     restore_scene_subtitle,
     restore_segment_subtitles,
     restore_selected_subtitles,
