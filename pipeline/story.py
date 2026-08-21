@@ -1,7 +1,7 @@
-import json
 from core.utils import read_json, write_json
-import os
-from urllib.parse import urlparse
+from pipeline.download import download_s3_video
+
+
 def convert_row_data_to_json(rows, story_path):
 
     data = []
@@ -158,7 +158,6 @@ def generate_final_script(script_path, cadidate_metadata_path, clips_path, s3_cl
     }
 
     download_dir = clips_path
-    os.makedirs(download_dir, exist_ok=True)
 
 
     for item in script:
@@ -195,20 +194,12 @@ def generate_final_script(script_path, cadidate_metadata_path, clips_path, s3_cl
 
         # 下载视频
         s3_url = meta["url"]
-        filename = f"{get_filename_from_s3_url(s3_url)}.mp4"
-
-        local_path = os.path.join(
+        local_path = download_s3_video(
+            s3_url,
             download_dir,
-            filename
+            s3_client,
+            suffix=".mp4",
         )
-
-        if os.path.exists(local_path):
-            print(f"已存在，跳过: {local_path}")
-        else:
-            s3_client.download_file(
-                s3_url,
-                local_path
-            )
 
         # 写回 script
         clip["local_path"] = local_path
@@ -248,9 +239,3 @@ def transcript_to_dict(row):
         "episode": row[5],
         "speaker": row[6],
     }
-def get_filename_from_s3_url(s3_path):
-    """
-    从 s3 url 提取文件名
-    """
-    parsed = urlparse(s3_path)
-    return os.path.basename(parsed.path)

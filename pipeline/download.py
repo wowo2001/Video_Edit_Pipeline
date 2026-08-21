@@ -49,6 +49,20 @@ def _get_filename_from_s3_url(s3_path):
     return os.path.basename(urlparse(s3_path).path)
 
 
+def download_s3_video(s3_url, download_dir, s3_client, suffix=""):
+    os.makedirs(download_dir, exist_ok=True)
+    filename = f"{_get_filename_from_s3_url(s3_url)}{suffix}"
+    local_path = os.path.join(download_dir, filename)
+
+    if os.path.exists(local_path):
+        print(f"已存在，跳过: {local_path}")
+    else:
+        print(f"下载: {s3_url}")
+        s3_client.download_file(s3_url, local_path)
+
+    return local_path
+
+
 def download_scene_videos(scene_path, download_dir, s3_client, standardize=True):
     scenes = read_json(scene_path)
     os.makedirs(download_dir, exist_ok=True)
@@ -57,13 +71,9 @@ def download_scene_videos(scene_path, download_dir, s3_client, standardize=True)
     for scene in scenes:
         s3_url = scene["video_url"]
         filename = _get_filename_from_s3_url(s3_url)
-        local_path = downloaded.setdefault(s3_url, os.path.join(download_dir, filename))
-
-        if os.path.exists(local_path):
-            print(f"已存在，跳过: {local_path}")
-        else:
-            print(f"下载: {s3_url}")
-            s3_client.download_file(s3_url, local_path)
+        if s3_url not in downloaded:
+            downloaded[s3_url] = download_s3_video(s3_url, download_dir, s3_client)
+        local_path = downloaded[s3_url]
 
         final_path = local_path
         if standardize:
