@@ -7,7 +7,6 @@ from pydub import AudioSegment
 
 from config import SPEAKER, VOLC_APPID, VOLC_SECRET
 from core.utils import ms_to_srt_time, read_json, write_json
-from pipeline import audio
 
 
 class Volcengine:
@@ -90,22 +89,9 @@ class Volcengine:
 
                 file.write(f"{index}\n{start} --> {end}\n{text}\n\n")
 
-    def generate_tts(self, script_path, output_path):
-        data = read_json(script_path)
-        data["hook"]["narrative"]["length"] = self._write_tts(
-            data["hook"]["narrative"]["content"],
-            output_path / "hook.mp3",
-        )
-
-        for item in data["clips"]:
-            item["narrative"]["length"] = self._write_tts(
-                item["narrative"]["content"],
-                output_path / f"clip_{item['place']}.mp3",
-            )
-
-        write_json(data, script_path, ensure_ascii=False, indent=2)
-
-    def _write_tts(self, text, audio_path):
+    def generate_tts(self, text, audio_path):
+        """把一段文本转换为指定路径的 MP3，并返回时长（毫秒）。"""
+        audio_path.parent.mkdir(parents=True, exist_ok=True)
         audio_path.write_bytes(self._tts_stream(text))
         return len(AudioSegment.from_file(audio_path))
 
@@ -141,37 +127,3 @@ class Volcengine:
                 chunks.append(result["data"])
 
         return base64.b64decode("".join(chunks))
-
-    def generate_tts_temp(self, script_path, output_path):
-        """根据 segment narration 生成 TTS，并回写 narration_length。"""
-        output_path.mkdir(parents=True, exist_ok=True)
-        data = read_json(script_path)
-
-        for scene in data:
-            scene_id = scene["scene_id"]
-            for segment in scene.get("segments", []):
-                text = segment.get("narration", "")
-                if not text:
-                    continue
-
-                segment_id = segment["segment_id"]
-                print(f"TTS scene:{scene_id} segment:{segment_id}")
-                segment["narration_length"] = self._write_tts(
-                    text,
-                    output_path / f"scene_{scene_id}_segment_{segment_id}.mp3",
-                )
-
-        write_json(data, script_path, ensure_ascii=False, indent=2)
-
-    def generate_hook_tts(self, hook_path, output_path):
-        """根据 hook_narration 生成开场钩子 TTS，并回写 hook_length。"""
-        output_path.mkdir(parents=True, exist_ok=True)
-        hook = read_json(hook_path)
-        text = hook.get("hook_narration", "")
-        if not text:
-            raise Exception("hook_narration为空")
-
-        print("TTS hook scene: hook")
-        hook["hook_length"] = self._write_tts(text, output_path / "hook.mp3")
-        write_json(hook, hook_path, ensure_ascii=False, indent=2)
-        return hook

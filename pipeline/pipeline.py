@@ -39,21 +39,33 @@ class AutoVideoPipeline:
     def _write_media(self, media):
         write_json(media, self.project_paths.media)
 
-    def _record_tts_paths(self):
+    def _generate_script_tts(self):
         media, main_media = self._read_main_media()
         script = read_json(self.project_paths.script)
+        tts = Volcengine()
+
+        hook_audio_path = self.project_paths.narration_audios / "hook.mp3"
+        script["hook"]["narrative"]["length"] = tts.generate_tts(
+            script["hook"]["narrative"]["content"],
+            hook_audio_path,
+        )
         main_media["script_path"] = str(self.project_paths.script)
         main_media["hook"] = {
-            "narration_audio_path": str(self.project_paths.narration_audios / "hook.mp3")
+            "narration_audio_path": str(hook_audio_path)
         }
-        main_media["clips"] = {
-            str(item["place"]): {
-                "narration_audio_path": str(
-                    self.project_paths.narration_audios / f"clip_{item['place']}.mp3"
-                )
+        main_media["clips"] = {}
+
+        for item in script["clips"]:
+            audio_path = self.project_paths.narration_audios / f"clip_{item['place']}.mp3"
+            item["narrative"]["length"] = tts.generate_tts(
+                item["narrative"]["content"],
+                audio_path,
+            )
+            main_media["clips"][str(item["place"])] = {
+                "narration_audio_path": str(audio_path)
             }
-            for item in script["clips"]
-        }
+
+        write_json(script, self.project_paths.script, ensure_ascii=False, indent=2)
         self._write_media(media)
 
     def _cut_script_videos(self):
@@ -182,8 +194,7 @@ class AutoVideoPipeline:
 
         print("========== 5. TTS ==========")
 
-        Volcengine().generate_tts(self.project_paths.script, self.project_paths.narration_audios)
-        self._record_tts_paths()
+        self._generate_script_tts()
 
         print("========== 6. 剪辑 ==========")
 

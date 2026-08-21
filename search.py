@@ -157,20 +157,32 @@ Ali().refine_narration(project_paths.scene_selected_subtitle)
 
 
 print("========== 08. 生成场景与 Hook 的 TTS ==========")
-Volcengine().generate_tts_temp(project_paths.scene_selected_subtitle, project_paths.narration_audios)
-Volcengine().generate_hook_tts(project_paths.hook, project_paths.narration_audios)
+tts = Volcengine()
+hook = read_json(project_paths.hook)
+hook_audio_path = project_paths.narration_audios / "hook.mp3"
+hook["hook_length"] = tts.generate_tts(hook["hook_narration"], hook_audio_path)
+write_json(hook, project_paths.hook, ensure_ascii=False, indent=2)
+
+scenes = read_json(project_paths.scene_selected_subtitle)
 media, search_media = read_search_media()
-for scene in read_json(project_paths.scene_selected_subtitle):
+for scene in scenes:
     scene_media = search_media["scenes"][str(scene["scene_id"])]
     for segment in scene.get("segments", []):
-        if segment.get("narration"):
-            scene_media["segments"][str(segment["segment_id"])] = {
-                "narration_audio_path": str(
-                    project_paths.narration_audios
-                    / f"scene_{scene['scene_id']}_segment_{segment['segment_id']}.mp3"
-                )
-            }
-search_media["hook"]["narration_audio_path"] = str(project_paths.narration_audios / "hook.mp3")
+        text = segment.get("narration")
+        if not text:
+            continue
+
+        audio_path = (
+            project_paths.narration_audios
+            / f"scene_{scene['scene_id']}_segment_{segment['segment_id']}.mp3"
+        )
+        segment["narration_length"] = tts.generate_tts(text, audio_path)
+        scene_media["segments"][str(segment["segment_id"])] = {
+            "narration_audio_path": str(audio_path)
+        }
+
+search_media["hook"]["narration_audio_path"] = str(hook_audio_path)
+write_json(scenes, project_paths.scene_selected_subtitle, ensure_ascii=False, indent=2)
 write_search_media(media)
 
 print("========== 09. 按已选字幕裁剪场景与 Hook 视频 ==========")
