@@ -3,7 +3,15 @@ import shutil
 import uuid
 
 from core.path import ProjectPaths
-from core.utils import safe_filename, clear_workdir, strip_srt, apply_speaker_mapping, apply_timeline,apply_speaker_mapping_to_script,chunk_srt_by_scenes,apply_character_scene_mapping
+from core.utils import safe_filename, clear_workdir
+from pipeline.subtitles import (
+    apply_character_scene_mapping,
+    apply_speaker_mapping,
+    apply_speaker_mapping_to_script,
+    apply_timeline,
+    chunk_srt_by_scenes,
+    strip_srt,
+)
 from core.whisper import Whisper
 from pipeline.audio import export_audio,mix_audio, export_all_audio
 from pipeline.download import download_video

@@ -14,7 +14,16 @@ from pipeline.audio import mix_audio_segment_temp
 from pipeline.story import convert_row_data_to_json, generate_cadidate_script, generate_final_script
 from pipeline.video import change_resolution,speed_up,mosaic_regions,add_subtitles,add_gif_overlay,concat_segment_videos,add_text_overlay,cut_hook_video_temp
 from pipeline.audio import export_audio,mix_audio_hook_temp
-from core.utils import safe_filename,clear_workdir, save_scene_candidates, restore_scene_subtitle, restore_selected_subtitles, merge_scene_narration, download_scene_videos, restore_segment_subtitles,extract_hook_segment
+from core.utils import safe_filename, clear_workdir
+from pipeline.scenes import (
+    download_scene_videos,
+    extract_hook_segment,
+    merge_scene_narration,
+    restore_scene_subtitle,
+    restore_segment_subtitles,
+    restore_selected_subtitles,
+    save_scene_candidates,
+)
 from services.google_drive import upload_to_drive
 from services.text_embedding_service import TextEmbeddingService
 from services.chatgpt import ChatGPT
