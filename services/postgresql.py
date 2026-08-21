@@ -402,6 +402,37 @@ class PostgresClient:
 
             return cur.fetchall()
         
+    def search_scene_by_id(
+            self,
+            id,
+            drama_title=None
+        ):
+            sql = """
+            SELECT
+                id,
+                drama_title,
+                video_url,
+                title,
+                event,
+                summary
+            FROM scene
+            WHERE
+                id = %s
+                AND (%s::TEXT IS NULL OR drama_title = %s::TEXT);
+            """
+    
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    sql,
+                    (
+                        id,
+                        drama_title,
+                        drama_title
+                    ),
+                )
+    
+                return cur.fetchone()
+        
     def get_subtitles_by_scene_id(
         self,
         scene_id

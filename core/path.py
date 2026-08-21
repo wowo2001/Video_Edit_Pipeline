@@ -22,6 +22,7 @@ class ProjectPaths:
         self.script = self.root / "script.json"
         self.scene = self.root / "scene.json"
         self.scene_candidate = self.root / "scene_candidate.json"
+        self.questions = self.root / "questions.json"
         self.selected_scene = self.root / "selected_scene.json"
         self.scene_with_subtitle = self.root / "scene_with_subtitle.json"
         self.scene_clips = self.root / "scene_clips.json"

@@ -35,7 +35,7 @@ class ChatGPT:
         story = "\n".join(stories)
         prompt = f"{TASK_RULES}\n\n{EDITING_RULES}\n\n{OUTPUT_SCHEMA}\n\n字幕内容：{subtitles}\n\n故事内容：{story}"
         response = self.client.chat.completions.create(
-            model="gpt-5.5",
+            model="gpt-5.6-luna",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -56,7 +56,7 @@ class ChatGPT:
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = f"{FIX_SUBTITLE_PROMPT}\n\n{subtitles}"
         response = self.client.chat.completions.create(
-            model="gpt-5.5",
+            model="gpt-5.6-luna",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -91,7 +91,7 @@ class ChatGPT:
             {subtitles}
         """
         response = self.client.chat.completions.create(
-            model="gpt-5.5",
+            model="gpt-5.6-sol",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -108,7 +108,7 @@ class ChatGPT:
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = f"{GET_TITLE_PROMPT}\n\n{subtitles}"
         response = self.client.chat.completions.create(
-            model="gpt-5.5",
+            model="gpt-5.6-luna",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -162,7 +162,7 @@ class ChatGPT:
             {subtitles}
         """
         response = self.client.chat.completions.create(
-            model="gpt-5.5",
+            model="gpt-5.6-luna",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -203,7 +203,7 @@ class ChatGPT:
         """
 
         response = self.client.chat.completions.create(
-        model="gpt-5.5",
+        model="gpt-5.6-luna",
         messages=[
             {
                 "role": "user",
@@ -261,7 +261,7 @@ class ChatGPT:
         """
 
         response = self.client.chat.completions.create(
-        model="gpt-5.5",
+        model="gpt-5.6-luna",
         messages=[
             {
                 "role": "user",
@@ -314,7 +314,7 @@ class ChatGPT:
             """
 
             response = self.client.chat.completions.create(
-                model="gpt-5.5",
+                model="gpt-5.6-luna",
                 messages=[
                 {
                     "role": "user",
@@ -350,6 +350,7 @@ class ChatGPT:
     def select_scene(
     self,
         candidate_path,
+        question,
         theme,
         output_path
     ):
@@ -374,6 +375,8 @@ class ChatGPT:
 
 
         prompt = f"""
+    问题：
+    {question}
     主题：
     {theme}
 
@@ -387,9 +390,11 @@ class ChatGPT:
 
 你是一名短视频剧情解说总导演。
 
-你的任务不是复述原剧剧情，而是根据【解说主题】重新组织已有场景，设计一篇围绕主题展开的短视频解说结构。
+你的任务不是复述原剧剧情，而是根据【主题】重新组织已有场景，设计一篇围绕主题展开的短视频解说结构。
 
 你需要站在整篇视频的宏观角度，对候选场景进行筛选和分配任务，让后续解说导演根据你的规划完成具体文案。
+
+给到你的候选场景不一定全部都要用到，你可以把与解说有关的内容总到其他场景的背景交代中去，要注意节奏。
 
 scene_id是故事发生的顺序，你最好按这个顺序安排避免逻辑漏洞
 
@@ -401,7 +406,7 @@ scene_id是故事发生的顺序，你最好按这个顺序安排避免逻辑漏
 
 ### 1. 提炼全文核心观点
 
-最多提炼3个核心观点。
+最多提炼1个核心观点。
 
 要求：
 - 必须服务于解说主题。
@@ -431,6 +436,7 @@ scene_id是故事发生的顺序，你最好按这个顺序安排避免逻辑漏
 
 禁止多个场景承担相同职责。
 
+
 ---
 
 ## 二、场景筛选原则
@@ -449,7 +455,7 @@ scene_id是故事发生的顺序，你最好按这个顺序安排避免逻辑漏
 
 2. 场景数量控制：
 
-- 最多保留5个场景。
+- 最多保留3个场景。
 - 优先选择信息价值高、冲突强、能够产生观点的场景。
 
 
@@ -463,7 +469,6 @@ scene_id是故事发生的顺序，你最好按这个顺序安排避免逻辑漏
 
 请根据选中的场景设计完整解说逻辑
 
-注意评论出现的密度，观点要分布在场景中层层递进输出，每个场景讲一部分，禁止讲所有观点集中在一个场景输出
 
 注意：
 
@@ -520,7 +525,7 @@ task 必须说明：
 - 哪些场景只讲剧情，作为连接。
 - 哪些场景承担主要观点输出。
 - 哪些场景只负责情绪积累。
-- 这些任务必须明确安排给场景导演。
+- 场景中哪些内容与【问题】和【核心观点】有直接因果关系需要展开讲，哪些不需要讲。
 
 
 ### 5. 最后一个场景特殊要求
@@ -550,7 +555,7 @@ task 必须说明：
 
 
         response = self.client.chat.completions.create(
-                model="gpt-5.5",
+                model="gpt-5.6-luna",
                 messages=[
                 {
                     "role": "user",
@@ -669,7 +674,7 @@ task 必须说明：
 
 
         response = self.client.chat.completions.create(
-            model="gpt-5.5",
+            model="gpt-5.6-luna",
             messages=[
                 {
                     "role":"user",
@@ -744,7 +749,7 @@ task 必须说明：
 
 
         response = self.client.chat.completions.create(
-            model="gpt-5.5",
+            model="gpt-5.6-luna",
             messages=[
                 {
                     "role":"user",
@@ -782,6 +787,8 @@ task 必须说明：
 
         prompt = f"""
 
+        【解说主题】： {theme}
+
         【当前场景】：{scene["summary"]}
 
         【原始对白】：{scene["subtitles_plain_text"]}
@@ -813,29 +820,11 @@ task 必须说明：
 
 1. 当前场景已经由总导演规划好职责。
 
-2. segment 数量服从场景任务，如果任务要求是简单交代、过连接等，最多选取2个segment就可以了，并且segment中台词也要精简。
+2. segment 数量服从场景任务，如果任务要求是简单交代、过连接等，最多选取2个segment就可以了。
 
-3. 每个 segment 必须有明确作用。
+3. 每个 segment 必须有明确作用。如果segment作用是观点输出，每个segment只输出1个观点。
 
 4. 与解说主题和任务无关segment统统舍弃
-
-========================
-【台词选择规则】
-========================
-
-每个 segment 只选择必要台词。每个segment里的台词数量不要太多，突出重点
-
-选择台词【必须】满足：
-
-- 来自序号连续递增字幕。
-- 保持原始顺序。
-- 不修改字幕编号。
-
-
-台词优先选择：
-
-- 与主题相关人物的台词，最好选择同一个人物的连续台词配合解说进行表演
-- 能够配合解说任务进行表演的台词。
 
 ========================
 【字幕编号规则】
@@ -846,6 +835,35 @@ task 必须说明：
 - 返回的subtitle_ids必须是连续递增的
 - 不允许修改编号。
 - 不返回对白文本。
+
+========================
+【台词选择规则】
+========================
+
+解说任务会告诉你当前场景是哪一种
+- 剧情铺垫
+- 转折
+- 观点分析
+- 情绪积累
+- 高潮
+- 结尾
+
+要根据场景任务来控制篇幅，重点应该是高潮部分
+
+每个segment中只选出少量的连续的台词
+
+选择台词【必须】满足：
+
+- 来自序号连续递增字幕。
+- 相邻两句台词之间编号的差值为1
+- 保持原始顺序。
+- 不修改字幕编号。
+
+
+台词优先选择：
+
+- 与主题相关人物的台词，最好选择同一个人物的连续台词配合解说进行表演
+- 能够配合解说任务进行表演的台词。
 
 
 ========================
@@ -890,7 +908,7 @@ task 必须说明：
 
 
         response = self.client.chat.completions.create(
-            model="gpt-5.5",
+            model="gpt-5.6-sol",
             messages=[
                 {
                     "role":"user",
@@ -1196,7 +1214,7 @@ hook解说要求：
 
 
         response = self.client.chat.completions.create(
-            model="gpt-5.5",
+            model="gpt-5.6-luna",
             messages=[
                 {
                     "role":"user",

@@ -24,21 +24,60 @@ text_embedding_service = TextEmbeddingService()
 s3_client = S3()
 
 # clear_workdir(ProjectPaths().root,ProjectPaths().vocals_path)
-search = "时知县 审案"
-theme = "根据时知县偏袒宋江的单一场景重点分析，其余前因后果一笔带过，解析语言艺术怎么偏袒"
-drama_title = "水浒传"
+search = "四阿哥"
+
+drama_title = "雍正王朝"
 ai = ChatGPT()
-print("====1. 召回场景故事====")
-embedding = text_embedding_service.encode(search)
-rows = client.search_scene(
-    query_embedding=embedding,
-    drama_title=drama_title,
-    limit = 50
-)
-save_scene_candidates(rows,project_paths.scene_candidate)
+# print("====1. 召回场景故事====")
+# embedding = text_embedding_service.encode(search)
+# rows = client.search_scene(
+#     query_embedding=embedding,
+#     drama_title=drama_title,
+#     limit = 50
+# )
+# save_scene_candidates(rows,project_paths.scene_candidate)
+
+with open(project_paths.questions, "r", encoding="utf-8") as f:
+        questions = json.load(f)
+question = questions["问题"]
+scene_ids = questions["场景"]
+subtitle = questions["标题"]
+strategy = questions["解说角度"]
+
+scenes = []
+
+for scene_id in scene_ids:
+    row = client.search_scene_by_id(scene_id)
+
+    if row:
+        scenes.append(
+            {
+                "scene_id": row[0],
+                "drama_title": row[1],
+                "video_url": row[2],
+                "title": row[3],
+                "event": row[4],
+                "summary": row[5]
+            }
+        )
+
+    # 输出文件
+output_path = Path(project_paths.scene_candidate)
+
+with open(output_path, "w", encoding="utf-8") as f:
+    json.dump(
+        scenes,
+        f,
+        ensure_ascii=False,
+        indent=2
+    )
+
+print(f"scene candidates saved: {output_path}")
+
+theme = f"{question}从{strategy}角度分析解说词，结合历史背景和人物性格，深入剖析人物的动机和策略。"
 
 print("====2. AI选取场景====")
-Ali().select_scene(project_paths.scene_candidate, theme, project_paths.selected_scene)
+ai.select_scene(project_paths.scene_candidate, question,theme, project_paths.selected_scene)
 
 print("====3. 重现场景对白====")
 restore_scene_subtitle(project_paths.selected_scene,project_paths.scene_candidate,project_paths.scene_with_subtitle,client)
@@ -144,7 +183,7 @@ print("========== 13. 成片语音识别导出字幕 ==========")
 Volcengine().transcribe_audio(project_paths.final_audio, project_paths.final_subtitles)
 
 print("========== 14. AI修正字幕 ==========")
-popup_text, subtitle = Ali().fix_subtitles(project_paths.final_subtitles['srt'], project_paths.final_subtitles['srt'])
+popup_text, _ = ai.fix_subtitles(project_paths.final_subtitles['srt'], project_paths.final_subtitles['srt'])
 safe_file_name = safe_filename(subtitle)
 
 print("========== 15. 添加字幕 ==========")
@@ -164,7 +203,7 @@ add_text_overlay(
     drama_title,
     subtitle,
     font_size_title=80,
-    font_size_sub=80,
+    font_size_sub=60,
     title_y=400,
     sub_y=450,
     title_color="#FFCC00",
@@ -188,5 +227,5 @@ add_gif_overlay(
 print("========== 18. 上传 ==========")
 output_path = project_paths.root / f"{safe_file_name}.mp4"
 shutil.copy2(project_paths.gif_overlay_video, output_path)
-upload_to_drive(output_path, folder_name="水浒人物志")
-upload_to_drive(output_path_origin, folder_name="水浒人物志")
+upload_to_drive(output_path, folder_name="雍正王朝解析")
+upload_to_drive(output_path_origin, folder_name="雍正王朝解析")
