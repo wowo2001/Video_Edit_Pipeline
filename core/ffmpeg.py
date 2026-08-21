@@ -1,4 +1,4 @@
-from core.cmd import run_cmd, run_cmd_output
+from core.cmd import run_cmd
 import json
 def extract_audio(input_path, output_path):
 
@@ -41,73 +41,31 @@ def get_duration(path):
         str(path)
     ]
 
-    result = run_cmd_output(cmd)
+    result = run_cmd(cmd, capture_output=True)
     data = json.loads(result.stdout)
     return round(float(data["format"]["duration"]),3)
 
-def mix_end_aligned(
-    video,
-    audio,
-    output,
-    narration_duration,
-    video_duration
-):
+def mix_narration(video, audio, output, alignment="start"):
+    """Mix narration at the start or end of a video clip."""
+    if alignment not in {"start", "end"}:
+        raise ValueError("alignment must be 'start' or 'end'")
 
-    narration_start_time = max(0, video_duration - narration_duration)
+    narration_duration = get_duration(audio)
+    video_duration = get_duration(video)
+    narration_start_time = 0 if alignment == "start" else max(0, video_duration - narration_duration)
+    narration_end_time = narration_duration if alignment == "start" else video_duration
     delay = int(narration_start_time * 1000)
 
     filter_complex = (
     "[0:a]loudnorm=I=-20:LRA=7:TP=-2[vnorm];"
     "[1:a]loudnorm=I=-14:LRA=7:TP=-2[anorm];"
-
     "[vnorm]asplit=2[a0][a1];"
-
-    f"[a0]volume=0.01:enable='between(t,{narration_start_time},{video_duration})'[a0_low];"
+    f"[a0]volume=0.01:enable='between(t,{narration_start_time},{narration_end_time})'[a0_low];"
     "[a1]volume=1.0[a1_norm];"
-
     "[a0_low][a1_norm]amix=inputs=2[aout];"
-
     f"[anorm]adelay={delay}|{delay}[a1v];"
-
     "[aout][a1v]amix=inputs=2:normalize=0[outa]"
-)
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", str(video),
-        "-i", str(audio),
-        "-filter_complex", filter_complex,
-        "-map", "0:v",
-        "-map", "[outa]",
-        "-c:v", "copy",
-        "-c:a", "aac",
-         str(output)
-    ]
-
-    run_cmd(cmd)
-
-def mix_start_aligned(
-    video,
-    audio,
-    output,
-    narration_duration
-):
-    filter_complex = (
-    # 归一化视频原声
-    "[0:a]loudnorm=I=-20:LRA=7:TP=-2[vnorm];"
-
-    # 归一化配音
-    "[1:a]loudnorm=I=-14:LRA=7:TP=-2[anorm];"
-
-    # 你的原逻辑
-    "[vnorm]asplit=2[a0][a1];"
-    f"[a0]volume=0.01:enable='between(t,0,{narration_duration})'[a0_low];"
-    "[a1]volume=1.0[a1_norm];"
-    "[a0_low][a1_norm]amix=inputs=2[aout];"
-
-    "[anorm]adelay=0|0[a1v];"
-
-    "[aout][a1v]amix=inputs=2:normalize=0[outa]"
-)
+    )
 
     cmd = [
         "ffmpeg", "-y",
@@ -161,21 +119,8 @@ def encode_to_standard(input_path, output_path):
 
     run_cmd(cmd)
 
-def concat_videos(filelist, output):
-
-    cmd = [
-        "ffmpeg", "-y",
-        "-f", "concat",
-        "-safe", "0",
-        "-i", str(filelist),
-
-        "-c", "copy",
-        output
-    ]
-
-    run_cmd(cmd)
-
-def concat_mp3s(filelist, output):
+def concat_media(filelist, output):
+    """Concatenate compatible media files listed in FFmpeg concat format."""
     cmd = [
         "ffmpeg",
         "-y",

@@ -1,6 +1,5 @@
 from core.cmd import run_cmd
-from core.ffmpeg import extract_audio,get_duration, mix_start_aligned, mix_start_aligned
-from core.ffmpeg import mix_end_aligned,concat_mp3s
+from core.ffmpeg import concat_media, extract_audio, mix_narration
 from core.demucs import extract_vocals_demucs
 import json
 from pathlib import Path
@@ -36,7 +35,7 @@ def export_all_audio(input_path, output_path):
         for mp3 in vocal_files:
             f.write(f"file '{mp3.absolute()}'\n")
 
-    concat_mp3s(filelist, output_path)
+    concat_media(filelist, output_path)
 
     print(f"\n✅ 音频导出完成: {output_path}")
 
@@ -70,14 +69,11 @@ def mix_audio(video_path, narration_audio_path, script_path, output_path):
     
 
 def _mix_hook_audio(video_path, narration_audio_path, output_path):    
-    video_dur = get_duration(video_path)
-    voice_dur = get_duration(narration_audio_path)
-    mix_end_aligned(video_path, narration_audio_path, output_path, voice_dur, video_dur)
+    mix_narration(video_path, narration_audio_path, output_path, alignment="end")
 
 def _mix_clip_audio(video_path, narration_audio_path, output_path):    
-    voice_dur = get_duration(narration_audio_path)
-    print(f"视频路径: {video_path}, 旁白路径: {narration_audio_path}, 输出路径: {output_path}, 旁白时长: {voice_dur}")
-    mix_start_aligned(video_path, narration_audio_path, output_path, voice_dur)
+    print(f"视频路径: {video_path}, 旁白路径: {narration_audio_path}, 输出路径: {output_path}")
+    mix_narration(video_path, narration_audio_path, output_path)
 
 def mix_audio_segment_temp(
     scene_path,

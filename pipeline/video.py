@@ -1,6 +1,6 @@
 from core.cmd import  run_cmd
 from core.ffmpeg import cut_video as cut_video_ffmpeg 
-from core.ffmpeg import concat_videos as concat_videos_ffmpeg
+from core.ffmpeg import concat_media as concat_videos_ffmpeg
 from core.ffmpeg import change_resolution as change_resolution_ffmpeg
 from core.ffmpeg import speed_up as speed_up_ffmpeg
 from core.ffmpeg import mask_sub as mask_sub_ffmpeg
