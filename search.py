@@ -11,7 +11,6 @@ from services.s3 import S3
 from services.volcengine import Volcengine
 from pipeline.video import concat_videos, cut_segment_video_temp
 from pipeline.audio import mix_audio_segment_temp
-from pipeline.story import convert_row_data_to_json, generate_cadidate_script, generate_final_script
 from pipeline.video import change_resolution,speed_up,mosaic_regions,add_subtitles,add_gif_overlay,concat_segment_videos,add_text_overlay,cut_hook_video_temp
 from pipeline.audio import export_audio,mix_audio_hook_temp
 from core.utils import safe_filename, clear_workdir
