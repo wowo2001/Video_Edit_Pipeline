@@ -15,8 +15,8 @@ from pipeline.story import convert_row_data_to_json, generate_cadidate_script, g
 from pipeline.video import change_resolution,speed_up,mosaic_regions,add_subtitles,add_gif_overlay,concat_segment_videos,add_text_overlay,cut_hook_video_temp
 from pipeline.audio import export_audio,mix_audio_hook_temp
 from core.utils import safe_filename, clear_workdir
+from pipeline.download import download_scene_videos
 from pipeline.scenes import (
-    download_scene_videos,
     extract_hook_segment,
     merge_scene_narration,
     restore_scene_subtitle,

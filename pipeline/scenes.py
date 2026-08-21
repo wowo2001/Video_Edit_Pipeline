@@ -1,7 +1,3 @@
-import os
-from urllib.parse import urlparse
-
-from core.ffmpeg import encode_to_standard
 from core.utils import read_json, write_json
 
 
@@ -92,41 +88,6 @@ def merge_scene_narration(scene_path, narration_path, output_path):
 
     write_json(results, output_path)
     return results
-
-
-def get_filename_from_s3_url(s3_path):
-    return os.path.basename(urlparse(s3_path).path)
-
-
-def download_scene_videos(scene_path, download_dir, s3_client, standardize=True):
-    scenes = read_json(scene_path)
-    os.makedirs(download_dir, exist_ok=True)
-    downloaded = {}
-
-    for scene in scenes:
-        s3_url = scene["video_url"]
-        filename = get_filename_from_s3_url(s3_url)
-        local_path = downloaded.setdefault(s3_url, os.path.join(download_dir, filename))
-
-        if os.path.exists(local_path):
-            print(f"已存在，跳过: {local_path}")
-        else:
-            print(f"下载: {s3_url}")
-            s3_client.download_file(s3_url, local_path)
-
-        final_path = local_path
-        if standardize:
-            standard_dir = os.path.join(download_dir, "standard")
-            os.makedirs(standard_dir, exist_ok=True)
-            standard_path = os.path.join(standard_dir, filename)
-            if not os.path.exists(standard_path):
-                print(f"标准化视频: {local_path}")
-                encode_to_standard(local_path, standard_path)
-            final_path = standard_path
-        scene["local_video_path"] = final_path
-
-    write_json(scenes, scene_path)
-    return scenes
 
 
 def restore_segment_subtitles(scene_path, segment_path, output_path):
