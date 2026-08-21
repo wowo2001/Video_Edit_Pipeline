@@ -211,9 +211,7 @@ class Volcengine:
     ):
         """
         根据 segment narration 生成TTS
-        回写 segment:
-        - narration_audio
-        - narration_length
+        回写 segment 的 narration_length。
         """
 
         output_path.mkdir(
@@ -276,10 +274,6 @@ class Volcengine:
                 duration_ms = len(audio)
 
 
-                segment["narration_audio"] = str(
-                    audio_path
-                )
-
                 segment["narration_length"] = duration_ms
 
 
@@ -297,7 +291,7 @@ class Volcengine:
     ):
         """
         根据 hook_narration 生成开场钩子TTS
-        回写 hook_audio 和 hook_length
+        回写 hook_length。
         """
 
         output_path.mkdir(
@@ -348,10 +342,6 @@ class Volcengine:
 
         duration_ms = len(audio)
 
-
-        hook["hook_audio"] = str(
-            audio_path
-        )
 
         hook["hook_length"] = duration_ms
 

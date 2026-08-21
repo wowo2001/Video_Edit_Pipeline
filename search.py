@@ -1,7 +1,7 @@
 from pathlib import Path
 import shutil
 import json
-from core.utils import read_json, write_json
+from core.utils import ms_to_seconds, read_json, write_json
 
 from core.path import ProjectPaths
 from services.ali import Ali
@@ -9,10 +9,17 @@ from services.postgresql import PostgresClient
 from services.s3 import S3
 
 from services.volcengine import Volcengine
-from pipeline.video import concat_videos, cut_segment_video_temp
-from pipeline.audio import mix_audio_segment_temp
-from pipeline.video import change_resolution,speed_up,mosaic_regions,add_subtitles,add_gif_overlay,concat_segment_videos,add_text_overlay,cut_hook_video_temp
-from pipeline.audio import export_audio,mix_audio_hook_temp
+from pipeline.video import (
+    add_gif_overlay,
+    add_subtitles,
+    add_text_overlay,
+    change_resolution,
+    concat_video_paths,
+    cut_video,
+    mosaic_regions,
+    speed_up,
+)
+from pipeline.audio import export_audio, mix_narration_audio
 from core.utils import safe_filename, clear_workdir
 from pipeline.download import download_scene_videos
 from pipeline.scenes import (
@@ -29,6 +36,16 @@ project_paths = ProjectPaths()
 client = PostgresClient()
 text_embedding_service = TextEmbeddingService()
 s3_client = S3()
+
+
+def read_search_media():
+    media = read_json(project_paths.media) if project_paths.media.exists() else {}
+    return media, media.setdefault("search", {"scenes": {}, "hook": {}})
+
+
+def write_search_media(media):
+    write_json(media, project_paths.media)
+
 
 # clear_workdir(ProjectPaths().root,ProjectPaths().vocals_path)
 search = "四阿哥"
@@ -124,7 +141,14 @@ attach_subtitles_to_segments(
 )
 
 print("========== 05. 下载并标准化场景源视频 ==========")
-download_scene_videos(project_paths.scene_selected_subtitle, project_paths.download, s3_client)
+scenes = read_json(project_paths.scene_selected_subtitle)
+scene_video_paths = download_scene_videos(scenes, project_paths.download, s3_client)
+media, search_media = read_search_media()
+search_media["scenes"] = {
+    scene_id: {"source_video_path": video_path, "segments": {}}
+    for scene_id, video_path in scene_video_paths.items()
+}
+write_search_media(media)
 print("========== 06. 生成并提取 Hook 片段 ==========")
 Ali().generate_hook(theme, project_paths.scene_selected_subtitle,project_paths.hook)
 build_hook_segment(project_paths.scene_selected_subtitle, project_paths.hook, project_paths.hook)
@@ -135,22 +159,130 @@ Ali().refine_narration(project_paths.scene_selected_subtitle)
 print("========== 08. 生成场景与 Hook 的 TTS ==========")
 Volcengine().generate_tts_temp(project_paths.scene_selected_subtitle, project_paths.narration_audios)
 Volcengine().generate_hook_tts(project_paths.hook, project_paths.narration_audios)
+media, search_media = read_search_media()
+for scene in read_json(project_paths.scene_selected_subtitle):
+    scene_media = search_media["scenes"][str(scene["scene_id"])]
+    for segment in scene.get("segments", []):
+        if segment.get("narration"):
+            scene_media["segments"][str(segment["segment_id"])] = {
+                "narration_audio_path": str(
+                    project_paths.narration_audios
+                    / f"scene_{scene['scene_id']}_segment_{segment['segment_id']}.mp3"
+                )
+            }
+search_media["hook"]["narration_audio_path"] = str(project_paths.narration_audios / "hook.mp3")
+write_search_media(media)
 
 print("========== 09. 按已选字幕裁剪场景与 Hook 视频 ==========")
-cut_segment_video_temp(project_paths.scene_selected_subtitle, project_paths.clips)
-cut_hook_video_temp(project_paths.hook, project_paths.clips)
-print("========== 10. 为场景与 Hook 混入解说音频 ==========")
-mix_audio_segment_temp(project_paths.scene_selected_subtitle, project_paths.final_clips)
-mix_audio_hook_temp(project_paths.hook, project_paths.final_clips)
-print("========== 11. 拼接 Hook 与场景成片 ==========")
+scenes = read_json(project_paths.scene_selected_subtitle)
+media, search_media = read_search_media()
+for scene in scenes:
+    scene_media = search_media["scenes"][str(scene["scene_id"])]
+    input_video = Path(scene_media["source_video_path"])
+    if not input_video.exists():
+        print(f"[ERROR] 找不到视频: {input_video}")
+        continue
+    for segment in scene.get("segments", []):
+        if not segment.get("subtitles"):
+            continue
+        segment_media = scene_media["segments"].setdefault(str(segment["segment_id"]), {})
+        segment_media["clip_video_path"] = str(
+            cut_video(
+                input_video,
+                segment["subtitles"],
+                ms_to_seconds(segment.get("narration_length", 0)),
+                project_paths.clips
+                / f"scene_{scene['scene_id']}_segment_{segment['segment_id']}.mp4",
+            )
+        )
+write_search_media(media)
 
-concat_segment_videos(project_paths.scene_selected_subtitle, project_paths.hook, project_paths.concatenated_video)
+hook = read_json(project_paths.hook)
+media, search_media = read_search_media()
+hook_scene_media = search_media["scenes"][str(hook["scene_id"])]
+search_media["hook"]["clip_video_path"] = str(
+    cut_video(
+        Path(hook_scene_media["source_video_path"]),
+        hook["subtitles"],
+        ms_to_seconds(hook.get("hook_length", 0)),
+        project_paths.clips / "hook.mp4",
+        narration_position="after",
+        keep_gaps=True,
+    )
+)
+write_search_media(media)
+print("========== 10. 为场景与 Hook 混入解说音频 ==========")
+scenes = read_json(project_paths.scene_selected_subtitle)
+media, search_media = read_search_media()
+for scene in scenes:
+    for segment in scene.get("segments", []):
+        segment_media = search_media["scenes"][str(scene["scene_id"])]["segments"][str(segment["segment_id"])]
+        video_path = Path(segment_media["clip_video_path"])
+        narration_audio_path = Path(segment_media["narration_audio_path"])
+        if not video_path.exists():
+            print(f"[ERROR] 找不到视频: {video_path}")
+            continue
+        if not narration_audio_path.exists():
+            print(f"[ERROR] 找不到旁白: {narration_audio_path}")
+            continue
+
+        output_path = (
+            project_paths.final_clips
+            / f"scene_{scene['scene_id']}_segment_{segment['segment_id']}_final.mp4"
+        )
+        mix_narration_audio(
+            video_path,
+            narration_audio_path,
+            output_path,
+        )
+        segment_media["final_video_path"] = str(output_path)
+write_search_media(media)
+
+hook = read_json(project_paths.hook)
+hook_output_path = project_paths.final_clips / "hook_final.mp4"
+media, search_media = read_search_media()
+hook_video_path = Path(search_media["hook"]["clip_video_path"])
+hook_audio_path = Path(search_media["hook"]["narration_audio_path"])
+if not hook_video_path.exists():
+    print(f"[ERROR] 找不到hook视频: {hook_video_path}")
+elif not hook_audio_path.exists():
+    print(f"[ERROR] 找不到hook音频: {hook_audio_path}")
+else:
+    mix_narration_audio(
+        hook_video_path,
+        hook_audio_path,
+        hook_output_path,
+        alignment="end",
+    )
+    search_media["hook"]["final_video_path"] = str(hook_output_path)
+    write_search_media(media)
+print("========== 11. 拼接 Hook 与场景成片 ==========")
+scenes = read_json(project_paths.scene_selected_subtitle)
+media, search_media = read_search_media()
+video_paths = [search_media["hook"]["final_video_path"]]
+for scene in scenes:
+    video_paths.extend(
+        search_media["scenes"][str(scene["scene_id"])]["segments"][str(segment["segment_id"])]["final_video_path"]
+        for segment in sorted(
+            scene.get("segments", []),
+            key=lambda item: item["segment_id"],
+        )
+    )
+concat_video_paths(
+    video_paths,
+    project_paths.concatenated_video,
+    project_paths.root / "final_video_concat_list.txt",
+)
+search_media["concatenated_video_path"] = str(project_paths.concatenated_video)
+write_search_media(media)
 
 
 
 print("========== 12. 加速成片 ==========")
 
-speed_up(project_paths.concatenated_video, project_paths.speed_up_video, speed=1.2)
+speed_up(search_media["concatenated_video_path"], project_paths.speed_up_video, speed=1.2)
+search_media["speed_up_video_path"] = str(project_paths.speed_up_video)
+write_search_media(media)
 
 print("========== 13. 遮挡原视频字幕 ==========")
 region = [
@@ -169,32 +301,60 @@ region = [
     "mosaic_size": 10,
 }]
 
-mosaic_regions(project_paths.speed_up_video,project_paths.masked_video,region)
+mosaic_regions(search_media["speed_up_video_path"], project_paths.masked_video, region)
+search_media["masked_video_path"] = str(project_paths.masked_video)
+write_search_media(media)
 
 
 print("========== 14. 导出成片音频 ==========")
-export_audio(project_paths.speed_up_video, project_paths.final_audio)
+export_audio(search_media["speed_up_video_path"], project_paths.final_audio)
+search_media["final_audio_path"] = str(project_paths.final_audio)
+write_search_media(media)
 
 print("========== 15. 识别成片语音并生成字幕 ==========")
-Volcengine().transcribe_audio(project_paths.final_audio, project_paths.final_subtitles)
+Volcengine().transcribe_audio(search_media["final_audio_path"], project_paths.final_subtitles)
+search_media["final_subtitles"] = {
+    "srt_path": str(project_paths.final_subtitles["srt"]),
+    "json_path": str(project_paths.final_subtitles["json"]),
+}
+write_search_media(media)
 
 print("========== 16. AI 修正成片字幕 ==========")
-popup_text, _ = ai.fix_subtitles(project_paths.final_subtitles['srt'], project_paths.final_subtitles['srt'])
+popup_text, _ = ai.fix_subtitles(
+    search_media["final_subtitles"]["srt_path"],
+    search_media["final_subtitles"]["srt_path"],
+)
 safe_file_name = safe_filename(subtitle)
 
 print("========== 17. 添加字幕并保留原比例成片 ==========")
-add_subtitles(project_paths.masked_video, project_paths.final_subtitles['srt'], project_paths.subtitle_video, y=40, font_size=30)
+add_subtitles(
+    search_media["masked_video_path"],
+    search_media["final_subtitles"]["srt_path"],
+    project_paths.subtitle_video,
+    y=40,
+    font_size=30,
+)
+search_media["subtitle_video_path"] = str(project_paths.subtitle_video)
 output_path_origin = project_paths.root / f"{safe_file_name}_origin.mp4"
-shutil.copy(project_paths.subtitle_video, output_path_origin)
+shutil.copy(search_media["subtitle_video_path"], output_path_origin)
+search_media["subtitle_video_origin_path"] = str(output_path_origin)
+write_search_media(media)
 
 print("========== 18. 转换为竖屏分辨率 ==========")
 
-change_resolution(project_paths.subtitle_video, project_paths.changed_resolution_video
-                          , width=1080, height=1920, fps=30)
+change_resolution(
+    search_media["subtitle_video_path"],
+    project_paths.changed_resolution_video,
+    width=1080,
+    height=1920,
+    fps=30,
+)
+search_media["changed_resolution_video_path"] = str(project_paths.changed_resolution_video)
+write_search_media(media)
 
 print("========== 19. 添加标题、副标题与弹幕文案 ==========")
 add_text_overlay(
-    project_paths.changed_resolution_video,
+    search_media["changed_resolution_video_path"],
     project_paths.text_overlay_video,
     drama_title,
     subtitle,
@@ -209,19 +369,25 @@ add_text_overlay(
     popup_color="#FFFFFF",
     popup_y=750
 )
+search_media["text_overlay_video_path"] = str(project_paths.text_overlay_video)
+write_search_media(media)
 
 print("========== 20. 添加 GIF 动画 ==========")
 add_gif_overlay(
-    project_paths.text_overlay_video,
+    search_media["text_overlay_video_path"],
     project_paths.gif_overlay_video,
     Path("assets") / "like.gif",
     x=500,
     y=1500,
     scale=2.0
 )
+search_media["final_video_path"] = str(project_paths.gif_overlay_video)
+write_search_media(media)
 
 print("========== 21. 导出并上传成片 ==========")
 output_path = project_paths.root / f"{safe_file_name}.mp4"
-shutil.copy2(project_paths.gif_overlay_video, output_path)
+shutil.copy2(search_media["final_video_path"], output_path)
+search_media["exported_video_path"] = str(output_path)
+write_search_media(media)
 upload_to_drive(output_path, folder_name="雍正王朝解析")
 upload_to_drive(output_path_origin, folder_name="雍正王朝解析")

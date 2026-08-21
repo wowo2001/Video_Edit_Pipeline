@@ -87,7 +87,6 @@ def build_hook_segment(scene_path, hook_path, output_path):
                 continue
             result = segment.copy()
             result["scene_id"] = hook["scene_id"]
-            result["local_video_path"] = scene["local_video_path"]
             result["hook_narration"] = hook["hook_narration"]
             write_json(result, output_path)
             return result
