@@ -29,25 +29,6 @@ def apply_speaker_mapping(subtitles_path, mapping_path):
     subtitles_path.write_text(text, encoding="utf-8")
 
 
-def apply_speaker_mapping_to_script(script_path, mapping_path):
-    script = read_json(script_path)
-    mapping = read_json(mapping_path)
-
-    def replace_speaker(obj):
-        if isinstance(obj, dict):
-            for key, value in obj.items():
-                if key == "speaker" and isinstance(value, str):
-                    obj[key] = mapping.get(value, value)
-                else:
-                    replace_speaker(value)
-        elif isinstance(obj, list):
-            for item in obj:
-                replace_speaker(item)
-
-    replace_speaker(script)
-    write_json(script, script_path)
-
-
 def apply_timeline(script_path, subtitles_path):
     script = read_json(script_path)
     utterances = read_json(subtitles_path)["utterances"]
