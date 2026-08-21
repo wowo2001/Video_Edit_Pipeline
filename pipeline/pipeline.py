@@ -3,7 +3,7 @@ import shutil
 import uuid
 
 from core.path import ProjectPaths
-from core.utils import safe_filename, clear_workdir
+from core.utils import read_json, safe_filename, clear_workdir, write_json
 from pipeline.subtitles import (
     apply_character_scene_mapping,
     apply_speaker_mapping,
@@ -13,7 +13,8 @@ from pipeline.subtitles import (
     strip_srt,
 )
 from core.whisper import Whisper
-from pipeline.audio import export_audio,mix_audio, export_all_audio
+from pipeline.audio import export_audio, mix_audio
+from core.ffmpeg import concat_media
 from pipeline.download import download_video
 from pipeline.video import add_gif_overlay, add_subtitles, change_resolution, cut_video, concat_videos, mask_sub, speed_up, add_text_overlay, mosaic_regions
 from services.post_cut_service import PostCutService
@@ -36,11 +37,31 @@ class AutoVideoPipeline:
 
         print("========== 1. 下载视频 ==========")
 
-        download_video(urls, self.project_paths.video, self.project_paths.origin)
+        download_video(
+            urls,
+            self.project_paths.video,
+            self.project_paths.origin,
+            self.project_paths.media,
+        )
 
         print("========== 2. 提取音频 ==========")
 
-        export_all_audio(self.project_paths.origin, self.project_paths.audio)
+        media_data = read_json(self.project_paths.media)
+        vocals_paths = []
+        for index, media in enumerate(media_data["media"]):
+            audio_path = self.project_paths.audio_dir / f"{index:03d}.mp3"
+            export_audio(Path(media["video_path"]), audio_path)
+            vocals_path = extract_vocals_demucs(audio_path)
+
+            media["audio_path"] = str(audio_path)
+            media["vocals_path"] = str(vocals_path)
+            vocals_paths.append(vocals_path)
+
+        write_json(media_data, self.project_paths.media)
+        with open(self.project_paths.vocals_filelist, "w", encoding="utf-8") as file:
+            for vocals_path in vocals_paths:
+                file.write(f"file '{vocals_path.absolute()}'\n")
+        concat_media(self.project_paths.vocals_filelist, self.project_paths.audio)
 
         print("========== 3. 字幕识别 ==========")
         Volcengine().transcribe_audio(self.project_paths.audio, self.project_paths.subtitles)

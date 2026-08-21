@@ -12,6 +12,9 @@ class ProjectPaths:
         self.video = self.root / "video.mp4"
         self.origin = self.root / "origin"
         self.audio = self.root / "audio.mp3"
+        self.audio_dir = self.root / "audio"
+        self.media = self.root / "media.json"
+        self.vocals_filelist = self.root / "vocals_list.txt"
         self.subtitles = {"srt": self.root / "subtitles.srt", "json": self.root / "subtitles.json", "stripped_srt": self.root / "subtitles_stripped.srt", "chunked_srt": self.root / "subtitles_chunked.srt"}
         self.subtitles_to_db = self.root / "subtitles_to_db.json"
         self.speaker_mapping = self.root / "speaker_mapping.json"
@@ -57,3 +60,4 @@ class ProjectPaths:
         self.final_clips.mkdir(parents=True, exist_ok=True)
         self.narration_audios.mkdir(parents=True, exist_ok=True)
         self.origin.mkdir(parents=True, exist_ok=True)
+        self.audio_dir.mkdir(parents=True, exist_ok=True)
