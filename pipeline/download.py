@@ -21,12 +21,22 @@ def download_video(urls, output_path):
         video = root_path.origin / f"{index:03d}.mp4"
 
         cmd = [
-            "yt-dlp",
-            "-f", "bestvideo+bestaudio/best",
-            "--merge-output-format", "mp4",
-            "-o", str(temp_video),
-            url
-        ]
+    "yt-dlp",
+
+    "--extractor-args",
+    "youtube:player_client=mweb",
+
+    "-f",
+    "bestvideo+bestaudio/best",
+
+    "--merge-output-format",
+    "mp4",
+
+    "-o",
+    str(temp_video),
+
+    url
+]
 
         run_cmd(cmd)
 
