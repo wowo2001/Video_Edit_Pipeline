@@ -2,7 +2,6 @@ from core.cmd import run_cmd
 from core.ffmpeg import extract_audio,get_duration, mix_start_aligned, mix_start_aligned
 from core.ffmpeg import mix_end_aligned,concat_mp3s
 from core.demucs import extract_vocals_demucs
-from core.path import ProjectPaths
 import json
 from pathlib import Path
 
@@ -27,10 +26,7 @@ def export_all_audio(input_path, output_path):
 
         print(f"Separating vocals: {mp3_file.name}")
 
-        extract_vocals_demucs(
-            mp3_file,
-            ProjectPaths().vocals_path / mp3_file.stem,
-        )
+        extract_vocals_demucs(mp3_file)
 
         vocal_files.append(mp3_file)
 

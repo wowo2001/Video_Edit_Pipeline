@@ -2,7 +2,7 @@ from pathlib import Path
 
 class ProjectPaths:
 
-    def __init__(self, root: str = "work"):
+    def __init__(self, root: str = "work", vocals_source: str | None = None):
 
         self.root = Path(root)
         self.pickle = Path("token.pickle")
@@ -34,6 +34,10 @@ class ProjectPaths:
         self.story = self.root / "story.json"
         self.candidate_metadata = self.root / "candidate_metadata.json"
         self.vocals_path = Path("separated/htdemucs")
+        if vocals_source:
+            self.vocals_path = self.vocals_path / vocals_source
+        self.vocals_wav = self.vocals_path / "vocals.wav"
+        self.vocals_mp3 = self.vocals_path / "vocals.mp3"
 
         self.clips = self.root / "clips"
         self.final_clips = self.root / "final_clips"

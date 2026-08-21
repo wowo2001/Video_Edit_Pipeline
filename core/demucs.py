@@ -1,8 +1,16 @@
 from core.cmd import run_cmd
 import shutil
 from pathlib import Path
+
 from core.ffmpeg import wav_to_map3
-def extract_vocals_demucs(input_path: Path, work_place_dir: Path):
+from core.path import ProjectPaths
+
+
+def extract_vocals_demucs(input_path: Path):
+    """Separate vocals and store Demucs artifacts at the managed project path."""
+    input_path = Path(input_path)
+    project_paths = ProjectPaths(vocals_source=input_path.stem)
+
     cmd = [
         "demucs",
         "-n", "htdemucs",
@@ -12,7 +20,7 @@ def extract_vocals_demucs(input_path: Path, work_place_dir: Path):
 
     run_cmd(cmd)
 
-    vocals_path = work_place_dir / "vocals.wav"
-    vocals_mp3_path = work_place_dir / "vocals.mp3"
+    vocals_path = project_paths.vocals_wav
+    vocals_mp3_path = project_paths.vocals_mp3
     wav_to_map3(vocals_path, vocals_mp3_path)
     shutil.copy(vocals_mp3_path, input_path)
