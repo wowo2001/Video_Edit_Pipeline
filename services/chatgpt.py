@@ -1,6 +1,7 @@
 import inspect
 import json
 import re
+from pathlib import Path
 
 from openai import OpenAI
 
@@ -79,6 +80,8 @@ class ChatGPT:
         write_json(safe_json_parse(self._complete(prompt)), script_path, ensure_ascii=False, indent=2)
 
     def fix_subtitles(self, subtitles_path, fixed_subtitles_path):
+        subtitles_path = Path(subtitles_path)
+        fixed_subtitles_path = Path(fixed_subtitles_path)
         subtitles = subtitles_path.read_text(encoding="utf-8")
         prompt = FIX_SUBTITLES_INPUT_PROMPT.format(prompt=FIX_SUBTITLE_PROMPT, subtitles=subtitles)
         result = json.loads(self._complete(prompt))

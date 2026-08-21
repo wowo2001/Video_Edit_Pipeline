@@ -1,6 +1,17 @@
 import json
+from pathlib import Path
 
 from core.cmd import run_cmd
+
+
+ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
+FONT_PATH = ASSETS_DIR / "fonts" / "msyh.ttc"
+
+
+def _font_filter_path(path):
+    if not path.exists():
+        raise FileNotFoundError(f"项目字体不存在: {path}")
+    return str(path.resolve()).replace("\\", "/").replace(":", "\\:")
 
 
 def extract_audio(input_path, output_path):
@@ -71,13 +82,18 @@ def mosaic_regions(input_video, output_video, regions):
 
 
 def add_subtitles(input_video, srt_file, output_video, y, font_size=10):
-    srt_path = str(srt_file).replace("\\", "/")
-    vf = f"subtitles={srt_path}:force_style='Alignment=2,MarginV={y},FontSize={font_size},PrimaryColour=&H00CCFF&,FontName=Microsoft YaHei'"
+    srt_path = _font_filter_path(Path(srt_file))
+    font_dir = _font_filter_path(FONT_PATH.parent)
+    vf = (
+        f"subtitles=filename='{srt_path}':fontsdir='{font_dir}':"
+        f"force_style='Alignment=2,MarginV={y},FontSize={font_size},"
+        "PrimaryColour=&H00CCFF&,FontName=Microsoft YaHei'"
+    )
     run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-vf", vf, "-c:v", "libx264", "-crf", "23", "-preset", "fast", "-c:a", "copy", str(output_video)])
 
 
 def add_text_overlay(input_video, output_video, title, subtitle, font_size_title, font_size_sub, title_y, sub_y, title_color, sub_color, popup_comments, popup_font_size, popup_color, popup_y):
-    font_path, filters = "C\\:/Windows/Fonts/msyh.ttc", []
+    font_path, filters = _font_filter_path(FONT_PATH), []
     filters.append(f"drawtext=fontfile='{font_path}':text='{title}':fontcolor={title_color}:fontsize={font_size_title}:x=(w-text_w)/2:y={title_y}")
     filters.append(f"drawtext=fontfile='{font_path}':text='{subtitle}':fontcolor={sub_color}:fontsize={font_size_sub}:x=(w-text_w)/2:y=h-{sub_y}")
     for item in popup_comments or []:
