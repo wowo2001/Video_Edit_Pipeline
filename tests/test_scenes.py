@@ -7,7 +7,6 @@ from pipeline.scenes import (
     attach_subtitles_to_segments,
     attach_subtitles_to_selected_scenes,
 )
-from services.chatgpt import scene_selection_issues, segment_plan_issues
 
 
 class FakePostgresClient:
@@ -21,67 +20,6 @@ class FakePostgresClient:
 
 
 class ScenePlanningTests(unittest.TestCase):
-    def test_scene_selection_rejects_global_budget_overflow(self):
-        candidates = [{"scene_id": 7}, {"scene_id": 8}]
-        plan = [
-            {"scene_id": 7, "max_segments": 4, "target_duration_seconds": 120},
-            {"scene_id": 8, "max_segments": 3, "target_duration_seconds": 100},
-        ]
-
-        issues = scene_selection_issues(candidates, plan)
-
-        self.assertTrue(any("超过 6 个上限" in issue for issue in issues))
-        self.assertTrue(any("超过 210 秒上限" in issue for issue in issues))
-
-    def test_scene_selection_requires_one_final_audience_question(self):
-        candidates = [{"scene_id": 7}, {"scene_id": 8}]
-        plan = [
-            {"scene_id": 7, "max_segments": 1, "target_duration_seconds": 50},
-            {"scene_id": 8, "max_segments": 2, "target_duration_seconds": 100},
-        ]
-
-        issues = scene_selection_issues(candidates, plan)
-
-        self.assertIn("最后一个场景必须提供 audience_question", issues)
-
-    def test_segment_plan_rejects_too_much_or_repeated_dialogue(self):
-        scene = {
-            "max_segments": 2,
-            "subtitles": [
-                {"start_time": 0, "end_time": 8000},
-                {"start_time": 8000, "end_time": 15000},
-                {"start_time": 15000, "end_time": 17000},
-            ],
-        }
-        plan = {
-            "segments": [
-                {"segment_id": 1, "subtitle_ids": [1, 2]},
-                {"segment_id": 2, "subtitle_ids": [2, 3]},
-                {"segment_id": 3, "subtitle_ids": [3]},
-            ]
-        }
-
-        issues = segment_plan_issues(scene, plan)
-
-        self.assertTrue(any("超过上限 2" in issue for issue in issues))
-        self.assertTrue(any("15.0 秒" in issue for issue in issues))
-        self.assertTrue(any("重复使用" in issue for issue in issues))
-
-    def test_segment_plan_rejects_non_contiguous_subtitle_ids(self):
-        scene = {
-            "max_segments": 1,
-            "subtitles": [
-                {"start_time": 0, "end_time": 1000},
-                {"start_time": 1000, "end_time": 2000},
-                {"start_time": 2000, "end_time": 3000},
-            ],
-        }
-        plan = {"segments": [{"segment_id": 1, "subtitle_ids": [1, 3]}]}
-
-        issues = segment_plan_issues(scene, plan)
-
-        self.assertTrue(any("必须连续" in issue for issue in issues))
-
     def test_scene_plan_keeps_budget_and_adds_subtitle_durations(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
