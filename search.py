@@ -43,15 +43,21 @@ class SearchPipeline:
     def _write_media(self, media):
         write_json(media, self.paths.media)
 
-    def _load_task(self):
-        task = read_json(self.paths.questions)
-        question = task["问题"]
-        strategy = task["解说角度"]
+    def _load_task(self, task):
+        question = task.get("问题") or task.get("question")
+        strategy = task.get("解说角度") or task.get("strategy")
+        scene_ids = task.get("场景") or task.get("scene_ids")
+        subtitle = task.get("标题") or task.get("subtitle")
+        if not all([question, strategy, scene_ids, subtitle]):
+            raise ValueError(
+                "Search task 必须包含 问题、解说角度、场景、标题 "
+                "（也支持 question、strategy、scene_ids、subtitle）。"
+            )
         theme = (
             f"{question}从{strategy}角度分析解说词，"
             "结合历史背景和人物性格，深入剖析人物的动机和策略。"
         )
-        return question, task["场景"], task["标题"], theme
+        return question, scene_ids, subtitle, theme
 
     def _save_scene_candidates(self, scene_ids):
         scenes = []
@@ -375,9 +381,9 @@ class SearchPipeline:
         self._write_media(media)
         return output_path
 
-    def run(self):
-        question, scene_ids, subtitle, theme = self._load_task()
-        drama_title = "雍正王朝"
+    def run(self, task):
+        question, scene_ids, subtitle, theme = self._load_task(task)
+        drama_title = task.get("剧名") or task.get("drama_title") or "雍正王朝"
 
         print("========== 01. 根据任务场景生成候选场景 ==========")
         self._save_scene_candidates(scene_ids)
@@ -425,5 +431,20 @@ class SearchPipeline:
         upload_to_drive(original_video, folder_name=f"{drama_title}解析")
 
 
+def main():
+    tasks = read_json(ProjectPaths().search_task_file)
+    if not isinstance(tasks, list):
+        raise ValueError("question.json 必须是任务对象列表。")
+
+    print(f"📦 Total search jobs: {len(tasks)}")
+    for index, task in enumerate(tasks, start=1):
+        job_name = safe_filename(task.get("标题") or task.get("subtitle") or f"search_{index}")
+        project_paths = ProjectPaths(Path("work") / f"{index:03d}_{job_name}")
+        print(f"\n▶ Search job {index}/{len(tasks)}")
+        SearchPipeline(project_paths).run(task)
+
+    print("\n🎬 ALL SEARCH JOBS DONE")
+
+
 if __name__ == "__main__":
-    SearchPipeline().run()
+    main()

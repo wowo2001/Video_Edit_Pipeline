@@ -8,6 +8,7 @@ class ProjectPaths:
         self.pickle = Path("token.pickle")
         self.credentials = Path("credentials.json")
         self.task_file = Path("tasks.json")
+        self.search_task_file = Path("question.json")
 
         self.video = self.root / "video.mp4"
         self.origin = self.root / "origin"
