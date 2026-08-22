@@ -21,6 +21,12 @@ def main():
             title=job["title"],
             subtitle=job.get("subtitle"),
             upload=True,
+            background_music=job.get("background_music") or job.get("背景音乐"),
+            background_music_volume=(
+                job.get("background_music_volume")
+                if job.get("background_music_volume") is not None
+                else job.get("背景音乐音量")
+            ),
         )
 
     print("\n🎬 ALL DONE")

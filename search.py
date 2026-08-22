@@ -4,7 +4,12 @@ from pathlib import Path
 from core.ffmpeg import get_duration
 from core.path import ProjectPaths
 from core.utils import ms_to_seconds, read_json, safe_filename, write_json
-from pipeline.audio import export_audio, mix_narration_audio
+from pipeline.audio import (
+    export_audio,
+    mix_background_music,
+    mix_narration_audio,
+    resolve_background_music,
+)
 from pipeline.download import download_scene_videos
 from pipeline.scenes import (
     attach_subtitles_to_segments,
@@ -37,6 +42,8 @@ class SearchPipeline:
         self.database = PostgresClient()
         self.s3 = S3()
         self.tts = Volcengine()
+        self.background_music = None
+        self.background_music_volume = None
 
     def _read_media(self):
         media = read_json(self.paths.media) if self.paths.media.exists() else {}
@@ -377,6 +384,29 @@ class SearchPipeline:
         media, search_media = self._read_media()
         speed_up(search_media["concatenated_video_path"], self.paths.speed_up_video, speed=1.2)
         search_media["speed_up_video_path"] = str(self.paths.speed_up_video)
+        search_media["post_speed_video_path"] = str(self.paths.speed_up_video)
+        search_media.pop("background_music", None)
+        if self.background_music:
+            music = resolve_background_music(self.background_music)
+            volume = (
+                self.background_music_volume
+                if self.background_music_volume is not None
+                else music.get("default_volume", 0.08)
+            )
+            mix_background_music(
+                self.paths.speed_up_video,
+                music["path"],
+                self.paths.background_music_video,
+                volume,
+            )
+            search_media["post_speed_video_path"] = str(self.paths.background_music_video)
+            search_media["background_music"] = {
+                "id": music["id"],
+                "name": music["name"],
+                "source_audio_path": str(music["path"]),
+                "volume": float(volume),
+                "mixed_video_path": str(self.paths.background_music_video),
+            }
         self._write_media(media)
 
     def _mask_original_subtitles(self):
@@ -385,19 +415,19 @@ class SearchPipeline:
             {"x": 200, "y": 50, "width": 200, "height": 100, "mosaic_size": 10},
             {"x": 850, "y": 50, "width": 200, "height": 100, "mosaic_size": 10},
         ]
-        mosaic_regions(search_media["speed_up_video_path"], self.paths.masked_video, regions)
+        mosaic_regions(search_media["post_speed_video_path"], self.paths.masked_video, regions)
         search_media["masked_video_path"] = str(self.paths.masked_video)
         self._write_media(media)
 
-    def _export_final_audio(self):
+    def _export_subtitle_audio(self):
         media, search_media = self._read_media()
-        export_audio(search_media["speed_up_video_path"], self.paths.final_audio)
-        search_media["final_audio_path"] = str(self.paths.final_audio)
+        export_audio(search_media["speed_up_video_path"], self.paths.subtitle_audio)
+        search_media["subtitle_audio_path"] = str(self.paths.subtitle_audio)
         self._write_media(media)
 
-    def _transcribe_final_audio(self):
+    def _transcribe_subtitle_audio(self):
         media, search_media = self._read_media()
-        self.tts.transcribe_audio(search_media["final_audio_path"], self.paths.final_subtitles)
+        self.tts.transcribe_audio(search_media["subtitle_audio_path"], self.paths.final_subtitles)
         search_media["final_subtitles"] = {
             "srt_path": str(self.paths.final_subtitles["srt"]),
             "json_path": str(self.paths.final_subtitles["json"]),
@@ -486,6 +516,12 @@ class SearchPipeline:
     def run(self, task):
         question, scene_ids, subtitle, theme = self._load_task(task)
         drama_title = task.get("剧名") or task.get("drama_title") or "雍正王朝"
+        self.background_music = task.get("背景音乐") or task.get("background_music")
+        self.background_music_volume = (
+            task.get("background_music_volume")
+            if task.get("background_music_volume") is not None
+            else task.get("背景音乐音量")
+        )
 
         print("========== 01. 根据任务场景生成候选场景 ==========")
         self._save_scene_candidates(scene_ids)
@@ -509,10 +545,10 @@ class SearchPipeline:
         self._speed_up_video()
         print("========== 11. 遮挡原视频字幕 ==========")
         self._mask_original_subtitles()
-        print("========== 12. 导出成片音频 ==========")
-        self._export_final_audio()
+        print("========== 12. 导出字幕识别音频（不含背景音乐） ==========")
+        self._export_subtitle_audio()
         print("========== 13. 识别成片语音并生成字幕 ==========")
-        self._transcribe_final_audio()
+        self._transcribe_subtitle_audio()
         print("========== 14. AI 修正成片字幕 ==========")
         popup_text = self._fix_final_subtitles()
         print("========== 15. 添加字幕并保留原比例成片 ==========")

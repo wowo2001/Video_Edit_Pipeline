@@ -12,7 +12,12 @@ from pipeline.subtitles import (
     strip_srt,
 )
 from core.whisper import Whisper
-from pipeline.audio import export_audio, mix_narration_audio
+from pipeline.audio import (
+    export_audio,
+    mix_background_music,
+    mix_narration_audio,
+    resolve_background_music,
+)
 from core.ffmpeg import concat_media
 from pipeline.download import download_video
 from pipeline.video import add_gif_overlay, add_subtitles, change_resolution, concat_video_paths, cut_video, mask_sub, speed_up, add_text_overlay, mosaic_regions
@@ -132,7 +137,15 @@ class AutoVideoPipeline:
             )
         self._write_media(media)
 
-    def run(self, urls, title, subtitle = None, upload=False):
+    def run(
+        self,
+        urls,
+        title,
+        subtitle=None,
+        upload=False,
+        background_music=None,
+        background_music_volume=None,
+    ):
 
         print("========== 1. 下载视频 ==========")
 
@@ -228,7 +241,35 @@ class AutoVideoPipeline:
             speed=1.2,
         )
         main_media["speed_up_video_path"] = str(self.project_paths.speed_up_video)
+        main_media["post_speed_video_path"] = str(self.project_paths.speed_up_video)
+        main_media.pop("background_music", None)
         self._write_media(media_data)
+
+        if background_music:
+            print("========== 10.1 添加背景音乐 ==========")
+            music = resolve_background_music(background_music)
+            volume = (
+                background_music_volume
+                if background_music_volume is not None
+                else music.get("default_volume", 0.08)
+            )
+            mix_background_music(
+                self.project_paths.speed_up_video,
+                music["path"],
+                self.project_paths.background_music_video,
+                volume,
+            )
+            main_media["post_speed_video_path"] = str(
+                self.project_paths.background_music_video
+            )
+            main_media["background_music"] = {
+                "id": music["id"],
+                "name": music["name"],
+                "source_audio_path": str(music["path"]),
+                "volume": float(volume),
+                "mixed_video_path": str(self.project_paths.background_music_video),
+            }
+            self._write_media(media_data)
 
         print("========== 11. 掩码字幕 ==========")
         region = [
@@ -261,18 +302,18 @@ class AutoVideoPipeline:
         #     "height": 50,
         #     "mosaic_size": 8,
         # }]
-        mosaic_regions(main_media["speed_up_video_path"], self.project_paths.masked_video, region)
+        mosaic_regions(main_media["post_speed_video_path"], self.project_paths.masked_video, region)
         main_media["masked_video_path"] = str(self.project_paths.masked_video)
         self._write_media(media_data)
 
 
-        print("========== 12. 导出成片音频 ==========")
-        export_audio(main_media["speed_up_video_path"], self.project_paths.final_audio)
-        main_media["final_audio_path"] = str(self.project_paths.final_audio)
+        print("========== 12. 导出字幕识别音频（不含背景音乐） ==========")
+        export_audio(main_media["speed_up_video_path"], self.project_paths.subtitle_audio)
+        main_media["subtitle_audio_path"] = str(self.project_paths.subtitle_audio)
         self._write_media(media_data)
 
         print("========== 13. 成片语音识别导出字幕 ==========")
-        Volcengine().transcribe_audio(main_media["final_audio_path"], self.project_paths.final_subtitles)
+        Volcengine().transcribe_audio(main_media["subtitle_audio_path"], self.project_paths.final_subtitles)
         main_media["final_subtitles"] = {
             "srt_path": str(self.project_paths.final_subtitles["srt"]),
             "json_path": str(self.project_paths.final_subtitles["json"]),

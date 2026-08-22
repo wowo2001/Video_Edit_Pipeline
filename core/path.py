@@ -49,11 +49,14 @@ class ProjectPaths:
         self.concatenated_video = self.root / "concatenated_video.mp4"
         self.changed_resolution_video = self.root / "changed_resolution_video.mp4"
         self.speed_up_video = self.root / "speed_up_video.mp4"
+        self.background_music_video = self.root / "background_music_video.mp4"
         self.masked_video = self.root / "masked_video.mp4"
         self.subtitle_video = self.root / "subtitle_video.mp4"
         self.text_overlay_video = self.root / "text_overlay_video.mp4"
         self.gif_overlay_video = self.root / "gif_overlay_video.mp4"
-        self.final_audio = self.root / "final_audio.mp3"
+        # This audio is used only for subtitle recognition.  It must never
+        # include optional background music (which may contain sung lyrics).
+        self.subtitle_audio = self.root / "subtitle_audio.mp3"
 
         self.narration_audios = self.root / "narration_audios"
 

@@ -65,7 +65,7 @@
 4. 生成解说脚本并把字幕时间线回填到脚本。
 5. 流水线读取脚本，逐段调用 TTS，回写时长到脚本，并把 MP3 路径写入 `media.json.main`。
 6. 根据脚本裁剪 hook 和 clip，混音，拼接成视频。
-7. 依次进行分辨率、加速、遮罩、字幕、文字/GIF 等后处理。
+7. 加速后先导出未混背景音乐的字幕识别音频；随后可选背景音乐混音，并依次进行遮罩、字幕、文字/GIF 等后处理。背景音乐绝不进入字幕识别音频。
 8. 上传素材并写入场景、人物和字幕数据库。
 
 `services/volcengine.py` 只负责：`generate_tts(text, audio_path)`、语音识别和与火山 API 通信。它不能解析主脚本或 search 的 JSON。
@@ -84,12 +84,16 @@
     "解说角度": "用人策略",
     "场景": [101, 102, 103],
     "标题": "雍正重用李卫的真相",
-    "剧名": "雍正王朝"
+    "剧名": "雍正王朝",
+    "背景音乐": "xiang_tian_zai_jie_500_nian",
+    "背景音乐音量": 0.15
   }
 ]
 ```
 
 也支持对应的英文键：`question`、`strategy`、`scene_ids`、`subtitle`、`drama_title`。
+
+背景音乐为可选项；`背景音乐`（或 `background_music`）填写 `assets/background_music.json` 中的 `id` 或 `name`，`背景音乐音量`（或 `background_music_volume`）可覆盖素材登记的默认音量，取值为 `0` 到 `1`。音乐会在视频变速后循环混入，保留原声且不会改变视频时长；其输出路径和实际音量记录于 `media.json`。
 
 1. 从 PostgreSQL 取指定场景和字幕。
 2. LLM 选择场景、拆分 segment、生成 hook 和润色旁白。
