@@ -35,6 +35,7 @@ class ProjectPaths:
         self.hook = self.root / "06_hook_segment.json"
         self.scene_narration = self.root / "scene_narration.json"
         self.download = self.root / "download"
+        self.search_download_cache = Path("work") / "search_download_cache"
         self.story = self.root / "story.json"
         self.candidate_metadata = self.root / "candidate_metadata.json"
         self.vocals_path = Path("separated/htdemucs")

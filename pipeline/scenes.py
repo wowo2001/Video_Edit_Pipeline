@@ -31,6 +31,10 @@ def attach_subtitles_to_selected_scenes(
             continue
 
         scene["task"] = item["task"]
+        scene["max_segments"] = item.get("max_segments", 2)
+        scene["target_duration_seconds"] = item.get("target_duration_seconds", 60)
+        if item.get("audience_question"):
+            scene["audience_question"] = item["audience_question"]
         subtitles = [
             {
                 "start_time": row[0],
@@ -42,7 +46,11 @@ def attach_subtitles_to_selected_scenes(
         ]
         scene["subtitles"] = subtitles
         scene["subtitles_plain_text"] = "\n".join(
-            f"[{index}] {subtitle['speaker']}：{subtitle['content']}"
+            (
+                f"[{index} | "
+                f"{max(0, subtitle['end_time'] - subtitle['start_time']) / 1000:.1f}秒] "
+                f"{subtitle['speaker']}：{subtitle['content']}"
+            )
             for index, subtitle in enumerate(subtitles, start=1)
         )
         results.append(scene)
@@ -64,11 +72,20 @@ def attach_subtitles_to_segments(scene_path, segment_path, output_path):
 
         subtitle_map = {index + 1: subtitle for index, subtitle in enumerate(scene["subtitles"])}
         for segment in segments:
-            segment["subtitles"] = [
+            segment_subtitles = [
                 subtitle_map[subtitle_id]
                 for subtitle_id in segment.get("subtitle_ids", [])
                 if subtitle_id in subtitle_map
             ]
+            segment["subtitles"] = segment_subtitles
+            segment["dialogue_duration_seconds"] = round(
+                sum(
+                    max(0, subtitle["end_time"] - subtitle["start_time"])
+                    for subtitle in segment_subtitles
+                )
+                / 1000,
+                3,
+            )
             segment.pop("subtitle_ids", None)
         scene["segments"] = segments
         results.append(scene)

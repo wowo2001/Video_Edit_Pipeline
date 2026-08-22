@@ -98,6 +98,8 @@
 5. 所有 search 媒体路径写入 `media.json.search`。
 6. 后续裁剪、混音、拼接仅读取 `media.json.search`。
 
+search 的场景源视频会缓存到 `work/search_download_cache/`，按 S3 URL 复用下载与标准化结果；每个任务的 `media.json.search` 仍记录它实际使用的缓存路径。
+
 主流程和 search 不共享“专用包装函数”。例如，不应存在 `cut_hook_video_temp`、`generate_tts_temp` 这种按某个 JSON 结构命名的 service 方法；应由流程层读取 JSON，再调用通用的 `cut_video`、`generate_tts`、`mix_narration_audio`。
 
 ## 服务边界

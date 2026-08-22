@@ -1,6 +1,7 @@
 import shutil
 from pathlib import Path
 
+from core.ffmpeg import get_duration
 from core.path import ProjectPaths
 from core.utils import ms_to_seconds, read_json, safe_filename, write_json
 from pipeline.audio import export_audio, mix_narration_audio
@@ -17,6 +18,7 @@ from pipeline.video import (
     change_resolution,
     concat_video_paths,
     cut_video,
+    cut_video_range,
     mosaic_regions,
     speed_up,
 )
@@ -42,6 +44,11 @@ class SearchPipeline:
 
     def _write_media(self, media):
         write_json(media, self.paths.media)
+
+    @staticmethod
+    def _has_question_outro_capacity(input_video, dialogue_end, question_duration):
+        remaining_duration = get_duration(input_video) - dialogue_end
+        return remaining_duration >= question_duration, remaining_duration
 
     def _load_task(self, task):
         question = task.get("问题") or task.get("question")
@@ -96,13 +103,28 @@ class SearchPipeline:
 
     def _build_segments(self, theme):
         scene_clips = []
-        for scene in read_json(self.paths.scene_with_subtitle):
+        scenes = read_json(self.paths.scene_with_subtitle)
+        for scene in scenes:
             scene_clips.append(
                 {
                     "scene_id": scene["scene_id"],
                     **self.ai.split_scene_segment(theme, scene),
                 }
             )
+
+        ending_scene = next(
+            (scene for scene in reversed(scenes) if scene.get("audience_question")),
+            None,
+        )
+        if ending_scene:
+            ending_plan = next(
+                plan for plan in scene_clips if plan["scene_id"] == ending_scene["scene_id"]
+            )
+            if not ending_plan.get("segments"):
+                raise ValueError("结尾场景必须至少包含一个 segment 才能添加 audience_question")
+            ending_plan["segments"][-1]["audience_question"] = ending_scene[
+                "audience_question"
+            ]
 
         write_json(scene_clips, self.paths.scene_clips, ensure_ascii=False, indent=2)
         attach_subtitles_to_segments(
@@ -113,7 +135,11 @@ class SearchPipeline:
 
     def _download_scene_sources(self):
         scenes = read_json(self.paths.scene_selected_subtitle)
-        video_paths = download_scene_videos(scenes, self.paths.download, self.s3)
+        video_paths = download_scene_videos(
+            scenes,
+            self.paths.search_download_cache,
+            self.s3,
+        )
 
         media, search_media = self._read_media()
         search_media["scenes"] = {
@@ -159,6 +185,20 @@ class SearchPipeline:
                 scene_media["segments"][str(segment["segment_id"])] = {
                     "narration_audio_path": str(audio_path)
                 }
+                audience_question = segment.get("audience_question")
+                if audience_question:
+                    question_audio_path = self.paths.narration_audios / (
+                        f"scene_{scene['scene_id']}_segment_{segment['segment_id']}_question.mp3"
+                    )
+                    segment["audience_question_length"] = self.tts.generate_tts(
+                        audience_question,
+                        question_audio_path,
+                    )
+                    scene_media["segments"][str(segment["segment_id"])].update(
+                        {
+                            "audience_question_audio_path": str(question_audio_path),
+                        }
+                    )
 
         search_media["hook"]["narration_audio_path"] = str(hook_audio_path)
         write_json(scenes, self.paths.scene_selected_subtitle, ensure_ascii=False, indent=2)
@@ -194,6 +234,42 @@ class SearchPipeline:
                         output_path,
                     )
                 )
+                audience_question_duration = ms_to_seconds(
+                    segment.get("audience_question_length", 0)
+                )
+                if audience_question_duration:
+                    question_video_path = self.paths.clips / (
+                        f"scene_{scene['scene_id']}_segment_{segment['segment_id']}_question.mp4"
+                    )
+                    question_start = ms_to_seconds(subtitles[-1]["end_time"])
+                    has_capacity, remaining_duration = self._has_question_outro_capacity(
+                        input_video,
+                        question_start,
+                        audience_question_duration,
+                    )
+                    if has_capacity:
+                        segment_media["audience_question_video_path"] = str(
+                            cut_video_range(
+                                input_video,
+                                question_video_path,
+                                question_start,
+                                question_start + audience_question_duration,
+                            )
+                        )
+                    else:
+                        segment_media.pop("audience_question_audio_path", None)
+                        segment_media.pop("audience_question_video_path", None)
+                        segment_media["audience_question_skipped_reason"] = (
+                            "源视频在最后一句原声后仅剩 "
+                            f"{max(0, remaining_duration):.3f} 秒，不足以播放 "
+                            f"{audience_question_duration:.3f} 秒的问题。"
+                        )
+                        print(
+                            "[WARN] 跳过结尾问题："
+                            f"scene {scene['scene_id']} segment {segment['segment_id']} "
+                            f"剩余画面 {max(0, remaining_duration):.3f}s，"
+                            f"问题需要 {audience_question_duration:.3f}s"
+                        )
 
         hook = read_json(self.paths.hook)
         hook_scene = search_media["scenes"][str(hook["scene_id"])]
@@ -204,7 +280,6 @@ class SearchPipeline:
                 ms_to_seconds(hook.get("hook_length", 0)),
                 self.paths.clips / "hook.mp4",
                 narration_position="after",
-                keep_gaps=True,
             )
         )
         self._write_media(media)
@@ -228,7 +303,34 @@ class SearchPipeline:
                 output_path = self.paths.final_clips / (
                     f"scene_{scene['scene_id']}_segment_{segment['segment_id']}_final.mp4"
                 )
-                mix_narration_audio(video_path, audio_path, output_path)
+                question_audio_path = segment_media.get("audience_question_audio_path")
+                if question_audio_path:
+                    narration_video_path = self.paths.final_clips / (
+                        f"scene_{scene['scene_id']}_segment_{segment['segment_id']}_narration.mp4"
+                    )
+                    question_video_path = Path(
+                        segment_media["audience_question_video_path"]
+                    )
+                    question_mix_video_path = self.paths.final_clips / (
+                        f"scene_{scene['scene_id']}_segment_{segment['segment_id']}_question.mp4"
+                    )
+                    mix_narration_audio(video_path, audio_path, narration_video_path)
+                    mix_narration_audio(
+                        question_video_path,
+                        Path(question_audio_path),
+                        question_mix_video_path,
+                    )
+                    concat_video_paths(
+                        [narration_video_path, question_mix_video_path],
+                        output_path,
+                        self.paths.root / (
+                            f"scene_{scene['scene_id']}_segment_{segment['segment_id']}_final_concat.txt"
+                        ),
+                    )
+                    narration_video_path.unlink(missing_ok=True)
+                    question_mix_video_path.unlink(missing_ok=True)
+                else:
+                    mix_narration_audio(video_path, audio_path, output_path)
                 segment_media["final_video_path"] = str(output_path)
 
         hook_media = search_media["hook"]

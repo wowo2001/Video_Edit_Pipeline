@@ -43,8 +43,9 @@ def cut_video(
         end = ms_to_seconds(_subtitle_time(subtitle, "end"))
         if narration_position == "before" and index == 0:
             start = max(0, start - narration_duration)
-        elif narration_position == "after" and index == len(subtitles) - 1:
-            end += narration_duration
+        if index == len(subtitles) - 1:
+            if narration_position == "after":
+                end += narration_duration
 
         temp_path = output_path.parent / f"temp_{output_path.stem}_{index}.mp4"
         cut_video_ffmpeg(input_path, temp_path, start, end)
@@ -62,6 +63,14 @@ def cut_video(
             temp_path.unlink(missing_ok=True)
         except OSError as error:
             print(f"[WARN] delete failed: {temp_path} -> {error}")
+    return output_path
+
+
+def cut_video_range(input_path, output_path, start, end):
+    """Cut one continuous source-video range for a separately mixed timeline section."""
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    cut_video_ffmpeg(input_path, output_path, start, end)
     return output_path
 
 

@@ -1,3 +1,4 @@
+import hashlib
 import os
 from urllib.parse import urlparse
 
@@ -59,9 +60,16 @@ def _get_filename_from_s3_url(s3_path):
     return os.path.basename(urlparse(s3_path).path)
 
 
+def _get_cache_filename(s3_path):
+    filename = _get_filename_from_s3_url(s3_path)
+    stem, suffix = os.path.splitext(filename)
+    url_hash = hashlib.sha256(s3_path.encode("utf-8")).hexdigest()[:12]
+    return f"{stem}_{url_hash}{suffix}"
+
+
 def download_s3_video(s3_url, download_dir, s3_client, suffix=""):
     os.makedirs(download_dir, exist_ok=True)
-    filename = f"{_get_filename_from_s3_url(s3_url)}{suffix}"
+    filename = f"{_get_cache_filename(s3_url)}{suffix}"
     local_path = os.path.join(download_dir, filename)
 
     if os.path.exists(local_path):
@@ -80,7 +88,7 @@ def download_scene_videos(scenes, download_dir, s3_client, standardize=True):
 
     for scene in scenes:
         s3_url = scene["video_url"]
-        filename = _get_filename_from_s3_url(s3_url)
+        filename = _get_cache_filename(s3_url)
         if s3_url not in downloaded:
             downloaded[s3_url] = download_s3_video(s3_url, download_dir, s3_client)
         local_path = downloaded[s3_url]
