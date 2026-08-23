@@ -20,6 +20,8 @@
 
 每个任务使用一个 `work/<任务名>/media.json`。它记录**运行时生成或使用的媒体路径**，而不是 LLM 的业务内容。
 
+主流程入库时，`story.json` 的 `总故事` 会写入 PostgreSQL 的 `source_story`；每条 `scene` 通过 `story_id` 关联该次素材入库的总故事。旧的 `story` 表保留给原有按人物/集数检索的用途，不与主流程混用。
+
 ```json
 {
   "sources": [

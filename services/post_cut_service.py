@@ -12,6 +12,16 @@ class PostCutService:
         with open(story_path, "r", encoding="utf-8") as file:
             story = read_json(file)
 
+        overall_story = story.get("总故事")
+        if not isinstance(overall_story, str) or not overall_story.strip():
+            raise ValueError("story.json 缺少非空的 总故事，无法写入 source_story")
+        story_id = self.postgres_client.upsert_source_story(
+            drama_title=drama_title,
+            video_url=video_url,
+            summary=overall_story,
+            embedding=self.text_embedding_service.encode(overall_story),
+        )
+
         scene_mapping = {}
         for scene in story.get("场景", []):
             scene_id = self.postgres_client.insert_scene(
@@ -21,6 +31,7 @@ class PostCutService:
                 event=scene.get("事件"),
                 summary=scene.get("剧情"),
                 embedding=self.text_embedding_service.encode(scene.get("剧情")),
+                story_id=story_id,
             )
             scene_mapping[scene.get("编号")] = scene_id
 

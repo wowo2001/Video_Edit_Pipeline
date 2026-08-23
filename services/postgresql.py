@@ -18,6 +18,25 @@ class PostgresClient:
     def close(self):
         self.conn.close()
 
+    def upsert_source_story(self, drama_title, video_url, summary, embedding):
+        sql = """
+            INSERT INTO source_story (
+                drama_title, video_url, summary, summary_embedding
+            )
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (drama_title, video_url)
+            DO UPDATE SET
+                summary = EXCLUDED.summary,
+                summary_embedding = EXCLUDED.summary_embedding
+            RETURNING id;
+        """
+        with self.conn.cursor() as cursor:
+            cursor.execute(sql, (drama_title, video_url, summary, embedding))
+            story_id = cursor.fetchone()[0]
+
+        self.conn.commit()
+        return story_id
+
     def insert_scene(
         self,
         drama_title,
@@ -26,18 +45,19 @@ class PostgresClient:
         event,
         summary,
         embedding,
+        story_id,
     ):
         sql = """
             INSERT INTO scene (
-                drama_title, video_url, title, event, summary, summary_embedding
+                drama_title, video_url, title, event, summary, summary_embedding, story_id
             )
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
         """
         with self.conn.cursor() as cursor:
             cursor.execute(
                 sql,
-                (drama_title, video_url, title, event, summary, embedding),
+                (drama_title, video_url, title, event, summary, embedding, story_id),
             )
             scene_id = cursor.fetchone()[0]
 
