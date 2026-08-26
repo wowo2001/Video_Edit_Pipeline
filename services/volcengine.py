@@ -29,7 +29,7 @@ class Volcengine:
             "use_itn": "True",
             "use_punc": "False",
             "max_lines": 1,
-            "words_per_line": 15,
+            "words_per_line": 30,
             "with_speaker_info": "True",
             "caption_type": "speech",
         }
