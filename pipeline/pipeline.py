@@ -3,6 +3,7 @@ import shutil
 import uuid
 
 from core.path import ProjectPaths
+from core.llm_cost import finish_llm_cost_report, start_llm_cost_report
 from core.utils import ms_to_seconds, read_json, safe_filename, clear_workdir, write_json
 from pipeline.subtitles import (
     apply_character_scene_mapping,
@@ -147,6 +148,8 @@ class AutoVideoPipeline:
         background_music_volume=None,
     ):
 
+        start_llm_cost_report(self.project_paths.llm_cost_report)
+
         print("========== 1. 下载视频 ==========")
 
         download_video(
@@ -192,17 +195,17 @@ class AutoVideoPipeline:
 
         print("========== 3.2 人物识别 ==========")
         strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=False)
-        ChatGPT().recognise_speaker(self.project_paths.subtitles['stripped_srt'], self.project_paths.speaker_mapping)
+        ChatGPT(usage_report_path=self.project_paths.llm_cost_report).recognise_speaker(self.project_paths.subtitles['stripped_srt'], self.project_paths.speaker_mapping)
         apply_speaker_mapping(self.project_paths.subtitles['srt'], self.project_paths.speaker_mapping)
         
         print("========== 3.3 生成故事 拆分场景 ==========")
         strip_srt(self.project_paths.subtitles['srt'], self.project_paths.subtitles['stripped_srt'], keep_index=True)
-        ChatGPT().generate_story(self.project_paths.subtitles['stripped_srt'], self.project_paths.story)
+        ChatGPT(usage_report_path=self.project_paths.llm_cost_report).generate_story(self.project_paths.subtitles['stripped_srt'], self.project_paths.story)
         
 
         print("========== 4. AI 脚本 ==========")
         chunk_srt_by_scenes(self.project_paths.subtitles['stripped_srt'], self.project_paths.story,self.project_paths.subtitles['chunked_srt'])
-        Ali().generate_script(self.project_paths.subtitles['stripped_srt'], self.project_paths.script, self.project_paths.story)
+        Ali(usage_report_path=self.project_paths.llm_cost_report).generate_script(self.project_paths.subtitles['stripped_srt'], self.project_paths.script, self.project_paths.story)
         apply_timeline(self.project_paths.script, self.project_paths.subtitles['json'])
 
         print("========== 5. TTS ==========")
@@ -321,7 +324,7 @@ class AutoVideoPipeline:
         self._write_media(media_data)
 
         print("========== 14. AI修正字幕 ==========")
-        popup_text, _ = Ali().fix_subtitles(
+        popup_text, _ = Ali(usage_report_path=self.project_paths.llm_cost_report).fix_subtitles(
             main_media["final_subtitles"]["srt_path"],
             main_media["final_subtitles"]["srt_path"],
         )
@@ -396,4 +399,5 @@ class AutoVideoPipeline:
         PostCutService().save_subtitle_to_db(self.project_paths.subtitles_to_db,
                                              s3_url,
                                              drama_title=title)
+        finish_llm_cost_report(self.project_paths.llm_cost_report)
 

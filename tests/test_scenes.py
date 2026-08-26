@@ -6,6 +6,7 @@ from core.utils import read_json, write_json
 from pipeline.scenes import (
     attach_subtitles_to_segments,
     attach_subtitles_to_selected_scenes,
+    build_hook_segment,
 )
 
 
@@ -31,7 +32,6 @@ class ScenePlanningTests(unittest.TestCase):
                     "scene_id": 7,
                     "task": "只保留冲突",
                     "max_segments": 2,
-                    "target_duration_seconds": 55,
                     "audience_question": "这句话是否值得讨论？",
                 }],
                 selected_path,
@@ -50,7 +50,6 @@ class ScenePlanningTests(unittest.TestCase):
 
             scene = read_json(output_path)[0]
             self.assertEqual(scene["max_segments"], 2)
-            self.assertEqual(scene["target_duration_seconds"], 55)
             self.assertEqual(scene["audience_question"], "这句话是否值得讨论？")
             self.assertIn("[1 | 2.4秒] 甲：第一句", scene["subtitles_plain_text"])
             self.assertIn("[2 | 1.8秒] 乙：第二句", scene["subtitles_plain_text"])
@@ -87,7 +86,79 @@ class ScenePlanningTests(unittest.TestCase):
 
             segment = read_json(output_path)[0]["segments"][0]
             self.assertEqual(segment["dialogue_duration_seconds"], 4.2)
+            self.assertEqual(segment["type"], "with_dialogue")
             self.assertNotIn("subtitle_ids", segment)
+
+    def test_background_segment_attaches_visual_subtitles_without_dialogue(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            scenes_path = root / "scenes.json"
+            plans_path = root / "plans.json"
+            output_path = root / "output.json"
+            write_json(
+                [{
+                    "scene_id": 7,
+                    "subtitles": [
+                        {"start_time": 1000, "end_time": 3400, "content": "第一句"},
+                        {"start_time": 5000, "end_time": 6800, "content": "第二句"},
+                    ],
+                }],
+                scenes_path,
+            )
+            write_json(
+                [{
+                    "scene_id": 7,
+                    "segments": [{
+                        "segment_id": 1,
+                        "type": "narration_only",
+                        "narration": "剧情复述",
+                        "visual_subtitle_ids": [1, 2],
+                    }],
+                }],
+                plans_path,
+            )
+
+            attach_subtitles_to_segments(scenes_path, plans_path, output_path)
+
+            segment = read_json(output_path)[0]["segments"][0]
+            self.assertEqual(segment["type"], "narration_only")
+            self.assertEqual(
+                [item["content"] for item in segment["visual_subtitles"]],
+                ["第一句", "第二句"],
+            )
+            self.assertEqual(segment["visual_anchor_duration_seconds"], 4.2)
+            self.assertNotIn("subtitles", segment)
+            self.assertNotIn("visual_subtitle_ids", segment)
+
+    def test_background_segment_can_supply_visual_anchor_to_hook(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            scenes_path = root / "scenes.json"
+            hook_path = root / "hook.json"
+            output_path = root / "hook_segment.json"
+            visual_subtitles = [
+                {"start_time": 1000, "end_time": 2000, "content": "画面锚点"}
+            ]
+            write_json(
+                [{
+                    "scene_id": 7,
+                    "segments": [{
+                        "segment_id": 1,
+                        "type": "narration_only",
+                        "visual_subtitles": visual_subtitles,
+                    }],
+                }],
+                scenes_path,
+            )
+            write_json(
+                {"scene_id": 7, "segment_id": 1, "hook_narration": "开场旁白"},
+                hook_path,
+            )
+
+            result = build_hook_segment(scenes_path, hook_path, output_path)
+
+            self.assertEqual(result["subtitles"], visual_subtitles)
+            self.assertEqual(read_json(output_path)["subtitles"], visual_subtitles)
 
 
 if __name__ == "__main__":

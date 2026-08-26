@@ -2,11 +2,13 @@ import shutil
 from pathlib import Path
 
 from core.ffmpeg import get_duration
+from core.llm_cost import finish_llm_cost_report, start_llm_cost_report
 from core.path import ProjectPaths
 from core.utils import ms_to_seconds, read_json, safe_filename, write_json
 from pipeline.audio import (
     export_audio,
     mix_background_music,
+    mix_background_narration_audio,
     mix_narration_audio,
     resolve_background_music,
 )
@@ -15,6 +17,8 @@ from pipeline.scenes import (
     attach_subtitles_to_segments,
     attach_subtitles_to_selected_scenes,
     build_hook_segment,
+    normalize_segment_type,
+    NARRATION_ONLY,
 )
 from pipeline.video import (
     add_gif_overlay,
@@ -24,10 +28,9 @@ from pipeline.video import (
     concat_video_paths,
     cut_video,
     cut_video_range,
+    fit_forward_video_range,
     mosaic_regions,
-    speed_up,
 )
-from services.ali import Ali
 from services.chatgpt import ChatGPT
 from services.postgresql import PostgresClient
 from services.s3 import S3
@@ -37,8 +40,8 @@ from services.volcengine import Volcengine
 class SearchPipeline:
     def __init__(self, project_paths=None):
         self.paths = project_paths or ProjectPaths()
-        self.ai = ChatGPT()
-        self.ali = Ali()
+        start_llm_cost_report(self.paths.llm_cost_report)
+        self.ai = ChatGPT(usage_report_path=self.paths.llm_cost_report)
         self.database = PostgresClient()
         self.s3 = S3()
         self.tts = Volcengine()
@@ -156,13 +159,13 @@ class SearchPipeline:
         self._write_media(media)
 
     def _generate_hook_and_narration(self, theme):
-        self.ali.generate_hook(theme, self.paths.scene_selected_subtitle, self.paths.hook)
+        self.ai.generate_hook(theme, self.paths.scene_selected_subtitle, self.paths.hook)
         build_hook_segment(
             self.paths.scene_selected_subtitle,
             self.paths.hook,
             self.paths.hook,
         )
-        self.ali.refine_narration(self.paths.scene_selected_subtitle)
+        self.ai.refine_narration(self.paths.scene_selected_subtitle)
 
     def _generate_tts(self):
         hook = read_json(self.paths.hook)
@@ -222,10 +225,6 @@ class SearchPipeline:
                 continue
 
             for segment in scene.get("segments", []):
-                subtitles = segment.get("subtitles")
-                if not subtitles:
-                    continue
-
                 output_path = self.paths.clips / (
                     f"scene_{scene['scene_id']}_segment_{segment['segment_id']}.mp4"
                 )
@@ -233,14 +232,57 @@ class SearchPipeline:
                     str(segment["segment_id"]),
                     {},
                 )
-                segment_media["clip_video_path"] = str(
-                    cut_video(
-                        input_video,
-                        subtitles,
-                        ms_to_seconds(segment.get("narration_length", 0)),
-                        output_path,
-                    )
+                segment_type = normalize_segment_type(segment.get("type", "with_dialogue"))
+                narration_duration = ms_to_seconds(
+                    segment.get("narration_length", 0)
                 )
+                segment_media["type"] = segment_type
+
+                if segment_type == NARRATION_ONLY:
+                    visual_subtitles = segment.get("visual_subtitles")
+                    if not visual_subtitles:
+                        print(
+                            "[ERROR] narration_only segment 缺少定位字幕: "
+                            f"scene {scene['scene_id']} segment {segment['segment_id']}"
+                        )
+                        continue
+                    anchor_start = ms_to_seconds(visual_subtitles[0]["start_time"])
+                    visual_start, visual_end = fit_forward_video_range(
+                        anchor_start,
+                        narration_duration,
+                        get_duration(input_video),
+                    )
+                    segment_media["clip_video_path"] = str(
+                        cut_video_range(
+                            input_video,
+                            output_path,
+                            visual_start,
+                            visual_end,
+                        )
+                    )
+                    segment_media["narration_visual_range"] = {
+                        "start": visual_start,
+                        "end": visual_end,
+                    }
+                    content_end = visual_end
+                else:
+                    subtitles = segment.get("subtitles")
+                    if not subtitles:
+                        print(
+                            "[ERROR] with_dialogue segment 缺少原声字幕: "
+                            f"scene {scene['scene_id']} segment {segment['segment_id']}"
+                        )
+                        continue
+                    segment_media["clip_video_path"] = str(
+                        cut_video(
+                            input_video,
+                            subtitles,
+                            narration_duration,
+                            output_path,
+                        )
+                    )
+                    content_end = ms_to_seconds(subtitles[-1]["end_time"])
+
                 audience_question_duration = ms_to_seconds(
                     segment.get("audience_question_length", 0)
                 )
@@ -248,7 +290,7 @@ class SearchPipeline:
                     question_video_path = self.paths.clips / (
                         f"scene_{scene['scene_id']}_segment_{segment['segment_id']}_question.mp4"
                     )
-                    question_start = ms_to_seconds(subtitles[-1]["end_time"])
+                    question_start = content_end
                     has_capacity, remaining_duration = self._has_question_outro_capacity(
                         input_video,
                         question_start,
@@ -321,7 +363,18 @@ class SearchPipeline:
                     question_mix_video_path = self.paths.final_clips / (
                         f"scene_{scene['scene_id']}_segment_{segment['segment_id']}_question.mp4"
                     )
-                    mix_narration_audio(video_path, audio_path, narration_video_path)
+                    if normalize_segment_type(segment.get("type", "with_dialogue")) == NARRATION_ONLY:
+                        mix_background_narration_audio(
+                            video_path,
+                            audio_path,
+                            narration_video_path,
+                        )
+                    else:
+                        mix_narration_audio(
+                            video_path,
+                            audio_path,
+                            narration_video_path,
+                        )
                     mix_narration_audio(
                         question_video_path,
                         Path(question_audio_path),
@@ -337,7 +390,14 @@ class SearchPipeline:
                     narration_video_path.unlink(missing_ok=True)
                     question_mix_video_path.unlink(missing_ok=True)
                 else:
-                    mix_narration_audio(video_path, audio_path, output_path)
+                    if normalize_segment_type(segment.get("type", "with_dialogue")) == NARRATION_ONLY:
+                        mix_background_narration_audio(
+                            video_path,
+                            audio_path,
+                            output_path,
+                        )
+                    else:
+                        mix_narration_audio(video_path, audio_path, output_path)
                 segment_media["final_video_path"] = str(output_path)
 
         hook_media = search_media["hook"]
@@ -380,11 +440,13 @@ class SearchPipeline:
         search_media["concatenated_video_path"] = str(self.paths.concatenated_video)
         self._write_media(media)
 
-    def _speed_up_video(self):
+    def _prepare_post_processing_video(self):
         media, search_media = self._read_media()
-        speed_up(search_media["concatenated_video_path"], self.paths.speed_up_video, speed=1.2)
-        search_media["speed_up_video_path"] = str(self.paths.speed_up_video)
-        search_media["post_speed_video_path"] = str(self.paths.speed_up_video)
+        source_video = search_media["concatenated_video_path"]
+        search_media.pop("speed_up_video_path", None)
+        search_media.pop("post_speed_video_path", None)
+        search_media["subtitle_source_video_path"] = source_video
+        search_media["post_processing_video_path"] = source_video
         search_media.pop("background_music", None)
         if self.background_music:
             music = resolve_background_music(self.background_music)
@@ -394,12 +456,12 @@ class SearchPipeline:
                 else music.get("default_volume", 0.08)
             )
             mix_background_music(
-                self.paths.speed_up_video,
+                source_video,
                 music["path"],
                 self.paths.background_music_video,
                 volume,
             )
-            search_media["post_speed_video_path"] = str(self.paths.background_music_video)
+            search_media["post_processing_video_path"] = str(self.paths.background_music_video)
             search_media["background_music"] = {
                 "id": music["id"],
                 "name": music["name"],
@@ -415,13 +477,13 @@ class SearchPipeline:
             {"x": 200, "y": 50, "width": 200, "height": 100, "mosaic_size": 10},
             {"x": 850, "y": 50, "width": 200, "height": 100, "mosaic_size": 10},
         ]
-        mosaic_regions(search_media["post_speed_video_path"], self.paths.masked_video, regions)
+        mosaic_regions(search_media["post_processing_video_path"], self.paths.masked_video, regions)
         search_media["masked_video_path"] = str(self.paths.masked_video)
         self._write_media(media)
 
     def _export_subtitle_audio(self):
         media, search_media = self._read_media()
-        export_audio(search_media["speed_up_video_path"], self.paths.subtitle_audio)
+        export_audio(search_media["subtitle_source_video_path"], self.paths.subtitle_audio)
         search_media["subtitle_audio_path"] = str(self.paths.subtitle_audio)
         self._write_media(media)
 
@@ -541,8 +603,8 @@ class SearchPipeline:
         self._mix_audio()
         print("========== 09. 拼接 Hook 与场景 ==========")
         self._concat_videos()
-        print("========== 10. 加速成片 ==========")
-        self._speed_up_video()
+        print("========== 10. 准备后处理视频（Search 不加速） ==========")
+        self._prepare_post_processing_video()
         print("========== 11. 遮挡原视频字幕 ==========")
         self._mask_original_subtitles()
         print("========== 12. 导出字幕识别音频（不含背景音乐） ==========")
@@ -567,6 +629,7 @@ class SearchPipeline:
         print("========== 20. 上传成片 ==========")
         upload_to_drive(output_path, folder_name=f"{drama_title}解析")
         upload_to_drive(original_video, folder_name=f"{drama_title}解析")
+        finish_llm_cost_report(self.paths.llm_cost_report)
 
 
 def main():

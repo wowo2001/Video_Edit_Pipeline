@@ -44,6 +44,11 @@ def mix_narration(video, audio, output, alignment="start"):
     run_cmd(["ffmpeg", "-y", "-i", str(video), "-i", str(audio), "-filter_complex", filter_complex, "-map", "0:v", "-map", "[outa]", "-c:v", "copy", "-c:a", "aac", str(output)])
 
 
+def mix_background_narration(video, audio, output):
+    """Use the existing narration mix from the start of a background-only clip."""
+    mix_narration(video, audio, output, alignment="start")
+
+
 def encode_to_standard(input_path, output_path):
     run_cmd(["ffmpeg", "-y", "-i", str(input_path), "-vf", "scale=-2:720,pad=1280:720:(ow-iw)/2:(oh-ih)/2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25", "-preset", "ultrafast", "-c:a", "aac", "-ar", "48000", "-ac", "2", str(output_path)])
 

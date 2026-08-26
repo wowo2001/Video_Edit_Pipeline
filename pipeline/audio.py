@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from core.cmd import run_cmd
-from core.ffmpeg import extract_audio, mix_narration
+from core.ffmpeg import extract_audio, mix_background_narration, mix_narration
 from core.utils import read_json
 
 
@@ -83,3 +83,18 @@ def mix_narration_audio(video_path, narration_audio_path, output_path, alignment
     output_path.parent.mkdir(parents=True, exist_ok=True)
     print(f"视频路径: {video_path}, 旁白路径: {narration_audio_path}, 输出路径: {output_path}")
     mix_narration(video_path, narration_audio_path, output_path, alignment=alignment)
+
+
+def mix_background_narration_audio(
+    video_path,
+    narration_audio_path,
+    output_path,
+):
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    print(f"背景视频: {video_path}, 旁白路径: {narration_audio_path}, 输出路径: {output_path}")
+    mix_background_narration(
+        video_path,
+        narration_audio_path,
+        output_path,
+    )

@@ -104,6 +104,13 @@
 5. 所有 search 媒体路径写入 `media.json.search`。
 6. 后续裁剪、混音、拼接仅读取 `media.json.search`。
 
+search 的 segment 有两种画面语法：
+
+- `type` 只描述是否展示原声，避免与旁白的复述/分析功能混淆。`narration_only` 表示不展示原声：可以复述剧情，也可以分析人物动机或权谋含义；`visual_subtitle_ids` 只负责定位对应画面，TTS 生成后程序从第一条定位字幕开始向后截取与旁白实际时长相等的连续画面，在整段画面上压低原声并叠加旁白。
+- `with_dialogue` 表示展示原声：仅用于原声本身能证明旁白判断、制造关键反差、完成反转或提供不可替代表演张力的段落；`subtitle_ids` 是要保留的完整原声，程序从原声前向前预留旁白时长，形成“旁白 → 原声”。片尾互动问题可直接接在任一类型之后：with_dialogue 为“旁白 → 原声 → 问题”，narration_only 为“旁白 → 问题”。
+
+类型判断与字幕定位由现有分段 LLM 调用一次完成，不额外增加模型调用。时长匹配、片尾容量和裁剪边界由程序根据 TTS 与源视频的真实时长确定。
+
 search 的场景源视频会缓存到 `work/search_download_cache/`，按 S3 URL 复用下载与标准化结果；每个任务的 `media.json.search` 仍记录它实际使用的缓存路径。
 
 主流程和 search 不共享“专用包装函数”。例如，不应存在 `cut_hook_video_temp`、`generate_tts_temp` 这种按某个 JSON 结构命名的 service 方法；应由流程层读取 JSON，再调用通用的 `cut_video`、`generate_tts`、`mix_narration_audio`。

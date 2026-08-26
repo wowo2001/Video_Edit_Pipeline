@@ -3,11 +3,30 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from core.ffmpeg import mix_background_narration
 from core.utils import write_json
 from pipeline.audio import mix_background_music, resolve_background_music
 
 
 class BackgroundMusicTests(unittest.TestCase):
+    @patch("core.ffmpeg.mix_narration")
+    def test_background_narration_reuses_existing_mix_logic(
+        self,
+        mix_narration,
+    ):
+        mix_background_narration(
+            "video.mp4",
+            "narration.mp3",
+            "output.mp4",
+        )
+
+        mix_narration.assert_called_once_with(
+            "video.mp4",
+            "narration.mp3",
+            "output.mp4",
+            alignment="start",
+        )
+
     def test_resolve_background_music_supports_id_and_name(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

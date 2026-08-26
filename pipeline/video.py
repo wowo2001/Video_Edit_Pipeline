@@ -74,6 +74,22 @@ def cut_video_range(input_path, output_path, start, end):
     return output_path
 
 
+def fit_forward_video_range(anchor_start, duration, source_duration):
+    """Return a duration-exact range starting at an anchor, shifting back only at EOF."""
+    anchor_start = max(0.0, float(anchor_start))
+    duration = float(duration)
+    source_duration = float(source_duration)
+    if duration <= 0:
+        raise ValueError("画面时长必须大于 0")
+    if source_duration < duration:
+        raise ValueError(
+            f"源视频仅 {source_duration:.3f} 秒，无法承载 {duration:.3f} 秒旁白"
+        )
+
+    start = min(anchor_start, source_duration - duration)
+    return start, start + duration
+
+
 def concat_video_paths(video_paths, output_path, list_file):
     if not video_paths:
         raise ValueError("没有可拼接的视频路径")

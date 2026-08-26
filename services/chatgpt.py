@@ -6,6 +6,7 @@ from pathlib import Path
 from openai import OpenAI
 
 from config import ALI_API_KEY, OPENAI_API_KEY
+from core.llm_cost import record_llm_usage
 from core.utils import read_json, safe_json_parse, srt_to_seconds, write_json
 from prompts.editing_rules import EDITING_RULES
 from prompts.fix_subtitles import FIX_SUBTITLE_PROMPT
@@ -26,9 +27,9 @@ PROVIDERS = {
         "api_key": OPENAI_API_KEY,
         "models": {
             "generate_script": "gpt-5.6-luna", "fix_subtitles": "gpt-5.6-luna",
-            "recognise_speaker": "gpt-5.6-sol", "generate_story": "gpt-5.6-sol",
-            "select_scene": "gpt-5.6-luna",
-            "split_scene_segment": "gpt-5.6-sol", "refine_narration": "gpt-5.4-mini",
+            "recognise_speaker": "gpt-5.6-terra", "generate_story": "gpt-5.6-terra",
+            "select_scene": "gpt-5.6-sol",
+            "split_scene_segment": "gpt-5.6-terra", "refine_narration": "gpt-5.6-terra",
             "generate_hook": "gpt-5.6-luna",
         },
     },
@@ -47,11 +48,12 @@ PROVIDERS = {
 
 
 class ChatGPT:
-    def __init__(self, provider="openai"):
+    def __init__(self, provider="openai", usage_report_path=None):
         if provider not in PROVIDERS:
             raise ValueError(f"不支持的 LLM provider: {provider}")
         self.provider = provider
         self.config = PROVIDERS[provider]
+        self.usage_report_path = usage_report_path
         options = {key: value for key, value in self.config.items()
                    if key in {"api_key", "base_url", "timeout", "max_retries"}}
         self.client = OpenAI(**options)
@@ -63,9 +65,18 @@ class ChatGPT:
         return self.config["models"][caller.f_code.co_name]
 
     def _complete(self, prompt):
-        return self.client.chat.completions.create(
-            model=self._model(), messages=[{"role": "user", "content": prompt}]
-        ).choices[0].message.content
+        stage, model = self._calling_stage(), self._model()
+        response = self.client.chat.completions.create(
+            model=model, messages=[{"role": "user", "content": prompt}]
+        )
+        record_llm_usage(self.usage_report_path, self.provider, stage, model, response.usage)
+        return response.choices[0].message.content
+
+    def _calling_stage(self):
+        caller = inspect.currentframe().f_back
+        if caller.f_code.co_name == "_complete":
+            caller = caller.f_back
+        return caller.f_code.co_name
 
     def generate_script(self, subtitles_path, script_path, story_path):
         subtitles = subtitles_path.read_text(encoding="utf-8")
@@ -108,16 +119,25 @@ class ChatGPT:
         write_json(result, output_path, ensure_ascii=False, indent=2)
 
     def split_scene_segment(self, theme, scene):
+        ending_requirement = (
+            "本场景之后会追加片尾互动问题；最后一个 segment 仍按是否展示原声选择 type。"
+            "若选 with_dialogue，成片以‘旁白 → 原声 → 互动问题’结束；若选 narration_only，成片以‘旁白 → 互动问题’结束。"
+            if scene.get("audience_question")
+            else "本场景不是片尾场景，无额外要求。"
+        )
         prompt = SPLIT_SCENE_SEGMENT_PROMPT.format(theme=theme, summary=scene["summary"],
                                                    subtitles=scene["subtitles_plain_text"], task=scene["task"],
                                                    max_segments=scene.get("max_segments", 2),
-                                                   target_duration_seconds=scene.get("target_duration_seconds", 60))
+                                                   ending_requirement=ending_requirement)
         return safe_json_parse(self._complete(prompt))
 
     def refine_narration(self, scene_path):
         scenes = read_json(scene_path)
-        ai_input = [{"scene_id": scene["scene_id"], "title": scene["title"],
-                     "segments": [{key: segment[key] for key in ("segment_id", "purpose", "narration")}
+        ai_input = [{"scene_id": scene["scene_id"], "title": scene["title"], "summary": scene.get("summary", ""),
+                     "segments": [{"segment_id": segment["segment_id"],
+                                   "type": segment.get("type", "with_dialogue"),
+                                   "purpose": segment["purpose"],
+                                   "narration": segment["narration"]}
                                   for segment in scene["segments"]]} for scene in scenes]
         refined = safe_json_parse(self._complete(REFINE_NARRATION_PROMPT.format(
             scenes=json.dumps(ai_input, ensure_ascii=False, indent=2))))
@@ -134,7 +154,8 @@ class ChatGPT:
     def generate_hook(self, theme, scene_path, output_path):
         scenes = read_json(scene_path)
         ai_input = [{"scene_id": scene["scene_id"], "title": scene["title"],
-                     "segments": [{"segment_id": seg["segment_id"], "purpose": seg["purpose"]} for seg in scene["segments"]]}
+                     "segments": [{"segment_id": seg["segment_id"], "type": seg.get("type", "with_dialogue"),
+                                   "purpose": seg["purpose"]} for seg in scene["segments"]]}
                     for scene in scenes]
         prompt = GENERATE_HOOK_PROMPT.format(theme=theme, scenes=json.dumps(ai_input, ensure_ascii=False, indent=2))
         write_json(safe_json_parse(self._complete(prompt)), output_path, ensure_ascii=False, indent=2)

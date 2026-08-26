@@ -1,5 +1,15 @@
 from core.utils import read_json, write_json
 
+NARRATION_ONLY = "narration_only"
+WITH_DIALOGUE = "with_dialogue"
+
+
+def normalize_segment_type(segment_type):
+    """Validate the explicit original-dialogue behavior selected by the director."""
+    if segment_type in {NARRATION_ONLY, WITH_DIALOGUE}:
+        return segment_type
+    raise ValueError(f"未知 segment type: {segment_type}")
+
 
 def save_scene_candidates(rows, output_path):
     scenes = [
@@ -32,7 +42,6 @@ def attach_subtitles_to_selected_scenes(
 
         scene["task"] = item["task"]
         scene["max_segments"] = item.get("max_segments", 2)
-        scene["target_duration_seconds"] = item.get("target_duration_seconds", 60)
         if item.get("audience_question"):
             scene["audience_question"] = item["audience_question"]
         subtitles = [
@@ -72,21 +81,41 @@ def attach_subtitles_to_segments(scene_path, segment_path, output_path):
 
         subtitle_map = {index + 1: subtitle for index, subtitle in enumerate(scene["subtitles"])}
         for segment in segments:
-            segment_subtitles = [
-                subtitle_map[subtitle_id]
-                for subtitle_id in segment.get("subtitle_ids", [])
-                if subtitle_id in subtitle_map
-            ]
-            segment["subtitles"] = segment_subtitles
-            segment["dialogue_duration_seconds"] = round(
-                sum(
-                    max(0, subtitle["end_time"] - subtitle["start_time"])
-                    for subtitle in segment_subtitles
+            segment_type = normalize_segment_type(segment.get("type", WITH_DIALOGUE))
+            segment["type"] = segment_type
+            if segment_type == NARRATION_ONLY:
+                visual_ids = segment.get("visual_subtitle_ids", [])
+                visual_subtitles = [
+                    subtitle_map[subtitle_id]
+                    for subtitle_id in visual_ids
+                    if subtitle_id in subtitle_map
+                ]
+                segment["visual_subtitles"] = visual_subtitles
+                segment["visual_anchor_duration_seconds"] = round(
+                    sum(
+                        max(0, subtitle["end_time"] - subtitle["start_time"])
+                        for subtitle in visual_subtitles
+                    )
+                    / 1000,
+                    3,
                 )
-                / 1000,
-                3,
-            )
-            segment.pop("subtitle_ids", None)
+                segment.pop("visual_subtitle_ids", None)
+            else:
+                segment_subtitles = [
+                    subtitle_map[subtitle_id]
+                    for subtitle_id in segment.get("subtitle_ids", [])
+                    if subtitle_id in subtitle_map
+                ]
+                segment["subtitles"] = segment_subtitles
+                segment["dialogue_duration_seconds"] = round(
+                    sum(
+                        max(0, subtitle["end_time"] - subtitle["start_time"])
+                        for subtitle in segment_subtitles
+                    )
+                    / 1000,
+                    3,
+                )
+                segment.pop("subtitle_ids", None)
         scene["segments"] = segments
         results.append(scene)
 
@@ -105,6 +134,8 @@ def build_hook_segment(scene_path, hook_path, output_path):
             result = segment.copy()
             result["scene_id"] = hook["scene_id"]
             result["hook_narration"] = hook["hook_narration"]
+            if not result.get("subtitles") and result.get("visual_subtitles"):
+                result["subtitles"] = result["visual_subtitles"]
             write_json(result, output_path)
             return result
 
