@@ -7,6 +7,13 @@ hook 不是选择剧情最高潮，而是选择最适合第一次吸引观众的
 输入剧情：
 {scenes}
 
+ID 选择规则（必须遵守）：
+1. `scene_id` 必须逐字使用输入剧情中某个 scene 的 `scene_id`，不得编造、改写、使用示例数字或使用 subtitle_id。
+2. `segment_id` 必须是该 `scene_id` 的 `segments` 数组中实际存在的 `segment_id`；两个 ID 必须构成输入中真实存在的一组。
+3. 输出前静默核对：在输入中找到 `scene_id`，再确认该 scene 中存在同一个 `segment_id`。若找不到，必须改选输入中存在的组合。
+4. 下方 JSON 仅展示字段结构；其中的占位符不是可选 ID，绝对不可原样输出。
+5. `scene_id` 和 `segment_id` 必须输出为 JSON 整数，不得加双引号。例如应输出 `"scene_id": 489`，不得输出 `"scene_id": "489"`。
+
 只输出 JSON：
-{{"scene_id": 8, "segment_id": 2, "hook_narration": "..."}}
+{{"scene_id": <输入中的整数scene_id>, "segment_id": <该scene实际存在的整数segment_id>, "hook_narration": "..."}}
 """
