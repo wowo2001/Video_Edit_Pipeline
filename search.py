@@ -158,14 +158,19 @@ class SearchPipeline:
         }
         self._write_media(media)
 
-    def _generate_hook_and_narration(self, theme):
+    def _generate_hook_and_narration(self, theme, advertisement=None):
         self.ai.generate_hook(theme, self.paths.scene_selected_subtitle, self.paths.hook)
         build_hook_segment(
             self.paths.scene_selected_subtitle,
             self.paths.hook,
             self.paths.hook,
         )
-        self.ai.refine_narration(self.paths.scene_selected_subtitle)
+        if advertisement:
+            self.ai.refine_narration(
+                self.paths.scene_selected_subtitle, advertisement=advertisement,
+            )
+        else:
+            self.ai.refine_narration(self.paths.scene_selected_subtitle)
 
     def _generate_tts(self):
         hook = read_json(self.paths.hook)
@@ -511,7 +516,7 @@ class SearchPipeline:
             search_media["final_subtitles"]["srt_path"],
             self.paths.subtitle_video,
             y=40,
-            font_size=30,
+            font_size=26,
         )
         search_media["subtitle_video_path"] = str(self.paths.subtitle_video)
 
@@ -577,6 +582,10 @@ class SearchPipeline:
 
     def run(self, task):
         question, scene_ids, subtitle, theme = self._load_task(task)
+        advertisement = task.get("广告")
+        if advertisement is not None and not isinstance(advertisement, str):
+            raise ValueError("广告必须是字符串或 null")
+        advertisement = advertisement.strip() if advertisement else None
         drama_title = task.get("剧名") or task.get("drama_title") or "雍正王朝"
         self.background_music = task.get("背景音乐") or task.get("background_music")
         self.background_music_volume = (
@@ -594,7 +603,7 @@ class SearchPipeline:
         print("========== 04. 下载并标准化场景源视频 ==========")
         self._download_scene_sources()
         print("========== 05. 生成 Hook 与场景解说 ==========")
-        self._generate_hook_and_narration(theme)
+        self._generate_hook_and_narration(theme, advertisement=advertisement)
         print("========== 06. 生成场景与 Hook 的 TTS ==========")
         self._generate_tts()
         print("========== 07. 按已选字幕裁剪视频 ==========")

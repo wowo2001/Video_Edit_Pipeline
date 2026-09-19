@@ -31,7 +31,7 @@ def resolve_background_music(selection, registry_path=BACKGROUND_MUSIC_REGISTRY)
     return {**music, "path": music_path}
 
 
-def mix_background_music(input_video, music_path, output_path, volume=0.08):
+def mix_background_music(input_video, music_path, output_path, volume=0.06):
     """Loop low-volume music underneath a video's existing audio without changing duration."""
     volume = float(volume)
     if not 0 <= volume <= 1:

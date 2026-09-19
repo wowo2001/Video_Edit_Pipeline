@@ -21,3 +21,17 @@ REFINE_NARRATION_PROMPT = """你是一名专业短视频解说文案编辑。只
   {{"scene_id": 1, "segments": [{{"segment_id": 1, "narration": "..."}}]}}
 ]
 """
+
+
+ADVERTISEMENT_RULES = """
+本次允许在 narration 中增加以下广告及自然过渡；广告中的点赞、关注引导不受前述禁止新增互动的限制。
+<advertisement>
+{advertisement}
+</advertisement>
+
+1. 通读全片，找一个合适的位置植入一次广告。
+2. 尽量通过当前解说自然带出广告，再接回剧情，不生硬插播，不编造广告信息。
+3. 广告出现位置尽量在视频前半段，以内容顺序判断，不要求精确计时。
+
+保持原 JSON 结构，广告直接写入所选段的 narration。
+"""

@@ -15,7 +15,7 @@ from prompts.generate_hook import GENERATE_HOOK_PROMPT
 from prompts.generate_script import GENERATE_SCRIPT_PROMPT
 from prompts.generate_story import build_generate_story_prompt
 from prompts.recognise_speaker_input import build_recognise_speaker_prompt
-from prompts.refine_narration import REFINE_NARRATION_PROMPT
+from prompts.refine_narration import ADVERTISEMENT_RULES, REFINE_NARRATION_PROMPT
 from prompts.script_schema import OUTPUT_SCHEMA
 from prompts.select_scene import SELECT_SCENE_PROMPT
 from prompts.split_scene_segment import SPLIT_SCENE_SEGMENT_PROMPT
@@ -131,7 +131,7 @@ class ChatGPT:
                                                    ending_requirement=ending_requirement)
         return safe_json_parse(self._complete(prompt))
 
-    def refine_narration(self, scene_path):
+    def refine_narration(self, scene_path, advertisement=None):
         scenes = read_json(scene_path)
         ai_input = [{"scene_id": scene["scene_id"], "title": scene["title"], "summary": scene.get("summary", ""),
                      "segments": [{"segment_id": segment["segment_id"],
@@ -139,8 +139,11 @@ class ChatGPT:
                                    "purpose": segment["purpose"],
                                    "narration": segment["narration"]}
                                   for segment in scene["segments"]]} for scene in scenes]
-        refined = safe_json_parse(self._complete(REFINE_NARRATION_PROMPT.format(
-            scenes=json.dumps(ai_input, ensure_ascii=False, indent=2))))
+        prompt = REFINE_NARRATION_PROMPT.format(
+            scenes=json.dumps(ai_input, ensure_ascii=False, indent=2))
+        if advertisement:
+            prompt += ADVERTISEMENT_RULES.format(advertisement=advertisement)
+        refined = safe_json_parse(self._complete(prompt))
         refined_map = {scene["scene_id"]: {segment["segment_id"]: segment["narration"] for segment in scene["segments"]}
                        for scene in refined}
         for scene in scenes:
