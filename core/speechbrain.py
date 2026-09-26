@@ -43,6 +43,22 @@ class SpeechBrain:
 
         return emb.squeeze().cpu().numpy()
 
+    def get_assignment_embedding(self, waveform, sample_rate, start, end):
+        """Embed even very short valid utterances for forced assignment."""
+        start_sample = int(start * sample_rate)
+        end_sample = int(end * sample_rate)
+        chunk = waveform[:, start_sample:end_sample]
+        if chunk.shape[1] == 0:
+            return None
+
+        minimum_samples = int(sample_rate * 0.3)
+        if chunk.shape[1] < minimum_samples:
+            chunk = torch.nn.functional.pad(chunk, (0, minimum_samples - chunk.shape[1]))
+
+        with torch.no_grad():
+            embedding = self.model.encode_batch(chunk)
+        return embedding.squeeze().cpu().numpy()
+
     @staticmethod
     def write_diarized_srt(subtitles_json_path, srt_path):
         """Rebuild an SRT from diarization labels stored in the subtitle JSON."""
@@ -185,3 +201,98 @@ class SpeechBrain:
         self.write_diarized_srt(output_path["json"], output_path["srt"])
 
         print(f"✅ Subtitle generated: {output_path['srt']}")
+
+    def diarize_to_primary_clusters(
+        self,
+        audio_path,
+        output_path,
+        threshold=0.5,
+        min_cluster_ratio=0.01,
+        core_min_duration=1.5,
+    ):
+        """Assign every subtitle utterance to its nearest primary speaker cluster.
+
+        Primary clusters are formed only from core (long) utterances, using the
+        same clustering and validity rules as :meth:`diarize`.  Every remaining
+        utterance is then assigned to its closest primary centroid without a
+        distance threshold or ambiguity margin.
+        """
+        if core_min_duration <= 0:
+            raise ValueError("core_min_duration must be positive")
+
+        subtitles = read_json(output_path["json"])
+        waveform, sample_rate = torchaudio.load(audio_path)
+        waveform, sample_rate = self.prepare_waveform(waveform, sample_rate)
+        utterances = subtitles["utterances"]
+        records = []
+
+        for index, utterance in enumerate(utterances):
+            start = utterance["start_time"] / 1000
+            end = utterance["end_time"] / 1000
+            if end <= start:
+                continue
+
+            embedding = self.get_assignment_embedding(
+                waveform,
+                sample_rate,
+                start,
+                end,
+            )
+            if embedding is None:
+                continue
+            records.append(
+                {
+                    "utt_idx": index,
+                    "embedding": embedding,
+                    "is_core": end - start >= core_min_duration,
+                }
+            )
+
+        core_records = [record for record in records if record["is_core"]]
+        labels = ["UNKNOWN"] * len(utterances)
+        if not core_records:
+            print("[WARN] No core utterances; all speakers remain UNKNOWN")
+        else:
+            core_embeddings = np.vstack([record["embedding"] for record in core_records])
+            clusterer = AgglomerativeClustering(
+                n_clusters=None,
+                metric="cosine",
+                linkage="average",
+                distance_threshold=threshold,
+            )
+            core_labels = clusterer.fit_predict(core_embeddings)
+            counts = Counter(core_labels)
+            primary_clusters = {
+                cluster
+                for cluster, count in counts.items()
+                if count / len(core_labels) >= min_cluster_ratio
+            }
+
+            if not primary_clusters:
+                print("[WARN] No primary speaker clusters; all speakers remain UNKNOWN")
+            else:
+                centroids = {}
+                for cluster in primary_clusters:
+                    embeddings = core_embeddings[core_labels == cluster]
+                    centroid = embeddings.mean(axis=0)
+                    centroids[cluster] = centroid / np.linalg.norm(centroid)
+
+                for record, cluster in zip(core_records, core_labels):
+                    if cluster in primary_clusters:
+                        labels[record["utt_idx"]] = f"SPEAKER_{cluster:02d}"
+
+                for record in records:
+                    if record["is_core"] and labels[record["utt_idx"]] != "UNKNOWN":
+                        continue
+                    embedding = record["embedding"] / np.linalg.norm(record["embedding"])
+                    nearest_cluster = min(
+                        centroids,
+                        key=lambda cluster: 1 - float(np.dot(embedding, centroids[cluster])),
+                    )
+                    labels[record["utt_idx"]] = f"SPEAKER_{nearest_cluster:02d}"
+
+        for utterance, label in zip(utterances, labels):
+            utterance.setdefault("attribute", {})["speaker"] = label
+
+        write_json(subtitles, output_path["json"])
+        self.write_diarized_srt(output_path["json"], output_path["srt"])

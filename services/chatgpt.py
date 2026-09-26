@@ -31,6 +31,8 @@ PROVIDERS = {
             "select_scene": "gpt-5.6-sol",
             "split_scene_segment": "gpt-5.6-terra", "refine_narration": "gpt-5.6-terra",
             "generate_hook": "gpt-5.6-luna",
+            "translate_subtitles": "gpt-5.6-luna",
+            "merge_english_subtitle_groups": "gpt-5.6-luna",
         },
     },
     "ali": {
@@ -162,3 +164,39 @@ class ChatGPT:
                     for scene in scenes]
         prompt = GENERATE_HOOK_PROMPT.format(theme=theme, scenes=json.dumps(ai_input, ensure_ascii=False, indent=2))
         write_json(safe_json_parse(self._complete(prompt)), output_path, ensure_ascii=False, indent=2)
+
+    def translate_subtitles(self, subtitles):
+        """Translate subtitle text while preserving the caller's ordering."""
+        prompt = """Translate each English subtitle into concise, natural Simplified Chinese.
+Also create one concise Chinese news-style subtitle (no more than 16 characters)
+that summarizes the complete content. Return only a JSON object with `subtitle`
+and `translations`. Every item in `translations` must contain the original
+`index` and its Chinese `text`. Preserve every index exactly once. Do not include
+timestamps, speaker labels, explanations, or Markdown.
+
+Input:
+""" + json.dumps(subtitles, ensure_ascii=False)
+        result = safe_json_parse(self._complete(prompt))
+        if not isinstance(result, dict) or not isinstance(result.get("translations"), list):
+            raise ValueError("字幕翻译结果必须包含 subtitle 和 translations")
+        return result
+
+    def merge_english_subtitle_groups(self, blocks):
+        """Return only source-index groups that form natural English sentences."""
+        prompt = """You are selecting natural sentence boundaries in English news subtitles.
+Each block contains consecutive fragments from one speaker with no long pause.
+Return only JSON: {"groups": [[source_index, ...], ...]}.
+
+Rules:
+- Use every source index exactly once, in its original order.
+- Each group must contain adjacent indices from one block only.
+- Combine fragments into a natural, complete English thought when possible.
+- Keep a fragment as its own group if combining would be unnatural.
+- Do not alter, repeat, translate, or explain any text. Do not use Markdown.
+
+Input:
+""" + json.dumps({"blocks": blocks}, ensure_ascii=False, separators=(",", ":"))
+        result = safe_json_parse(self._complete(prompt))
+        if not isinstance(result, dict) or not isinstance(result.get("groups"), list):
+            raise ValueError("短句整合结果必须包含 groups")
+        return result["groups"]

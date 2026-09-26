@@ -21,11 +21,17 @@ class Volcengine:
         }
         self.speaker = SPEAKER
 
-    def transcribe_audio(self, input_path, output_path, speaker_info=False):
+    def transcribe_audio(
+        self,
+        input_path,
+        output_path,
+        speaker_info=False,
+        language="zh-CN",
+    ):
         submit_url = f"{self.asr_url}/submit"
         params = {
             "appid": self.app_id,
-            "language": "zh-CN",
+            "language": language,
             "use_itn": "True",
             "use_punc": "False",
             "max_lines": 1,
@@ -89,18 +95,18 @@ class Volcengine:
 
                 file.write(f"{index}\n{start} --> {end}\n{text}\n\n")
 
-    def generate_tts(self, text, audio_path):
+    def generate_tts(self, text, audio_path, speaker=None):
         """把一段文本转换为指定路径的 MP3，并返回时长（毫秒）。"""
         audio_path.parent.mkdir(parents=True, exist_ok=True)
-        audio_path.write_bytes(self._tts_stream(text))
+        audio_path.write_bytes(self._tts_stream(text, speaker or self.speaker))
         return len(AudioSegment.from_file(audio_path))
 
-    def _tts_stream(self, text: str) -> bytes:
+    def _tts_stream(self, text: str, speaker: str) -> bytes:
         payload = {
             "user": {"uid": "123"},
             "req_params": {
                 "text": text,
-                "speaker": self.speaker,
+                "speaker": speaker,
                 "audio_params": {"format": "mp3", "sample_rate": 24000},
             },
         }

@@ -115,3 +115,20 @@ def add_gif_overlay(input_video, output_video, gif_path, x, y, scale):
 
 def wav_to_map3(wav_path, mp3_path):
     run_cmd(["ffmpeg", "-y", "-i", str(wav_path), "-codec:a", "libmp3lame", "-q:a", "2", str(mp3_path)])
+
+
+def dub_video_segment(input_video, tts_audio, output_video, start_ms, end_ms, target_duration_ms):
+    """Retiming source video and replacing its original audio with TTS."""
+    source_duration_ms = end_ms - start_ms
+    if source_duration_ms <= 0 or target_duration_ms <= 0:
+        raise ValueError("视频和 TTS 时长必须大于 0")
+    speed = source_duration_ms / target_duration_ms
+    output_video = Path(output_video)
+    output_video.parent.mkdir(parents=True, exist_ok=True)
+    run_cmd([
+        "ffmpeg", "-y", "-ss", str(start_ms / 1000), "-t", str(source_duration_ms / 1000),
+        "-i", str(input_video), "-i", str(tts_audio),
+        "-filter_complex", f"[0:v]setpts=PTS/{speed}[video]", "-map", "[video]", "-map", "1:a",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-c:a", "aac", "-shortest", str(output_video),
+    ])
+    return speed
