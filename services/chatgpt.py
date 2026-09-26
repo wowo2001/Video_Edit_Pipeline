@@ -33,6 +33,8 @@ PROVIDERS = {
             "generate_hook": "gpt-5.6-luna",
             "translate_subtitles": "gpt-5.6-luna",
             "merge_english_subtitles_before_diarization": "gpt-5.6-terra",
+            "translate_chinese_subtitles": "gpt-5.6-luna",
+            "merge_chinese_subtitles_before_diarization": "gpt-5.6-terra",
             "screen_news_titles": "gpt-5.6-luna",
         },
     },
@@ -201,6 +203,44 @@ Input:
         result = safe_json_parse(self._complete(prompt))
         if not isinstance(result, dict) or not isinstance(result.get("groups"), list):
             raise ValueError("英文短句整合结果必须包含 groups")
+        return result["groups"]
+
+    def translate_chinese_subtitles(self, subtitles):
+        """Translate Chinese subtitle records into concise natural English."""
+        prompt = """Translate each Simplified Chinese subtitle into concise, natural English.
+Also create one concise English news-style subtitle (no more than 4 words and
+no more than 28 characters)
+that summarizes the complete content. Return only a JSON object with `subtitle`
+and `translations`. Every item in `translations` must contain the original
+`index` and its English `text`. Preserve every index exactly once. Do not include
+timestamps, speaker labels, explanations, or Markdown.
+
+Input:
+""" + json.dumps(subtitles, ensure_ascii=False)
+        result = safe_json_parse(self._complete(prompt))
+        if not isinstance(result, dict) or not isinstance(result.get("translations"), list):
+            raise ValueError("字幕翻译结果必须包含 subtitle 和 translations")
+        return result
+
+    def merge_chinese_subtitles_before_diarization(self, subtitles):
+        """Select complete Chinese thought groups before speaker diarization."""
+        prompt = """You are selecting natural Simplified Chinese sentence boundaries in news subtitles.
+Speaker identity is intentionally unavailable and must not be inferred.
+Return only JSON: {"groups": [[source_index, ...], ...]}.
+
+Rules:
+- Use every source index exactly once, in its original order.
+- Each group must contain adjacent source indices.
+- Combine fragments into a natural, complete Chinese thought when possible.
+- Keep a fragment alone if combining would be unnatural.
+- Do not alter, repeat, translate, label speakers, or explain any text.
+- Do not use Markdown.
+
+Input:
+""" + json.dumps({"subtitles": subtitles}, ensure_ascii=False, separators=(",", ":"))
+        result = safe_json_parse(self._complete(prompt))
+        if not isinstance(result, dict) or not isinstance(result.get("groups"), list):
+            raise ValueError("中文短句整合结果必须包含 groups")
         return result["groups"]
 
     def screen_news_titles(self, videos, topics):
