@@ -4,7 +4,9 @@ Step 1 downloads a source video into a fresh workspace for every run.
 """
 
 from datetime import datetime
+import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -104,7 +106,7 @@ def classify_speakers(paths: ProjectPaths) -> None:
     SpeechBrain().diarize_to_primary_clusters(
         media_data["main"]["vocals_audio_path"],
         paths.subtitles,
-        threshold=0.7,
+        threshold=0.75,
         min_cluster_ratio=0.05,
     )
 
@@ -144,11 +146,19 @@ def classify_speaker_genders(paths: ProjectPaths) -> dict:
         audio_path = gender_audio_dir / f"{speaker}.wav"
         audio_path.parent.mkdir(parents=True, exist_ok=True)
         torchaudio.save(audio_path, audio, sample_rate)
+        gender_environment = {
+            **os.environ,
+            "OMP_NUM_THREADS": "1",
+            "MKL_NUM_THREADS": "1",
+            "OPENBLAS_NUM_THREADS": "1",
+            "NUMEXPR_NUM_THREADS": "1",
+        }
         result = subprocess.run(
             [sys.executable, "-m", "core.voice_gender", str(audio_path)],
             capture_output=True,
             text=True,
             check=True,
+            env=gender_environment,
         )
         genders[speaker] = json.loads(result.stdout.strip().splitlines()[-1])
     media_data["main"]["speaker_gender_mapping"] = genders
@@ -177,48 +187,6 @@ def export_speaker_english_subtitles(paths: ProjectPaths) -> Path:
     media_data["main"]["speaker_english_subtitles_path"] = str(output_path)
     write_json(media_data, paths.media)
     return output_path
-
-
-MAX_MERGED_DURATION_MS = 10_000
-MAX_MERGED_WORDS = 25
-MAX_MERGE_GAP_MS = 500
-
-
-def _build_merge_blocks(records: list[dict]) -> list[dict]:
-    """Build safe, same-speaker candidates for AI sentence-boundary selection."""
-    blocks = []
-    current = []
-
-    def flush() -> None:
-        if current:
-            blocks.append({"id": len(blocks), "items": current.copy()})
-            current.clear()
-
-    for index, record in enumerate(records):
-        english = record["english"]
-        item = [index, english["text"].strip()]
-        if not current:
-            current.append(item)
-            continue
-
-        first_index = current[0][0]
-        previous_index = current[-1][0]
-        first = records[first_index]
-        previous = records[previous_index]
-        same_speaker = record["speaker"] == previous["speaker"]
-        gap_ms = english["start_time"] - previous["english"]["end_time"]
-        duration_ms = english["end_time"] - first["english"]["start_time"]
-        words = sum(len(text.split()) for _, text in current) + len(item[1].split())
-        if (
-            not same_speaker
-            or gap_ms > MAX_MERGE_GAP_MS
-            or duration_ms > MAX_MERGED_DURATION_MS
-            or words > MAX_MERGED_WORDS
-        ):
-            flush()
-        current.append(item)
-    flush()
-    return blocks
 
 
 def _validate_merge_groups(groups: list, blocks: list[dict], records: list[dict]) -> list[list[int]]:
@@ -250,29 +218,47 @@ def _validate_merge_groups(groups: list, blocks: list[dict], records: list[dict]
     return normalized_groups
 
 
-def merge_speaker_english_subtitles(paths: ProjectPaths) -> Path:
-    """Ask AI only for safe source-index groups, then build merged English records locally."""
-    output_path = paths.root / "speaker_english_subtitles.json"
-    records = read_json(output_path)
-    blocks = _build_merge_blocks(records)
-    groups = ChatGPT(usage_report_path=paths.llm_cost_report).merge_english_subtitle_groups(blocks)
-    groups = _validate_merge_groups(groups, blocks, records)
+def merge_english_subtitles_before_diarization(paths: ProjectPaths) -> Path:
+    """Merge English subtitle fragments before any speaker labels are assigned."""
+    subtitles = read_json(paths.subtitles["json"])
+    utterances = subtitles["utterances"]
+    raw_path = paths.root / "subtitles_raw.json"
+    write_json(subtitles, raw_path)
 
-    merged_records = []
+    source_items = [[index, utterance["text"].strip()] for index, utterance in enumerate(utterances)]
+    # The complete recognizer sequence is deliberately sent to Luna unchanged.
+    # A single validation block checks ordering only; it does not limit meaning.
+    blocks = [{"id": 0, "items": source_items}]
+    groups = ChatGPT(usage_report_path=paths.llm_cost_report).merge_english_subtitles_before_diarization(source_items)
+    try:
+        groups = _validate_merge_groups(groups, blocks, utterances)
+    except (KeyError, ValueError):
+        # Do not alter recognizer boundaries when Luna returns malformed JSON.
+        print("⚠️ AI 短句分组不完整，已保留原始识别字幕")
+        groups = [[index] for index in range(len(utterances))]
+
+    merged_utterances = []
     for source_indices in groups:
-        source_records = [records[index] for index in source_indices]
-        first, last = source_records[0], source_records[-1]
-        merged_records.append({
-            "speaker": first["speaker"],
-            "source_indices": source_indices,
-            "english": {
-                "text": " ".join(record["english"]["text"].strip() for record in source_records),
-                "start_time": first["english"]["start_time"],
-                "end_time": last["english"]["end_time"],
-            },
-        })
-    write_json(merged_records, output_path)
-    return output_path
+        source_utterances = [utterances[index] for index in source_indices]
+        first, last = source_utterances[0], source_utterances[-1]
+        merged = dict(first)
+        merged.pop("attribute", None)
+        merged["source_indices"] = source_indices
+        merged["text"] = " ".join(item["text"].strip() for item in source_utterances)
+        merged["start_time"] = first["start_time"]
+        merged["end_time"] = last["end_time"]
+        merged_utterances.append(merged)
+
+    subtitles["utterances"] = merged_utterances
+    write_json(subtitles, paths.subtitles["json"])
+    media_data = read_json(paths.media)
+    media_data["main"]["raw_subtitles"] = {
+        "json_path": str(raw_path),
+        "utterance_count": len(utterances),
+    }
+    media_data["main"]["merged_english_subtitle_count"] = len(merged_utterances)
+    write_json(media_data, paths.media)
+    return paths.subtitles["json"]
 
 
 def translate_speaker_english_subtitles(paths: ProjectPaths) -> Path:
@@ -436,9 +422,9 @@ def create_news_short_video(paths: ProjectPaths) -> Path:
         title=title,
         subtitle=subtitle,
         font_size_title=80,
-        font_size_sub=48,
-        title_y=180,
-        sub_y=280,
+        font_size_sub=60,
+        title_y=400,
+        sub_y=450,
         title_color="#FFCC00",
         sub_color="#FFCC00",
         popup_comments=[],
@@ -477,9 +463,9 @@ def upload_news_video(paths: ProjectPaths) -> str:
     write_json(media_data, paths.media)
     return file_id
 
-def main() -> None:
-    """Download every source listed in translate_tasks.json."""
-    task_file = Path("translate_tasks.json")
+def main(task_file: str | Path = "translate_tasks.json") -> None:
+    """Run every source listed in the supplied translation task file."""
+    task_file = Path(task_file)
     jobs = read_json(task_file)
 
     for index, job in enumerate(jobs, start=1):
@@ -503,6 +489,9 @@ def main() -> None:
         print("========== 3. 英文字幕识别 ==========")
         transcribe_english_subtitles(paths)
 
+        print("========== 3.05 AI 整合英文短句 ==========")
+        merge_english_subtitles_before_diarization(paths)
+
         print("========== 3.1 语音分类 ==========")
         classify_speakers(paths)
 
@@ -511,9 +500,6 @@ def main() -> None:
 
         print("========== 3.2 导出说话人英文字幕 ==========")
         export_speaker_english_subtitles(paths)
-
-        print("========== 3.3 AI 整合英文短句 ==========")
-        merge_speaker_english_subtitles(paths)
 
         print("========== 4. AI 翻译字幕 ==========")
         translate_speaker_english_subtitles(paths)
@@ -536,4 +522,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Translate YouTube news videos into Chinese.")
+    parser.add_argument(
+        "--tasks",
+        default="translate_tasks.json",
+        help="JSON task file path (default: translate_tasks.json)",
+    )
+    arguments = parser.parse_args()
+    main(arguments.tasks)

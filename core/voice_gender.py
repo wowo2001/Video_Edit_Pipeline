@@ -2,6 +2,13 @@
 
 import argparse
 import json
+import os
+
+# This Wav2Vec2 classifier is run as an isolated worker on Windows.  Force a
+# single native thread before importing PyTorch to avoid intermittent c10.dll
+# access violations from the CPU parallel runtime.
+for _thread_env in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+    os.environ[_thread_env] = "1"
 
 import numpy as np
 import torch
@@ -17,8 +24,22 @@ class VoiceGenderClassifier:
     """Classify aggregated speaker audio as male, female, or unknown."""
 
     def __init__(self, model_id=GENDER_MODEL_ID):
-        self.feature_extractor = AutoFeatureExtractor.from_pretrained(model_id)
-        self.model = AutoModelForAudioClassification.from_pretrained(model_id)
+        torch.set_num_threads(1)
+        try:
+            torch.set_num_interop_threads(1)
+        except RuntimeError:
+            # The setting may already be fixed by an embedding application.
+            pass
+        # The model is pre-downloaded in the local Hugging Face cache.  Staying
+        # offline avoids network retries and makes this pipeline deterministic.
+        self.feature_extractor = AutoFeatureExtractor.from_pretrained(
+            model_id,
+            local_files_only=True,
+        )
+        self.model = AutoModelForAudioClassification.from_pretrained(
+            model_id,
+            local_files_only=True,
+        )
         self.model.eval()
 
     def classify(self, waveform, sample_rate):

@@ -1,0 +1,17 @@
+[
+  {
+    "name": "ABC News Australia",
+    "channel_ref": "https://www.youtube.com/@ABCNewsAustralia",
+    "enabled": true
+  },
+  {
+    "name": "7 News",
+    "channel_ref": "https://www.youtube.com/@7news",
+    "enabled": true
+  },
+  {
+    "name": "9 News",
+    "channel_ref": "https://www.youtube.com/@9NewsAUS",
+    "enabled": true
+  }
+]

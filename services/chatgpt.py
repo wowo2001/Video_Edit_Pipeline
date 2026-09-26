@@ -32,7 +32,8 @@ PROVIDERS = {
             "split_scene_segment": "gpt-5.6-terra", "refine_narration": "gpt-5.6-terra",
             "generate_hook": "gpt-5.6-luna",
             "translate_subtitles": "gpt-5.6-luna",
-            "merge_english_subtitle_groups": "gpt-5.6-luna",
+            "merge_english_subtitles_before_diarization": "gpt-5.6-terra",
+            "screen_news_titles": "gpt-5.6-luna",
         },
     },
     "ali": {
@@ -181,22 +182,49 @@ Input:
             raise ValueError("字幕翻译结果必须包含 subtitle 和 translations")
         return result
 
-    def merge_english_subtitle_groups(self, blocks):
-        """Return only source-index groups that form natural English sentences."""
-        prompt = """You are selecting natural sentence boundaries in English news subtitles.
-Each block contains consecutive fragments from one speaker with no long pause.
+    def merge_english_subtitles_before_diarization(self, subtitles):
+        """Select complete sentence groups before speaker diarization."""
+        prompt = """You are selecting natural English sentence boundaries in news subtitles.
+Speaker identity is intentionally unavailable and must not be inferred.
 Return only JSON: {"groups": [[source_index, ...], ...]}.
 
 Rules:
 - Use every source index exactly once, in its original order.
-- Each group must contain adjacent indices from one block only.
+- Each group must contain adjacent source indices.
 - Combine fragments into a natural, complete English thought when possible.
-- Keep a fragment as its own group if combining would be unnatural.
-- Do not alter, repeat, translate, or explain any text. Do not use Markdown.
+- Keep a fragment alone if combining would be unnatural.
+- Do not alter, repeat, translate, label speakers, or explain any text.
+- Do not use Markdown.
 
 Input:
-""" + json.dumps({"blocks": blocks}, ensure_ascii=False, separators=(",", ":"))
+""" + json.dumps({"subtitles": subtitles}, ensure_ascii=False, separators=(",", ":"))
         result = safe_json_parse(self._complete(prompt))
         if not isinstance(result, dict) or not isinstance(result.get("groups"), list):
-            raise ValueError("短句整合结果必须包含 groups")
+            raise ValueError("英文短句整合结果必须包含 groups")
         return result["groups"]
+
+    def screen_news_titles(self, videos, topics):
+        """Classify YouTube news titles against the selected editorial topics."""
+        prompt = """You are selecting Australian news videos for a Chinese-language
+landlord audience. Judge relevance from the title and channel only; do not invent
+facts that are not stated.
+
+Selected topics: """ + json.dumps(topics, ensure_ascii=False) + """
+
+Return only JSON in this exact form:
+{"results":[{"video_id":"...","relevant":true,"matched_topics":["..."],"reason":"简短中文理由"}]}
+
+Rules:
+- Return every supplied video_id exactly once.
+- relevant is true only when the title is substantively connected to at least one
+  selected topic, or clearly affects Australian landlords, tenants, housing or welfare.
+- matched_topics must use only values from Selected topics.
+- reason must be concise Simplified Chinese (maximum 30 characters).
+- Do not use Markdown or add fields.
+
+Videos:
+""" + json.dumps(videos, ensure_ascii=False, separators=(",", ":"))
+        result = safe_json_parse(self._complete(prompt))
+        if not isinstance(result, dict) or not isinstance(result.get("results"), list):
+            raise ValueError("新闻筛选结果必须包含 results")
+        return result["results"]
