@@ -13,5 +13,10 @@
     "name": "9 News",
     "channel_ref": "https://www.youtube.com/@9NewsAUS",
     "enabled": true
+  },
+  {
+    "name": "Guardian",
+    "channel_ref": "https://www.youtube.com/@theGuardian",
+    "enabled": true
   }
 ]

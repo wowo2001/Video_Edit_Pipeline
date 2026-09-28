@@ -31,7 +31,7 @@ PROVIDERS = {
             "select_scene": "gpt-5.6-sol",
             "split_scene_segment": "gpt-5.6-terra", "refine_narration": "gpt-5.6-terra",
             "generate_hook": "gpt-5.6-luna",
-            "translate_subtitles": "gpt-5.6-luna",
+            "translate_subtitles": "gpt-5.6-terra",
             "merge_english_subtitles_before_diarization": "gpt-5.6-terra",
             "translate_chinese_subtitles": "gpt-5.6-luna",
             "merge_chinese_subtitles_before_diarization": "gpt-5.6-terra",
@@ -171,8 +171,18 @@ class ChatGPT:
     def translate_subtitles(self, subtitles):
         """Translate subtitle text while preserving the caller's ordering."""
         prompt = """Translate each English subtitle into concise, natural Simplified Chinese.
-Also create one concise Chinese news-style subtitle (no more than 16 characters)
-that summarizes the complete content. Return only a JSON object with `subtitle`
+The source is Australian news. Unless the source explicitly identifies another
+country or currency, interpret `dollar`/`dollars` as Australian dollars and
+translate it as `澳元`, not `美元`. Preserve any explicitly stated currency,
+country, measurement, quantity, and unit exactly in meaning: never convert,
+replace, or guess a different currency or unit. Translate `USD` or `US$` as
+`美元` only when they are explicitly present.
+Also create one concise, audience-facing Chinese news-style subtitle (no more
+than 16 characters) that summarizes the complete content. It must make clear
+that this is Australian news (prefer an `澳洲` lead-in) and foreground the most
+practical impact on ordinary Australian residents, such as their housing,
+costs, income, benefits, rights, or daily life. Do not invent an impact that
+the source does not support. Return only a JSON object with `subtitle`
 and `translations`. Every item in `translations` must contain the original
 `index` and its Chinese `text`. Preserve every index exactly once. Do not include
 timestamps, speaker labels, explanations, or Markdown.

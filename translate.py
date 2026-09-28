@@ -14,7 +14,8 @@ from uuid import uuid4
 
 from core.path import ProjectPaths
 from core.demucs import extract_vocals_demucs
-from core.ffmpeg import add_subtitles, add_text_overlay, change_resolution, concat_media, dub_video_segment
+from core.framing import crop_to_four_three, four_three_to_vertical
+from core.ffmpeg import add_subtitles, add_text_overlay, concat_media, dub_video_segment
 from core.utils import ms_to_srt_time
 from core.utils import read_json, safe_filename, write_json
 from pipeline.audio import export_audio
@@ -388,14 +389,20 @@ def add_chinese_dubbed_subtitles(paths: ProjectPaths) -> Path:
             )
 
     media_data = read_json(paths.media)
+    cropped_video = paths.root / "chinese_dubbed_cropped_4_3.mp4"
+    crop_to_four_three(
+        media_data["main"]["chinese_dubbed_video_path"],
+        cropped_video,
+    )
     output_video = paths.root / "chinese_dubbed_subtitled.mp4"
     add_subtitles(
-        media_data["main"]["chinese_dubbed_video_path"],
+        cropped_video,
         srt_path,
         output_video,
         y=50,
         font_size=20,
     )
+    media_data["main"]["chinese_dubbed_cropped_4_3_video_path"] = str(cropped_video)
     media_data["main"]["chinese_dubbed_subtitles_path"] = str(srt_path)
     media_data["main"]["chinese_dubbed_subtitled_video_path"] = str(output_video)
     write_json(media_data, paths.media)
@@ -409,7 +416,7 @@ def create_news_short_video(paths: ProjectPaths) -> Path:
     subtitle = media_data["main"].get("news_subtitle") or ""
     vertical_video = paths.root / "chinese_dubbed_vertical.mp4"
     final_video = paths.root / "chinese_dubbed_news.mp4"
-    change_resolution(
+    four_three_to_vertical(
         media_data["main"]["chinese_dubbed_subtitled_video_path"],
         vertical_video,
         width=1080,
