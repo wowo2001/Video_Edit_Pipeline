@@ -169,7 +169,12 @@ def start_translation_workflow(title: str, upload: bool) -> None:
     task_file = run_dir / "translate_tasks.json"
     log_file = run_dir / "translate.log"
     tasks = [
-        {"urls": item["url"], "title": title.strip() or "今日要闻", "upload": upload}
+        {
+            "urls": item["url"],
+            "title": title.strip() or "今日要闻",
+            "subtitle": item["title"],
+            "upload": upload,
+        }
         for item in selected_items
     ]
     task_file.write_text(json.dumps(tasks, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

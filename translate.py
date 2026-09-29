@@ -44,7 +44,9 @@ def create_workspace(title: str | None = None) -> ProjectPaths:
     return ProjectPaths(workspace)
 
 
-def download_source_video(urls: str | list[str], title: str | None = None) -> ProjectPaths:
+def download_source_video(
+    urls: str | list[str], title: str | None = None, subtitle: str | None = None,
+) -> ProjectPaths:
     """Create a new workspace, then download the source video into it."""
     paths = create_workspace(title)
     download_video(
@@ -55,6 +57,8 @@ def download_source_video(urls: str | list[str], title: str | None = None) -> Pr
     )
     media_data = read_json(paths.media)
     media_data["main"]["task_title"] = title or ""
+    if isinstance(subtitle, str) and subtitle.strip():
+        media_data["main"]["task_subtitle"] = subtitle.strip()
     write_json(media_data, paths.media)
     return paths
 
@@ -295,7 +299,13 @@ def translate_speaker_english_subtitles(paths: ProjectPaths) -> Path:
         }
     write_json(records, output_path)
     media_data = read_json(paths.media)
-    media_data["main"]["news_subtitle"] = translation_result["subtitle"]
+    task_subtitle = media_data["main"].get("task_subtitle")
+    if isinstance(task_subtitle, str) and task_subtitle.strip():
+        media_data["main"]["news_subtitle"] = ChatGPT(
+            usage_report_path=paths.llm_cost_report
+        ).rewrite_australian_news_subtitle(task_subtitle)
+    else:
+        media_data["main"]["news_subtitle"] = translation_result["subtitle"]
     write_json(media_data, paths.media)
     return output_path
 
@@ -487,7 +497,7 @@ def main(task_file: str | Path = "translate_tasks.json") -> None:
             raise ValueError(f"任务 {index} 的 urls 必须是一个或多个 HTTP(S) URL")
 
         print("========== 1. 下载视频 ==========")
-        paths = download_source_video(urls, job.get("title"))
+        paths = download_source_video(urls, job.get("title"), job.get("subtitle"))
         print(f"任务 {index} 下载完成，工作区: {paths.root}")
 
         print("========== 2. 提取音频 ==========")

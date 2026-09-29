@@ -32,6 +32,7 @@ PROVIDERS = {
             "split_scene_segment": "gpt-5.6-terra", "refine_narration": "gpt-5.6-terra",
             "generate_hook": "gpt-5.6-luna",
             "translate_subtitles": "gpt-5.6-terra",
+            "rewrite_australian_news_subtitle": "gpt-5.6-terra",
             "merge_english_subtitles_before_diarization": "gpt-5.6-terra",
             "translate_chinese_subtitles": "gpt-5.6-luna",
             "merge_chinese_subtitles_before_diarization": "gpt-5.6-terra",
@@ -193,6 +194,24 @@ Input:
         if not isinstance(result, dict) or not isinstance(result.get("translations"), list):
             raise ValueError("字幕翻译结果必须包含 subtitle 和 translations")
         return result
+
+    def rewrite_australian_news_subtitle(self, source_title: str) -> str:
+        """Turn a supplied YouTube title into a short reader-facing Chinese subtitle."""
+        prompt = """Rewrite this YouTube news title as one concise Simplified Chinese
+subtitle for an Australian local-news short video. Use no more than 16 Chinese
+characters. Make the Australian context explicit (prefer an `澳洲` lead-in) and
+foreground the most practical impact on ordinary Australian residents, such as
+housing, costs, income, benefits, rights, or daily life. Do not invent facts,
+impact, currency, quantities, or locations not supported by the source title.
+Return only JSON: {"subtitle":"..."}.
+
+Source title:
+""" + source_title
+        result = safe_json_parse(self._complete(prompt))
+        subtitle = result.get("subtitle") if isinstance(result, dict) else None
+        if not isinstance(subtitle, str) or not subtitle.strip():
+            raise ValueError("前端标题改写结果缺少 subtitle")
+        return subtitle.strip()
 
     def merge_english_subtitles_before_diarization(self, subtitles):
         """Select complete sentence groups before speaker diarization."""
