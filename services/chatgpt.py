@@ -15,6 +15,10 @@ from prompts.generate_hook import GENERATE_HOOK_PROMPT
 from prompts.generate_script import GENERATE_SCRIPT_PROMPT
 from prompts.generate_story import build_generate_story_prompt
 from prompts.recognise_speaker_input import build_recognise_speaker_prompt
+from prompts.recognise_parliament_speaker import build_recognise_parliament_speaker_prompt
+from prompts.segment_parliament_content import build_segment_parliament_content_prompt
+from prompts.select_chinese_australia_topic import build_select_chinese_australia_topic_prompt
+from prompts.plan_parliament_commentary import build_plan_parliament_commentary_prompt
 from prompts.refine_narration import ADVERTISEMENT_RULES, REFINE_NARRATION_PROMPT
 from prompts.script_schema import OUTPUT_SCHEMA
 from prompts.select_scene import SELECT_SCENE_PROMPT
@@ -36,6 +40,10 @@ PROVIDERS = {
             "merge_english_subtitles_before_diarization": "gpt-5.6-terra",
             "translate_chinese_subtitles": "gpt-5.6-luna",
             "merge_chinese_subtitles_before_diarization": "gpt-5.6-terra",
+            "recognise_parliament_speakers": "gpt-5.6-terra",
+            "segment_parliament_content": "gpt-5.6-terra",
+            "select_chinese_australia_topic": "gpt-5.6-terra",
+            "plan_parliament_commentary": "gpt-5.6-terra",
             "screen_news_titles": "gpt-5.6-luna",
         },
     },
@@ -111,6 +119,33 @@ class ChatGPT:
     def recognise_speaker(self, subtitles_path, mapping_path):
         mapping = json.loads(self._complete(build_recognise_speaker_prompt(subtitles_path.read_text(encoding="utf-8"))).strip())
         write_json(mapping, mapping_path, ensure_ascii=False, indent=2)
+
+    def recognise_parliament_speakers(self, source_context, speaker_lines):
+        """Return structured identities for Parliament-video voice clusters."""
+        response = self._complete(
+            build_recognise_parliament_speaker_prompt(source_context, speaker_lines)
+        )
+        return safe_json_parse(response)
+
+    def segment_parliament_content(self, source_context, utterances):
+        """Return consecutive topic segments for a Parliament source video."""
+        return safe_json_parse(self._complete(
+            build_segment_parliament_content_prompt(source_context, utterances)
+        ))
+
+    def select_chinese_australia_topic(self, source_context, segments):
+        """Select a Chinese-Australian daily-life topic from content segments."""
+        return safe_json_parse(self._complete(
+            build_select_chinese_australia_topic_prompt(source_context, segments)
+        ))
+
+    def plan_parliament_commentary(self, selected_topic, source_context, utterances):
+        """Plan alternating Chinese narration and retained English dialogue."""
+        return safe_json_parse(self._complete(
+            build_plan_parliament_commentary_prompt(
+                selected_topic, source_context, utterances
+            )
+        ))
 
     def generate_story(self, subtitles_path, story_path):
         write_json(json.loads(self._complete(build_generate_story_prompt(subtitles_path.read_text(encoding="utf-8"))).strip()),
