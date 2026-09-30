@@ -481,6 +481,10 @@ class SearchPipeline:
         regions = [
             {"x": 200, "y": 50, "width": 200, "height": 100, "mosaic_size": 10},
             {"x": 850, "y": 50, "width": 200, "height": 100, "mosaic_size": 10},
+            # Search clips are masked while still 1280x720. Source subtitles
+            # sit in the bottom band (roughly y=620-710), before the pipeline
+            # burns its own yellow subtitles in a later step.
+            {"x": 0, "y": 600, "width": 1280, "height": 120, "mosaic_size": 8},
         ]
         mosaic_regions(search_media["post_processing_video_path"], self.paths.masked_video, regions)
         search_media["masked_video_path"] = str(self.paths.masked_video)
@@ -586,7 +590,10 @@ class SearchPipeline:
         if advertisement is not None and not isinstance(advertisement, str):
             raise ValueError("广告必须是字符串或 null")
         advertisement = advertisement.strip() if advertisement else None
-        drama_title = task.get("剧名") or task.get("drama_title") or "雍正王朝"
+        drama_title = task.get("剧名") or task.get("drama_title")
+        if not isinstance(drama_title, str) or not drama_title.strip():
+            raise ValueError("任务缺少非空的 剧名 或 drama_title")
+        drama_title = drama_title.strip()
         self.background_music = task.get("背景音乐") or task.get("background_music")
         self.background_music_volume = (
             task.get("background_music_volume")
@@ -636,8 +643,8 @@ class SearchPipeline:
         from services.google_drive import upload_to_drive
 
         print("========== 20. 上传成片 ==========")
-        upload_to_drive(output_path, folder_name=f"{drama_title}解析")
-        upload_to_drive(original_video, folder_name=f"{drama_title}解析")
+        upload_to_drive(output_path, folder_name=drama_title)
+        upload_to_drive(original_video, folder_name=drama_title)
         finish_llm_cost_report(self.paths.llm_cost_report)
 
 
