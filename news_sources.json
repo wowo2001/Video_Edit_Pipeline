@@ -16,7 +16,17 @@
   },
   {
     "name": "Guardian",
-    "channel_ref": "https://www.youtube.com/@theGuardian",
+    "channel_ref": "https://www.youtube.com/@Guardianaustralia",
+    "enabled": true
+  },
+  {
+    "name": "Sky news",
+    "channel_ref": "https://youtube.com/@news24",
+    "enabled": true
+  },
+  {
+    "name": "10News",
+    "channel_ref": "https://youtube.com/@10newsau",
     "enabled": true
   }
 ]

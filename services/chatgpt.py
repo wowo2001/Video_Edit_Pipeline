@@ -322,6 +322,12 @@ Rules:
 - Return every supplied video_id exactly once.
 - relevant is true only when the title is substantively connected to at least one
   selected topic, or clearly affects Australian landlords, tenants, housing or welfare.
+- Set relevant to false for any broad news roundup, bulletin, headlines package,
+  news update, or multi-story compilation, even if its title mentions a selected
+  topic. Examples include titles such as "news roundup", "top stories", "headlines",
+  "news bulletin", "latest news", "news update", or Chinese equivalents such as
+  "综合报道", "新闻汇总", "新闻简报", "新闻速览". Select videos focused on one
+  identifiable story instead.
 - matched_topics must use only values from Selected topics.
 - reason must be concise Simplified Chinese (maximum 30 characters).
 - Do not use Markdown or add fields.

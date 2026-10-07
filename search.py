@@ -479,8 +479,6 @@ class SearchPipeline:
     def _mask_original_subtitles(self):
         media, search_media = self._read_media()
         regions = [
-            {"x": 200, "y": 50, "width": 200, "height": 100, "mosaic_size": 10},
-            {"x": 850, "y": 50, "width": 200, "height": 100, "mosaic_size": 10},
             # Search clips are masked while still 1280x720. Source subtitles
             # sit in the bottom band (roughly y=620-710), before the pipeline
             # burns its own yellow subtitles in a later step.

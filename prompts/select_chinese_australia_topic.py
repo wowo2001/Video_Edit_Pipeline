@@ -14,8 +14,9 @@ SELECT_CHINESE_AUSTRALIA_TOPIC_PROMPT = """你是面向在澳洲生活的中文�
 2. 每个候选必须在 relevance 中说明具体受众、关联路径和视频中的证据；如果关联只能依赖泛泛推测，或对普通人没有可解释的现实意义，则不入选。
 3. 可以选多个非相邻段落组成一个候选话题，但必须说明它们如何共同支持该话题。
 4. candidates 应保留所有足够独立、受众广、现实关联清晰且原声材料完整的主题；不要只因只能选一项而丢弃其他合格候选。
-5. 解说角度是中性、实用的新闻说明。
-6. 如果没有任何主题满足上述标准，返回空 candidates，selected_topic_id 设为 null，并在 no_candidate_reason 说明原因；不要为了凑选题而勉强关联。若 candidates 非空，selected_topic_id 必须是 candidates 中优先级最高的一项。
+5. 解说角度是就新闻中的某一个主题呈现给观众的实用新闻说明。
+6. viewer_takeaway 应从已有新闻内容出发，概括观众应理解的事实及其对目标观众的影响。
+7. 如果没有任何主题满足上述标准，返回空 candidates，selected_topic_id 设为 null，并在 no_candidate_reason 说明原因；不要为了凑选题而勉强关联。若 candidates 非空，selected_topic_id 必须是 candidates 中优先级最高的一项。
 
 只输出合法 JSON：
 {
@@ -26,13 +27,13 @@ SELECT_CHINESE_AUSTRALIA_TOPIC_PROMPT = """你是面向在澳洲生活的中文�
       "segment_ids": ["s05", "s08"],
       "relevance": "为什么与在澳洲华人的日常相关",
       "source_basis": "这些段实际提到了什么",
-      "commentary_angle": "这个候选主题应如何中性、实用地讲给观众",
-      "viewer_takeaway": "观众看完这一候选主题应理解的事实，不是行动建议"
+      "commentary_angle": "就新闻中的这个主题应如何实用地呈现给观众",
+      "viewer_takeaway": "从已有新闻内容出发，观众应理解的事实及其对目标观众的影响"
     }
   ],
   "selected_topic_id": "mortgage_and_rates",
-  "commentary_angle": "建议如何把这个话题讲给观众",
-  "viewer_takeaway": "观众看完应理解的事实，不是行动建议",
+  "commentary_angle": "就新闻中的优先主题应如何呈现给观众",
+  "viewer_takeaway": "从已有新闻内容出发，观众应理解的事实及其对目标观众的影响",
   "no_candidate_reason": ""
 }
 

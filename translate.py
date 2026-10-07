@@ -18,7 +18,7 @@ from core.framing import crop_to_four_three, four_three_to_vertical
 from core.ffmpeg import add_subtitles, add_text_overlay, concat_media, dub_video_segment
 from core.utils import ms_to_srt_time
 from core.utils import read_json, safe_filename, write_json
-from pipeline.audio import export_audio
+from pipeline.audio import boost_tts_audio, export_audio
 from pipeline.download import download_video
 from services.chatgpt import ChatGPT
 from services.volcengine import Volcengine
@@ -345,6 +345,7 @@ def generate_chinese_tts(paths: ProjectPaths) -> Path:
         voice = voice_mapping[speaker]
         audio_path = tts_dir / f"{index:03d}.mp3"
         duration = tts.generate_tts(chinese["text"], audio_path, speaker=voice)
+        boost_tts_audio(audio_path)
         chinese["audio_path"] = str(audio_path)
         chinese["voice"] = voice
         chinese["start_time"] = current_time

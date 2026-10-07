@@ -50,7 +50,13 @@ def mix_background_narration(video, audio, output):
 
 
 def encode_to_standard(input_path, output_path):
-    run_cmd(["ffmpeg", "-y", "-i", str(input_path), "-vf", "scale=-2:720,pad=1280:720:(ow-iw)/2:(oh-ih)/2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25", "-preset", "ultrafast", "-c:a", "aac", "-ar", "48000", "-ac", "2", str(output_path)])
+    # Fit every source inside a 1280x720 canvas. Scaling only by height made
+    # ultrawide sources wider than 1280, so FFmpeg could not pad them back down.
+    vf = (
+        "scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2,"
+        "pad=1280:720:(ow-iw)/2:(oh-ih)/2:black,setsar=1"
+    )
+    run_cmd(["ffmpeg", "-y", "-i", str(input_path), "-vf", vf, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "25", "-preset", "ultrafast", "-c:a", "aac", "-ar", "48000", "-ac", "2", str(output_path)])
 
 
 def concat_media(filelist, output):

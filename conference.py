@@ -27,6 +27,7 @@ from core.ffmpeg import add_subtitles, add_text_overlay, dub_video_segment, get_
 from core.framing import crop_to_four_three, four_three_to_vertical
 from core.utils import ms_to_srt_time, read_json, safe_filename, write_json
 from pipeline.download import download_video
+from pipeline.audio import boost_tts_audio
 from pipeline.video import cut_video_range, fit_forward_video_range
 from services.chatgpt import ChatGPT
 from services.volcengine import Volcengine
@@ -852,19 +853,11 @@ def _is_strictly_continuous_indices(indices: object, allowed: set[int]) -> bool:
     )
 
 
-def _short_video_subtitle(value: object, maximum_length: int = 14) -> str:
-    """Keep the small vertical-video subtitle readable even if an LLM overproduces."""
-    text = re.sub(r"\s+", "", str(value or "")).strip("。！？；：，、 ")
-    if len(text) <= maximum_length:
-        return text
-    # Prefer a natural pause before the hard limit; otherwise enforce the cap.
-    natural_breaks = [
-        index + 1 for index, character in enumerate(text[:maximum_length])
-        if character in "，、："
-    ]
-    if natural_breaks:
-        return text[:natural_breaks[-1]].rstrip("，、：")
-    return text[:maximum_length].rstrip("，、：")
+def _short_video_subtitle(value: object) -> str:
+    """Normalise whitespace while preserving the title written by the model."""
+    # The prompt owns title length and wording.  A question mark is valid
+    # on-screen text; safe_filename() handles it separately for file paths.
+    return re.sub(r"\s+", "", str(value or "")).strip("。！；：，、 ")
 
 
 def plan_parliament_commentary(paths: ProjectPaths) -> Path:
@@ -942,6 +935,16 @@ def plan_parliament_commentary(paths: ProjectPaths) -> Path:
         indices = item.get(key)
         if not _is_strictly_continuous_indices(indices, allowed_indices):
             continue
+        # A dubbed dialogue clip has exactly one synthetic voice.  Do not let a
+        # journalist's question and a minister's answer pass plan validation as
+        # one clip: that would only fail later, after the plan has been saved.
+        if segment_type == "with_dialogue":
+            speakers = {
+                all_utterances[index].get("attribute", {}).get("speaker")
+                for index in indices
+            }
+            if len(speakers) != 1 or None in speakers or "UNKNOWN" in speakers:
+                continue
         if indices[0] <= previous_index:
             continue
         previous_index = indices[-1]
@@ -1095,6 +1098,7 @@ def generate_commentary_tts(paths: ProjectPaths) -> Path:
         segment["narration_duration_ms"] = tts.generate_tts(
             narration, narration_path, speaker=NARRATOR_TTS_VOICE
         )
+        boost_tts_audio(narration_path)
 
         audience_question = str(segment.get("audience_question") or "").strip()
         if audience_question:
@@ -1106,6 +1110,7 @@ def generate_commentary_tts(paths: ProjectPaths) -> Path:
             segment["audience_question_duration_ms"] = tts.generate_tts(
                 audience_question, question_path, speaker=NARRATOR_TTS_VOICE
             )
+            boost_tts_audio(question_path)
 
         if segment.get("type") != "with_dialogue":
             continue
@@ -1117,6 +1122,7 @@ def generate_commentary_tts(paths: ProjectPaths) -> Path:
         dub["duration_ms"] = tts.generate_tts(
             dub["chinese_text"], dub_path, speaker=dub["voice"]
         )
+        boost_tts_audio(dub_path)
         segment.setdefault("dubbed_dialogue", {}).update({
             "audio_path": dub["audio_path"], "duration_ms": dub["duration_ms"],
         })

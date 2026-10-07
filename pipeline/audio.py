@@ -6,6 +6,19 @@ from core.utils import read_json
 
 
 BACKGROUND_MUSIC_REGISTRY = Path("assets/background_music.json")
+TTS_AUDIO_VOLUME = 1.12
+
+
+def boost_tts_audio(audio_path: Path, volume: float = TTS_AUDIO_VOLUME) -> None:
+    """Apply a small, limiter-protected gain to generated speech in place."""
+    audio_path = Path(audio_path)
+    boosted_path = audio_path.with_name(f"{audio_path.stem}_boosted{audio_path.suffix}")
+    run_cmd([
+        "ffmpeg", "-y", "-i", str(audio_path),
+        "-af", f"volume={volume},alimiter=limit=0.98",
+        "-codec:a", "libmp3lame", "-q:a", "2", str(boosted_path),
+    ])
+    boosted_path.replace(audio_path)
 
 
 def resolve_background_music(selection, registry_path=BACKGROUND_MUSIC_REGISTRY):
