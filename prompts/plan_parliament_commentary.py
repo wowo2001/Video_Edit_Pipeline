@@ -52,7 +52,7 @@ PLAN_PARLIAMENT_COMMENTARY_PROMPT = """你是面向在澳洲生活的中文用�
 不要使用 Markdown，不要输出 JSON 以外的内容。"""
 
 
-def build_plan_parliament_commentary_prompt(selected_topic: dict, source_context: dict, utterances: list[dict]) -> str:
+def build_plan_parliament_commentary_prompt(selected_topic: dict, source_context: dict, utterances: list[dict], advertisement: str | None = None) -> str:
     topic_context = {
         "selected_topic_id": selected_topic.get("selected_topic_id"),
         "candidates": selected_topic.get("candidates", []),
@@ -75,8 +75,20 @@ def build_plan_parliament_commentary_prompt(selected_topic: dict, source_context
         }
         for item in utterances
     ]
+    advertisement_rules = ""
+    if advertisement:
+        advertisement_rules = f"""
+
+商业推广要求：
+- 在一个既有 segment 的 narration 中自然植入且仅植入一次广告；不新增 segment、不改变 segment 类型、字幕索引、原声台词、选题结论或片尾互动问题。
+- 广告只能使用下方提供的资料，不能编造功效、价格、优惠、用户评价或其他事实。植入后必须自然回到政策解读。
+- 该 segment 须额外输出 "advertisement": true；其他 segment 不得输出此字段。
+
+<advertisement>
+{advertisement}
+</advertisement>"""
     return (
-        f"{PLAN_PARLIAMENT_COMMENTARY_PROMPT}\n\n"
+        f"{PLAN_PARLIAMENT_COMMENTARY_PROMPT}{advertisement_rules}\n\n"
         f"视频背景：\n{json.dumps(source, ensure_ascii=False, indent=2)}\n\n"
         f"已选话题：\n{json.dumps(topic_context, ensure_ascii=False, indent=2)}\n\n"
         f"可用原始字幕：\n{json.dumps(subtitle_rows, ensure_ascii=False, indent=2)}"

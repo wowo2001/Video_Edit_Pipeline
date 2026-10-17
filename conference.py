@@ -913,8 +913,13 @@ def plan_parliament_commentary(paths: ProjectPaths) -> Path:
 
     media_data = read_json(paths.media)
     source_context = media_data.get("main", {}).get("source_context", {})
+    advertisement = media_data.get("main", {}).get("advertisement")
+    if not isinstance(advertisement, str) or not advertisement.strip():
+        advertisement = None
+    else:
+        advertisement = advertisement.strip()
     plan = ChatGPT(usage_report_path=paths.llm_cost_report).plan_parliament_commentary(
-        topic_context, source_context, utterances
+        topic_context, source_context, utterances, advertisement
     )
     raw_segments = plan.get("segments") if isinstance(plan, dict) else None
     if not isinstance(raw_segments, list) or not raw_segments:
@@ -957,6 +962,8 @@ def plan_parliament_commentary(paths: ProjectPaths) -> Path:
         }
         if isinstance(item.get("audience_question"), str) and item["audience_question"].strip():
             validated_segment["audience_question"] = item["audience_question"].strip()
+        if item.get("advertisement") is True:
+            validated_segment["advertisement"] = True
         validated_segments.append(validated_segment)
     if not validated_segments:
         raise ValueError("解说计划没有可用且顺序正确的段落")
@@ -969,6 +976,12 @@ def plan_parliament_commentary(paths: ProjectPaths) -> Path:
         "summary": str(plan.get("summary") or ""),
         "segments": validated_segments,
     }
+    advertisement_segments = [item["segment_id"] for item in validated_segments if item.get("advertisement")]
+    if advertisement:
+        output["advertisement"] = {
+            "source": advertisement,
+            "segment_ids": advertisement_segments,
+        }
     output_path = paths.root / "commentary_plan.json"
     write_json(output, output_path, ensure_ascii=False, indent=2)
     media_data["main"]["commentary_plan_path"] = str(output_path)
@@ -1459,7 +1472,7 @@ class ParliamentVideoPipeline:
         self.project_paths = project_paths
 
     def download_sources_and_captions(
-        self, urls: str | list[str], title: str | None = None, subtitle: str | None = None
+        self, urls: str | list[str], title: str | None = None, subtitle: str | None = None, advertisement: str | None = None
     ) -> None:
         """Run main-flow step 1: source video plus available English captions."""
         if isinstance(urls, str):
@@ -1477,6 +1490,8 @@ class ParliamentVideoPipeline:
         media_data = read_json(self.project_paths.media)
         media_data["main"]["task_title"] = title or ""
         media_data["main"]["task_subtitle"] = subtitle or ""
+        if advertisement:
+            media_data["main"]["advertisement"] = advertisement
         caption_paths: list[str] = []
         for index, source in enumerate(media_data["sources"]):
             caption_path = download_english_caption(
@@ -1504,10 +1519,10 @@ class ParliamentVideoPipeline:
         record_source_metadata(self.project_paths)
         print(f"第 1 步完成，工作区: {self.project_paths.root}")
 
-    def run(self, urls, title, subtitle=None, **_unused) -> None:
+    def run(self, urls, title, subtitle=None, advertisement=None, **_unused) -> None:
         """Run one source job through production and upload every candidate."""
         print("========== 1. 下载视频和英文字幕 ==========")
-        self.download_sources_and_captions(urls, title, subtitle)
+        self.download_sources_and_captions(urls, title, subtitle, advertisement)
         print("========== 1.05 云端英文字幕识别 ==========")
         transcribe_parliament_english_subtitles(self.project_paths)
         print("========== 1.1 AI 整合英文短句 ==========")
@@ -1538,11 +1553,15 @@ def main(tasks_path: str | Path = "conference_tasks.json") -> None:
         urls = job.get("urls") or job.get("url")
         if not urls:
             raise ValueError(f"任务 {index} 缺少 url 或 urls")
+        advertisement = job.get("广告") if "广告" in job else job.get("advertisement")
+        if advertisement is not None and not isinstance(advertisement, str):
+            raise ValueError(f"任务 {index} 的广告必须是字符串或 null")
         paths = create_workspace(job.get("subtitle") or job.get("title"))
         ParliamentVideoPipeline(paths).run(
             urls=urls,
             title=job.get("title"),
             subtitle=job.get("subtitle"),
+            advertisement=advertisement.strip() if isinstance(advertisement, str) and advertisement.strip() else None,
         )
 
 

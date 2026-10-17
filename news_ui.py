@@ -42,6 +42,11 @@ DEFAULT_CONFERENCE_SOURCES = [
         "playlist_id": "PLHpsRD1kEE6zaL9QK2446ntmZPOaI4aTa",
         "enabled": True,
     },
+    {
+        "name": "指定 YouTube 播放列表（dLJdXRVMdJs）",
+        "playlist_id": "PLvo1VRu7zepSeLhUdjq1dPfILDA_Ajgpu",
+        "enabled": True,
+    },
 ]
 SOURCES_PATH = Path("news_sources.json")
 CONFERENCE_SOURCES_PATH = Path("conference_sources.json")
@@ -196,7 +201,7 @@ def format_video_duration(seconds: object) -> str:
     return f"{remaining_seconds}秒"
 
 
-def start_translation_workflow(title: str, upload: bool) -> None:
+def start_translation_workflow(title: str, upload: bool, advertisement: str) -> None:
     selected_ids = st.session_state.selected_video_ids
     selected_items = [
         item for item in st.session_state.candidates if item["video_id"] in selected_ids
@@ -214,6 +219,7 @@ def start_translation_workflow(title: str, upload: bool) -> None:
             "urls": item["url"],
             "title": title.strip() or "今日要闻",
             "subtitle": item["title"],
+            "广告": advertisement.strip(),
             "upload": upload,
         }
         for item in selected_items
@@ -240,7 +246,7 @@ def start_translation_workflow(title: str, upload: bool) -> None:
     })
 
 
-def start_conference_workflow(title: str) -> None:
+def start_conference_workflow(title: str, advertisement: str) -> None:
     selected_ids = st.session_state.selected_video_ids
     selected_items = [
         item for item in st.session_state.candidates if item["video_id"] in selected_ids
@@ -258,6 +264,7 @@ def start_conference_workflow(title: str) -> None:
             "urls": item["url"],
             "title": title.strip() or "澳洲政策解读",
             "subtitle": item["title"],
+            "广告": advertisement.strip(),
         }
         for item in selected_items
     ]
@@ -312,6 +319,7 @@ sources = st.session_state[source_key]
 with st.sidebar:
     st.header("本次范围")
     days = st.slider("最近几天", min_value=1, max_value=7, value=1)
+
     selected_topics = []
     if not is_conference:
         st.subheader("关注主题")
@@ -370,7 +378,13 @@ with source_tab:
         st.caption("固定来源")
         st.markdown("- [ABC News Australia · Live](https://www.youtube.com/@abcnewsaustralia/streams)")
         st.markdown("- [9 News Australia · Live](https://www.youtube.com/@9NewsAUS/streams)")
-        st.markdown("- [指定 YouTube 播放列表](https://www.youtube.com/playlist?list=PLHpsRD1kEE6zaL9QK2446ntmZPOaI4aTa)")
+        for source in sources:
+            playlist_id = str(source.get("playlist_id") or "").strip()
+            if playlist_id:
+                source_name = source.get("name") or "指定 YouTube 播放列表"
+                st.markdown(
+                    f"- [{source_name}](https://www.youtube.com/playlist?list={playlist_id})"
+                )
     else:
         for index, source in enumerate(sources):
             with st.container(border=True):
@@ -447,14 +461,20 @@ with workflow_tab:
     selected_count = len(st.session_state.selected_video_ids)
     st.info(f"已选择 {selected_count} 条视频。" + ("每条都会建立独立工作区，并启动 conference.py；成片会自动上传 Google Drive。" if is_conference else "每条都会建立独立工作区，并启动 translate.py。"))
     task_title = st.text_input("视频大标题", value="澳洲政策解读" if is_conference else "今日要闻", key=f"{mode}_title")
+    advertisement = st.text_input(
+        "广告文案",
+        value="如果你想了解更多澳洲资讯，请关注土澳小红叔",
+        help="新闻翻译会独立插入广告；发布会解读会将广告融入一段既有解说。",
+        key=f"{mode}_advertisement",
+    )
     upload_to_drive = False if is_conference else st.checkbox("完成后上传 Google Drive", value=True)
     action_label = "启动已选发布会的政策解读制作" if is_conference else "启动已选视频的翻译工作流"
     if st.button(action_label, disabled=selected_count == 0, type="primary"):
         try:
             if is_conference:
-                start_conference_workflow(task_title)
+                start_conference_workflow(task_title, advertisement)
             else:
-                start_translation_workflow(task_title, upload_to_drive)
+                start_translation_workflow(task_title, upload_to_drive, advertisement)
             st.success("工作流已在后台启动。日志会持续写入下方路径。")
         except (OSError, ValueError) as error:
             st.error(str(error))

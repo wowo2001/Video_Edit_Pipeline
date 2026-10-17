@@ -15,7 +15,7 @@ from uuid import uuid4
 from core.path import ProjectPaths
 from core.demucs import extract_vocals_demucs
 from core.framing import crop_to_four_three, four_three_to_vertical
-from core.ffmpeg import add_subtitles, add_text_overlay, concat_media, dub_video_segment
+from core.ffmpeg import add_subtitles, add_text_overlay, concat_media, dub_video_segment, get_duration
 from core.utils import ms_to_srt_time
 from core.utils import read_json, safe_filename, write_json
 from pipeline.audio import boost_tts_audio, export_audio
@@ -28,6 +28,8 @@ MALE_NEWS_TTS_VOICES = [
     "zh_male_m191_uranus_bigtts",
     "ICL_uranus_zh_male_lvchaxiaoge_tob",
 ]
+
+ADVERTISEMENT_TTS_VOICE = "zh_female_tvbnv_uranus_bigtts"
 
 FEMALE_NEWS_TTS_VOICES = [
     "ICL_uranus_zh_female_kefunvshengwenhecuishou_tob",
@@ -309,17 +311,60 @@ def translate_speaker_english_subtitles(paths: ProjectPaths) -> Path:
     write_json(media_data, paths.media)
     return output_path
 
-def generate_chinese_tts(paths: ProjectPaths) -> Path:
-    """Generate Chinese speech with one stable news voice per speaker."""
+def plan_translation_advertisement(paths: ProjectPaths, advertisement: str) -> Path:
+    """Insert one labelled ad record without changing the translated news lines."""
     output_path = paths.root / "speaker_english_subtitles.json"
     records = read_json(output_path)
-    speakers = sorted({record["speaker"] for record in records})
+    if not records:
+        raise ValueError("没有可用于广告植入的译文字幕")
+
+    subtitles = [
+        {"index": index, "text": record["chinese"]["text"]}
+        for index, record in enumerate(records)
+    ]
+    plan = ChatGPT(usage_report_path=paths.llm_cost_report).plan_translation_advertisement(
+        subtitles, advertisement
+    )
+    insert_after_index = plan.get("insert_after_index")
+    narration = plan.get("narration")
+    if not isinstance(insert_after_index, int) or not 0 <= insert_after_index < len(records):
+        raise ValueError("广告规划结果缺少有效的字幕插入位置")
+    if not isinstance(narration, str) or not narration.strip():
+        raise ValueError("广告规划结果缺少有效文案")
+
+    anchor = records[insert_after_index]["english"]
+    advertisement_record = {
+        "kind": "advertisement",
+        "speaker": "ADVERTISEMENT",
+        "chinese": {"text": narration.strip(), "start_time": None, "end_time": None},
+        "advertisement": {
+            "source": advertisement,
+            "insert_after_index": insert_after_index,
+            "visual_start_time": anchor["start_time"],
+            "visual_end_time": anchor["end_time"],
+        },
+    }
+    records.insert(insert_after_index + 1, advertisement_record)
+    write_json(records, output_path)
+
+    media_data = read_json(paths.media)
+    media_data["main"]["advertisement"] = {
+        "source": advertisement,
+        "insert_after_index": insert_after_index,
+        "narration": narration.strip(),
+    }
+    write_json(media_data, paths.media)
+    return output_path
+
+
+def generate_chinese_tts(paths: ProjectPaths) -> Path:
+    """Generate Chinese speech with stable speaker voices and a labelled ad voice."""
+    output_path = paths.root / "speaker_english_subtitles.json"
+    records = read_json(output_path)
+    speakers = sorted({record["speaker"] for record in records if record.get("kind") != "advertisement"})
     media_data = read_json(paths.media)
     genders = media_data["main"].get("speaker_gender_mapping", {})
-    voice_lists = {
-        "male": MALE_NEWS_TTS_VOICES,
-        "female": FEMALE_NEWS_TTS_VOICES,
-    }
+    voice_lists = {"male": MALE_NEWS_TTS_VOICES, "female": FEMALE_NEWS_TTS_VOICES}
     speakers_by_gender = {"male": [], "female": []}
     for speaker in speakers:
         gender = genders.get(speaker, {}).get("gender")
@@ -329,9 +374,9 @@ def generate_chinese_tts(paths: ProjectPaths) -> Path:
 
     voice_mapping = {}
     for gender, gender_speakers in speakers_by_gender.items():
-        voices = voice_lists[gender]
         for index, speaker in enumerate(gender_speakers):
-            voice_mapping[speaker] = voices[index % len(voices)]
+            voice_mapping[speaker] = voice_lists[gender][index % len(voice_lists[gender])]
+    voice_mapping["ADVERTISEMENT"] = ADVERTISEMENT_TTS_VOICE
 
     tts_dir = paths.root / "chinese_tts"
     tts = Volcengine()
@@ -339,17 +384,13 @@ def generate_chinese_tts(paths: ProjectPaths) -> Path:
     for index, record in enumerate(records):
         chinese = record.get("chinese")
         if not chinese or not chinese.get("text"):
-            raise ValueError(f"第 {index + 1} 条字幕缺少中文翻译")
-
+            raise ValueError(f"第 {index + 1} 条字幕缺少中文文本")
         speaker = record["speaker"]
-        voice = voice_mapping[speaker]
         audio_path = tts_dir / f"{index:03d}.mp3"
-        duration = tts.generate_tts(chinese["text"], audio_path, speaker=voice)
+        duration = tts.generate_tts(chinese["text"], audio_path, speaker=voice_mapping[speaker])
         boost_tts_audio(audio_path)
-        chinese["audio_path"] = str(audio_path)
-        chinese["voice"] = voice
-        chinese["start_time"] = current_time
-        chinese["end_time"] = current_time + duration
+        chinese.update({"audio_path": str(audio_path), "voice": voice_mapping[speaker],
+                        "start_time": current_time, "end_time": current_time + duration})
         current_time += duration
 
     write_json(records, output_path)
@@ -357,22 +398,35 @@ def generate_chinese_tts(paths: ProjectPaths) -> Path:
     media_data["main"]["chinese_tts_dir"] = str(tts_dir)
     write_json(media_data, paths.media)
     return output_path
-
 def create_chinese_dubbed_video(paths: ProjectPaths) -> Path:
+    """Create dubbed news clips, including a separately labelled advertisement clip."""
     records_path = paths.root / "speaker_english_subtitles.json"
     records = read_json(records_path)
     media_data = read_json(paths.media)
+    source_video = media_data["main"]["source_video_path"]
+    source_duration_ms = int(get_duration(source_video) * 1000)
     clips_dir = paths.root / "chinese_video_clips"
     clip_paths = []
     for index, record in enumerate(records):
-        english, chinese = record["english"], record["chinese"]
+        chinese = record["chinese"]
         output_path = clips_dir / f"{index:03d}.mp4"
-        speed = dub_video_segment(
-            media_data["main"]["source_video_path"], chinese["audio_path"], output_path,
-            english["start_time"], english["end_time"], chinese["end_time"] - chinese["start_time"],
-        )
-        chinese["video_path"] = str(output_path)
-        chinese["video_speed"] = speed
+        if record.get("kind") == "advertisement":
+            visual = record["advertisement"]
+            visual_start = max(0, int(visual["visual_start_time"]) - 3000)
+            visual_end = min(source_duration_ms, max(int(visual["visual_end_time"]) + 6000, visual_start + 8000))
+            if visual_end - visual_start < 3000:
+                raise ValueError("广告植入点附近没有足够的新闻画面")
+            speed = dub_video_segment(source_video, chinese["audio_path"], output_path, visual_start, visual_end,
+                                      chinese["end_time"] - chinese["start_time"])
+            visual.update({"video_path": str(output_path), "video_speed": speed,
+                           "source_start_time": visual_start, "source_end_time": visual_end})
+        else:
+            english = record["english"]
+            speed = dub_video_segment(source_video, chinese["audio_path"], output_path,
+                                      english["start_time"], english["end_time"],
+                                      chinese["end_time"] - chinese["start_time"])
+            chinese["video_path"] = str(output_path)
+            chinese["video_speed"] = speed
         clip_paths.append(output_path)
     filelist_path = paths.root / "chinese_video_concat_list.txt"
     with open(filelist_path, "w", encoding="utf-8") as file:
@@ -384,7 +438,6 @@ def create_chinese_dubbed_video(paths: ProjectPaths) -> Path:
     media_data["main"]["chinese_dubbed_video_path"] = str(final_video)
     write_json(media_data, paths.media)
     return final_video
-
 
 def add_chinese_dubbed_subtitles(paths: ProjectPaths) -> Path:
     """Create Chinese-only subtitles from the TTS timeline and burn them into the dubbed video."""
@@ -521,6 +574,13 @@ def main(task_file: str | Path = "translate_tasks.json") -> None:
 
         print("========== 4. AI 翻译字幕 ==========")
         translate_speaker_english_subtitles(paths)
+
+        advertisement = job.get("广告") if "广告" in job else job.get("advertisement")
+        if advertisement is not None and not isinstance(advertisement, str):
+            raise ValueError("广告必须是字符串或 null")
+        if isinstance(advertisement, str) and advertisement.strip():
+            print("========== 4.5 规划广告植入 ==========")
+            plan_translation_advertisement(paths, advertisement.strip())
 
         print("========== 5. 中文 TTS ==========")
         generate_chinese_tts(paths)

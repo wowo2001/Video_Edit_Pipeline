@@ -19,6 +19,7 @@ from prompts.recognise_parliament_speaker import build_recognise_parliament_spea
 from prompts.segment_parliament_content import build_segment_parliament_content_prompt
 from prompts.select_chinese_australia_topic import build_select_chinese_australia_topic_prompt
 from prompts.plan_parliament_commentary import build_plan_parliament_commentary_prompt
+from prompts.plan_translation_advertisement import build_plan_translation_advertisement_prompt
 from prompts.refine_narration import ADVERTISEMENT_RULES, REFINE_NARRATION_PROMPT
 from prompts.script_schema import OUTPUT_SCHEMA
 from prompts.select_scene import SELECT_SCENE_PROMPT
@@ -45,6 +46,7 @@ PROVIDERS = {
             "select_chinese_australia_topic": "gpt-5.6-terra",
             "plan_parliament_commentary": "gpt-5.6-terra",
             "screen_news_titles": "gpt-5.6-luna",
+            "plan_translation_advertisement": "gpt-5.6-terra",
         },
     },
     "ali": {
@@ -56,6 +58,7 @@ PROVIDERS = {
             "select_scene": "qwen3.7-max",
             "split_scene_segment": "qwen3.7-max", "refine_narration": "qwen3.7-max",
             "generate_hook": "qwen3.7-max",
+            "plan_translation_advertisement": "qwen3.7-max",
         },
     },
 }
@@ -139,11 +142,11 @@ class ChatGPT:
             build_select_chinese_australia_topic_prompt(source_context, segments)
         ))
 
-    def plan_parliament_commentary(self, selected_topic, source_context, utterances):
+    def plan_parliament_commentary(self, selected_topic, source_context, utterances, advertisement=None):
         """Plan alternating Chinese narration and retained English dialogue."""
         return safe_json_parse(self._complete(
             build_plan_parliament_commentary_prompt(
-                selected_topic, source_context, utterances
+                selected_topic, source_context, utterances, advertisement
             )
         ))
 
@@ -248,6 +251,14 @@ Source title:
             raise ValueError("前端标题改写结果缺少 subtitle")
         return subtitle.strip()
 
+    def plan_translation_advertisement(self, subtitles, advertisement):
+        """Choose one safe insertion point for an independent ad record."""
+        result = safe_json_parse(self._complete(
+            build_plan_translation_advertisement_prompt(subtitles, advertisement)
+        ))
+        if not isinstance(result, dict):
+            raise ValueError("广告规划结果必须是 JSON 对象")
+        return result
     def merge_english_subtitles_before_diarization(self, subtitles):
         """Select complete sentence groups before speaker diarization."""
         prompt = """You are selecting natural English sentence boundaries in news subtitles.
