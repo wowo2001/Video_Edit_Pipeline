@@ -173,7 +173,12 @@ class YouTubeNews:
                     continue
                 published_at = datetime.fromisoformat(published_value.replace("Z", "+00:00"))
                 if published_at < cutoff:
-                    continue
+                    # The configured editorial playlists are newest-first.  Once
+                    # an item is older than the requested window, later pages
+                    # cannot contribute candidates.  Returning here prevents a
+                    # short "recent" query from scanning the whole playlist and
+                    # consuming the API quota one page at a time.
+                    return videos
                 video_id = resource.get("videoId")
                 if not video_id:
                     continue

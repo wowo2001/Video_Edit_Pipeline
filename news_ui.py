@@ -85,6 +85,8 @@ def initialise_state() -> None:
         st.session_state.workflow_runs = []
     if "ui_events" not in st.session_state:
         st.session_state.ui_events = []
+    if "source_errors" not in st.session_state:
+        st.session_state.source_errors = []
 
 
 def log_ui_event(message: str) -> None:
@@ -138,14 +140,39 @@ def fetch_recent_news(days: int, sources: list[dict]) -> None:
     enabled_sources = [source for source in sources if source["enabled"]]
     if not enabled_sources:
         raise ValueError("请至少启用一个新闻源")
+
     candidates = []
+    st.session_state.source_errors = []
     for source in enabled_sources:
         channel_ref = str(source.get("channel_ref") or "").strip()
         playlist_id = str(source.get("playlist_id") or "").strip()
         if not channel_ref and not playlist_id:
-            raise ValueError(f"新闻源“{source['name'] or '未命名'}”缺少频道网址、@handle 或播放列表 ID")
-        candidates.extend(client.recent_videos(source, days))
-    client.add_video_durations(candidates)
+            error = f"新闻源“{source['name'] or '未命名'}”缺少频道网址、@handle 或播放列表 ID"
+            st.session_state.source_errors.append(error)
+            log_ui_event(f"跳过来源：{error}")
+            continue
+
+        source_name = source["name"] or "未命名"
+        log_ui_event(f"正在拉取来源：{source_name}")
+        try:
+            source_candidates = client.recent_videos(source, days)
+        except Exception as error:
+            message = f"{source_name}：{type(error).__name__}: {error}"
+            st.session_state.source_errors.append(message)
+            log_ui_event(f"来源失败，已跳过：{message}")
+            continue
+        candidates.extend(source_candidates)
+        log_ui_event(f"来源完成：{source_name}，{len(source_candidates)} 条")
+
+    if not candidates:
+        raise RuntimeError("所有 YouTube 来源均未能返回视频；请查看执行日志中的来源错误。")
+
+    try:
+        client.add_video_durations(candidates)
+    except Exception as error:
+        message = f"视频时长读取失败，将以“时长未知”继续：{type(error).__name__}: {error}"
+        st.session_state.source_errors.append(message)
+        log_ui_event(message)
     st.session_state.candidates = sorted(candidates, key=lambda item: item["published_at"], reverse=True)
     st.session_state.selected_video_ids = set()
 
@@ -403,6 +430,10 @@ with source_tab:
     if st.session_state.ui_events:
         with st.expander("执行日志", expanded=True):
             st.code("\n".join(st.session_state.ui_events), language="text")
+    if st.session_state.source_errors:
+        st.warning("部分来源未能拉取，已跳过：\n\n" + "\n\n".join(
+            f"- {message}" for message in st.session_state.source_errors
+        ))
 
 with candidate_tab:
     st.subheader("候选发布会" if is_conference else "候选新闻")
