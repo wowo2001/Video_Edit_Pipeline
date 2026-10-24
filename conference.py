@@ -24,7 +24,6 @@ if hasattr(sys.stdout, "reconfigure"):
 
 from core.path import ProjectPaths
 from core.ffmpeg import dub_video_segment, get_duration
-from core.framing import crop_to_four_three
 from core.utils import ms_to_srt_time, read_json, safe_filename, write_json
 from pipeline.download import download_video
 from pipeline.audio import boost_tts_audio, export_audio
@@ -1313,23 +1312,22 @@ def create_commentary_short_video(paths: ProjectPaths) -> Path:
                       if item.get("topic_id") == selection.get("selected_topic_id")), {})
     subtitle = str(candidate.get("title") or plan.get("title") or main_media.get("task_subtitle") or "")
     cover_path = create_portrait_cover(subtitle, paths.root / "commentary_cover.png")
-    cropped_path = paths.root / "commentary_cropped_4_3.mp4"
     layout_path = paths.root / "commentary_avatar_layout.mp4"
     body_path = paths.root / "commentary_body.mp4"
     final_path = paths.root / "commentary_news.mp4"
-    print("========== 10.1 生成封面、裁剪新闻画面 ==========", flush=True)
-    crop_to_four_three(preview_path, cropped_path)
+    print("========== 10.1 生成封面、保留完整新闻画面 ==========", flush=True)
     srt_path = write_commentary_chinese_subtitles(paths, preview_path)
     events = read_json(paths.root / "commentary_layout_timeline.json")
     print("========== 10.2 解说与原声画中画动画 ==========", flush=True)
-    render_avatar_layout(cropped_path, layout_path, events)
+    render_avatar_layout(preview_path, layout_path, events)
     print("========== 10.3 烧录得意黑字幕（程序换行） ==========", flush=True)
     burn_avatar_subtitles(layout_path, paths.root / "final_subtitles.ass", body_path)
     print("========== 10.4 插入 1 秒片头封面 ==========", flush=True)
     prepend_cover(body_path, cover_path, final_path)
     main_media["commentary_body_video_path"] = str(body_path)
     main_media["commentary_chinese_subtitles_path"] = str(srt_path)
-    main_media["commentary_cropped_4_3_video_path"] = str(cropped_path)
+    main_media.pop("commentary_cropped_4_3_video_path", None)
+    main_media["commentary_layout_source_video_path"] = str(preview_path)
     main_media["commentary_vertical_video_path"] = str(layout_path)
     main_media["commentary_news_video_path"] = str(final_path)
     main_media["news_title"] = str(main_media.get("task_title") or "澳洲政策解读")

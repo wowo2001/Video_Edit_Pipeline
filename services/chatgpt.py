@@ -210,6 +210,10 @@ class ChatGPT:
     def translate_subtitles(self, subtitles):
         """Translate subtitle text while preserving the caller's ordering."""
         prompt = """Translate each English subtitle into concise, natural Simplified Chinese.
+Keep all person names, place names (including countries, states, cities, and
+suburbs), and company names exactly as written in the source. Do not translate
+or transliterate these names, or add Chinese names in parentheses. Translate
+the surrounding text normally. Apply this rule to both translations and subtitle.
 The source is Australian news. Unless the source explicitly identifies another
 country or currency, interpret `dollar`/`dollars` as Australian dollars and
 translate it as `澳元`, not `美元`. Preserve any explicitly stated currency,

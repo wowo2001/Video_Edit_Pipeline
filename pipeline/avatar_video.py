@@ -148,6 +148,17 @@ def layout_amount(t, intervals, transition=.5):
 def render_avatar_layout(news_path, output_path, events, avatar_path=AVATAR):
     """Composite clean news footage; subtitles are added in a separate final pass."""
     duration = video_duration(news_path)
+    result = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0',
+        '-show_entries', 'stream=width,height,sample_aspect_ratio', '-of', 'json', str(news_path)],
+        capture_output=True, text=True, check=True)
+    stream = json.loads(result.stdout)['streams'][0]
+    sar = stream.get('sample_aspect_ratio', '1:1')
+    numerator, denominator = map(int, sar.split(':')) if sar not in ('N/A', '0:1') else (1, 1)
+    aspect = stream['width'] * numerator / (stream['height'] * denominator)
+    news_size = (WIDTH, round(WIDTH / aspect))
+    small_height = round(594 / aspect)
+    small_y = HEIGHT - 52 - 4 - small_height
+    large_y = (HEIGHT - news_size[1]) / 2
     intervals = [(e['start'],e['end']) for e in events if e['kind']=='dialogue']
     def decoder(path,size,loop=False):
         args=['ffmpeg','-v','error']
@@ -162,7 +173,7 @@ def render_avatar_layout(news_path, output_path, events, avatar_path=AVATAR):
             return None
         return Image.frombytes('RGB',size,data)
     avatar=decoder(avatar_path,(WIDTH,HEIGHT),True)
-    news=decoder(news_path,(WIDTH,810))
+    news=decoder(news_path,news_size)
     log_path=output_path.with_suffix('.log')
     with log_path.open('w') as log:
         encoder=subprocess.Popen(['ffmpeg','-v','error','-y','-f','rawvideo','-pix_fmt','rgb24',
@@ -172,7 +183,7 @@ def render_avatar_layout(news_path, output_path, events, avatar_path=AVATAR):
             stdin=subprocess.PIPE,stderr=log)
         try:
             for i in range(math.ceil(duration*FPS)):
-                bg=read_frame(avatar,(WIDTH,HEIGHT)); fg=read_frame(news,(WIDTH,810))
+                bg=read_frame(avatar,(WIDTH,HEIGHT)); fg=read_frame(news,news_size)
                 if bg is None or fg is None:
                     raise RuntimeError('布局解码提前结束')
                 amount=layout_amount(i/FPS,intervals)
@@ -180,9 +191,9 @@ def render_avatar_layout(news_path, output_path, events, avatar_path=AVATAR):
                     blur=bg.resize((270,480)).filter(ImageFilter.GaussianBlur(7)).resize((WIDTH,HEIGHT),Image.Resampling.BILINEAR)
                     blur=ImageEnhance.Brightness(blur).enhance(.82)
                     bg=Image.blend(bg,blur,amount)
-                # Narration: 594x446, with the border 32px from right and 52px from bottom.
-                width=round(594+486*amount); height=round(width*.75)
-                x=round(450*(1-amount)); y=round(1418*(1-amount)+555*amount)
+                # Preserve the source aspect ratio and anchor the small window at bottom right.
+                width=round(594+486*amount); height=round(width/aspect)
+                x=round(450*(1-amount)); y=round(small_y*(1-amount)+large_y*amount)
                 box=(max(0,x-4),max(0,y-4),min(WIDTH,x+width+4),min(HEIGHT,y+height+4))
                 if amount<1:
                     region=bg.crop(box)
