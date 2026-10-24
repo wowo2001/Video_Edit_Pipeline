@@ -1,4 +1,5 @@
 import json
+import tempfile
 from pathlib import Path
 
 from core.cmd import run_cmd
@@ -93,6 +94,12 @@ def mosaic_regions(input_video, output_video, regions):
 
 
 def add_subtitles(input_video, srt_file, output_video, y, font_size=10):
+    # Keep source-title punctuation out of FFmpeg's filter-string parser.
+    if "'" in str(Path(srt_file).resolve()):
+        with tempfile.TemporaryDirectory(prefix="video_captions_") as directory:
+            safe_srt = Path(directory) / "captions.srt"
+            safe_srt.write_bytes(Path(srt_file).read_bytes())
+            return add_subtitles(input_video, safe_srt, output_video, y, font_size)
     srt_path = _font_filter_path(Path(srt_file))
     font_dir = _font_filter_path(FONT_PATH.parent)
     vf = (
@@ -106,12 +113,22 @@ def add_subtitles(input_video, srt_file, output_video, y, font_size=10):
 def add_text_overlay(input_video, output_video, title, subtitle, font_size_title, font_size_sub, title_y, sub_y, title_color, sub_color, popup_comments, popup_font_size, popup_color, popup_y):
     font_path, filters = _font_filter_path(FONT_PATH), []
     filters.append(f"drawtext=fontfile='{font_path}':text='{title}':fontcolor={title_color}:fontsize={font_size_title}:x=(w-text_w)/2:y={title_y}")
-    filters.append(f"drawtext=fontfile='{font_path}':text='{subtitle}':fontcolor={sub_color}:fontsize={font_size_sub}:x=(w-text_w)/2:y=h-{sub_y}")
-    for item in popup_comments or []:
-        filters.append(f"drawtext=fontfile='{font_path}':text='{item['text']}':fontcolor={popup_color}:fontsize={popup_font_size}:borderw=3:bordercolor=black:x=w-(t-{item['start_time']})*200:y={popup_y}:enable='gte(t,{item['start_time']})'")
-    vf = ",".join(filters)
-    print(vf)
-    run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-vf", vf, "-c:v", "libx264", "-crf", "23", "-preset", "fast", "-c:a", "copy", str(output_video)])
+    # Text files preserve newlines/quotes/colons without filter-string escaping.
+    with tempfile.TemporaryDirectory(prefix="video_subtitle_") as directory:
+        for index, line in enumerate(str(subtitle).splitlines()):
+            text_path = Path(directory) / f"line_{index}.txt"
+            text_path.write_text(line, encoding="utf-8")
+            offset = index * round(font_size_sub * 1.25)
+            filters.append(
+                f"drawtext=fontfile='{font_path}':textfile='{_font_filter_path(text_path)}':"
+                f"expansion=none:fontcolor={sub_color}:fontsize={font_size_sub}:"
+                f"x=(w-text_w)/2:y=h-{sub_y}+{offset}"
+            )
+        for item in popup_comments or []:
+            filters.append(f"drawtext=fontfile='{font_path}':text='{item['text']}':fontcolor={popup_color}:fontsize={popup_font_size}:borderw=3:bordercolor=black:x=w-(t-{item['start_time']})*200:y={popup_y}:enable='gte(t,{item['start_time']})'")
+        vf = ",".join(filters)
+        print(vf)
+        run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-vf", vf, "-c:v", "libx264", "-crf", "23", "-preset", "fast", "-c:a", "copy", str(output_video)])
 
 
 def add_gif_overlay(input_video, output_video, gif_path, x, y, scale):

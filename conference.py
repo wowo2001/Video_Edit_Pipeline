@@ -23,11 +23,11 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from core.path import ProjectPaths
-from core.ffmpeg import add_subtitles, add_text_overlay, dub_video_segment, get_duration
-from core.framing import crop_to_four_three, four_three_to_vertical
+from core.ffmpeg import dub_video_segment, get_duration
+from core.framing import crop_to_four_three
 from core.utils import ms_to_srt_time, read_json, safe_filename, write_json
 from pipeline.download import download_video
-from pipeline.audio import boost_tts_audio
+from pipeline.audio import boost_tts_audio, export_audio
 from pipeline.video import cut_video_range, fit_forward_video_range
 from services.chatgpt import ChatGPT
 from services.volcengine import Volcengine
@@ -820,6 +820,7 @@ def produce_all_candidate_topics(paths: ProjectPaths, topic_ids: set[str] | None
                 "status": "completed",
                 "workspace": str(topic_paths.root),
                 "final_video_path": str(final_path),
+                "cover_path": str(topic_paths.root / "commentary_cover.png"),
             })
         except Exception as error:
             results.append({
@@ -851,13 +852,6 @@ def _is_strictly_continuous_indices(indices: object, allowed: set[int]) -> bool:
         and all(isinstance(item, int) and item in allowed for item in indices)
         and indices == list(range(indices[0], indices[-1] + 1))
     )
-
-
-def _short_video_subtitle(value: object) -> str:
-    """Normalise whitespace while preserving the title written by the model."""
-    # The prompt owns title length and wording.  A question mark is valid
-    # on-screen text; safe_filename() handles it separately for file paths.
-    return re.sub(r"\s+", "", str(value or "")).strip("。！；：，、 ")
 
 
 def plan_parliament_commentary(paths: ProjectPaths) -> Path:
@@ -972,7 +966,7 @@ def plan_parliament_commentary(paths: ProjectPaths) -> Path:
         "selected_topic": candidate,
         "commentary_angle": candidate_angle,
         "viewer_takeaway": candidate_takeaway,
-        "title": _short_video_subtitle(plan.get("title") or candidate.get("title") or ""),
+        "title": str(candidate.get("title") or ""),
         "summary": str(plan.get("summary") or ""),
         "segments": validated_segments,
     }
@@ -1290,121 +1284,65 @@ def render_commentary_preview(paths: ProjectPaths) -> Path:
     return output_path
 
 
-def write_commentary_chinese_subtitles(paths: ProjectPaths) -> Path:
-    """Build a Chinese-only SRT against the already-rendered commentary timeline."""
-    plan_path = paths.root / "commentary_plan.json"
-    if not plan_path.exists():
-        raise ValueError("缺少 commentary_plan.json；请先运行 --step plan")
+def write_commentary_chinese_subtitles(paths: ProjectPaths, preview_path: Path) -> Path:
+    """Build explicitly wrapped subtitles from the existing script and TTS timing."""
+    from pipeline.avatar_video import build_timeline, video_duration, write_script_subtitles
 
-    plan = read_json(plan_path)
-    subtitle_entries: list[tuple[float, float, str]] = []
-
-    def add_sentence_entries(start: float, duration: float, text: str) -> None:
-        """Split narration at natural Chinese sentence endings without changing audio."""
-        sentences = [
-            item.strip()
-            for item in re.findall(r"[^。！？；]+[。！？；]?", text)
-            if item.strip()
-        ]
-        if not sentences:
-            return
-        total_weight = sum(max(1, len(item)) for item in sentences)
-        cursor = start
-        for number, sentence in enumerate(sentences):
-            if number == len(sentences) - 1:
-                end = start + duration
-            else:
-                sentence_duration = duration * max(1, len(sentence)) / total_weight
-                end = cursor + sentence_duration
-            subtitle_entries.append((cursor, end, sentence))
-            cursor = end
-    timeline_start = 0.0
-    for segment in plan.get("segments", []):
-        # Use the renderer's recorded value instead of assuming every segment is
-        # discontinuous. Consecutive source ranges are joined without a crossfade.
-        render_info = segment.get("render_preview") or {}
-        timeline_start = max(
-            0.0,
-            timeline_start - float(render_info.get("crossfade_before_seconds") or 0.0),
-        )
-
-        narration_path = segment.get("narration_audio_path")
-        narration_duration = get_duration(narration_path) if narration_path else 0.0
-        narration = str(segment.get("narration") or "").strip()
-        if narration and narration_duration:
-            add_sentence_entries(timeline_start, narration_duration, narration)
-
-        cursor = timeline_start + narration_duration
-        dialogue = segment.get("dubbed_dialogue") or {}
-        dialogue_path = dialogue.get("audio_path")
-        dialogue_text = str(dialogue.get("chinese_text") or "").strip()
-        dialogue_duration = get_duration(dialogue_path) if dialogue_path else 0.0
-        if dialogue_text and dialogue_duration:
-            add_sentence_entries(cursor, dialogue_duration, dialogue_text)
-            cursor += dialogue_duration
-
-        question_path = segment.get("audience_question_audio_path")
-        question = str(segment.get("audience_question") or "").strip()
-        question_duration = get_duration(question_path) if question_path else 0.0
-        if question and question_duration:
-            add_sentence_entries(cursor, question_duration, question)
-            cursor += question_duration
-
-        timeline_start = cursor
-
-    if not subtitle_entries:
-        raise ValueError("没有可烧录的中文解说字幕；请先运行 --step tts")
-
-    srt_path = paths.root / "commentary_chinese_subtitles.srt"
-    with open(srt_path, "w", encoding="utf-8") as file:
-        for index, (start, end, text) in enumerate(subtitle_entries, start=1):
-            file.write(
-                f"{index}\n{ms_to_srt_time(round(start * 1000))} --> "
-                f"{ms_to_srt_time(round(end * 1000))}\n{text}\n\n"
-            )
-    return srt_path
+    plan = read_json(paths.root / "commentary_plan.json")
+    events = build_timeline(plan, paths.root, video_duration(preview_path))
+    write_json(events, paths.root / "commentary_layout_timeline.json")
+    write_script_subtitles(events, paths.final_subtitles["srt"],
+                           paths.root / "final_subtitles.ass", paths.final_subtitles["json"])
+    return paths.final_subtitles["srt"]
 
 
 def create_commentary_short_video(paths: ProjectPaths) -> Path:
-    """Crop first, burn Chinese subtitles second, then make the vertical news layout."""
+    """Compose animated avatar/news layout, then burn script-derived subtitles."""
+    from pipeline.avatar_video import render_avatar_layout, burn_avatar_subtitles, prepend_cover
+    from pipeline.cover import create_portrait_cover
+
     media_data, media_path = _read_workspace_media(paths)
     main_media = media_data["main"]
-    # A multi-topic run shares media.json, so prefer the current topic's own
-    # preview rather than the path most recently written by another candidate.
     preview_path = paths.root / "commentary_preview_horizontal.mp4"
     if not preview_path.exists():
-        preview_path = Path(main_media.get("commentary_preview_horizontal_path") or "")
-    if not preview_path.exists():
         raise ValueError("缺少横版预览；请先运行 --step preview")
-
     plan = read_json(paths.root / "commentary_plan.json")
-    title = str(main_media.get("task_title") or "澳洲政策解读")
-    subtitle = str(plan.get("title") or main_media.get("task_subtitle") or "")
-    srt_path = write_commentary_chinese_subtitles(paths)
+    selection_path = paths.root / "selected_topic.json"
+    selection = read_json(selection_path) if selection_path.exists() else {}
+    candidate = next((item for item in selection.get("candidates", [])
+                      if item.get("topic_id") == selection.get("selected_topic_id")), {})
+    subtitle = str(candidate.get("title") or plan.get("title") or main_media.get("task_subtitle") or "")
+    cover_path = create_portrait_cover(subtitle, paths.root / "commentary_cover.png")
     cropped_path = paths.root / "commentary_cropped_4_3.mp4"
-    subtitled_path = paths.root / "commentary_subtitled_4_3.mp4"
-    vertical_path = paths.root / "commentary_vertical.mp4"
+    layout_path = paths.root / "commentary_avatar_layout.mp4"
+    body_path = paths.root / "commentary_body.mp4"
     final_path = paths.root / "commentary_news.mp4"
-
+    print("========== 10.1 生成封面、裁剪新闻画面 ==========", flush=True)
     crop_to_four_three(preview_path, cropped_path)
-    add_subtitles(cropped_path, srt_path, subtitled_path, y=50, font_size=20)
-    four_three_to_vertical(subtitled_path, vertical_path, width=1080, height=1920, fps=30)
-    add_text_overlay(
-        vertical_path, final_path,
-        title=title, subtitle=subtitle,
-        font_size_title=80, font_size_sub=60,
-        title_y=400, sub_y=450,
-        title_color="#FFCC00", sub_color="#FFCC00",
-        popup_comments=[], popup_font_size=1, popup_color="#FFFFFF", popup_y=1,
-    )
-
+    srt_path = write_commentary_chinese_subtitles(paths, preview_path)
+    events = read_json(paths.root / "commentary_layout_timeline.json")
+    print("========== 10.2 解说与原声画中画动画 ==========", flush=True)
+    render_avatar_layout(cropped_path, layout_path, events)
+    print("========== 10.3 烧录得意黑字幕（程序换行） ==========", flush=True)
+    burn_avatar_subtitles(layout_path, paths.root / "final_subtitles.ass", body_path)
+    print("========== 10.4 插入 0.5 秒片头封面 ==========", flush=True)
+    prepend_cover(body_path, cover_path, final_path)
+    main_media["commentary_body_video_path"] = str(body_path)
     main_media["commentary_chinese_subtitles_path"] = str(srt_path)
     main_media["commentary_cropped_4_3_video_path"] = str(cropped_path)
-    main_media["commentary_subtitled_4_3_video_path"] = str(subtitled_path)
-    main_media["commentary_vertical_video_path"] = str(vertical_path)
+    main_media["commentary_vertical_video_path"] = str(layout_path)
     main_media["commentary_news_video_path"] = str(final_path)
-    main_media["news_title"] = title
+    main_media["news_title"] = str(main_media.get("task_title") or "澳洲政策解读")
     main_media["news_subtitle"] = subtitle
+    main_media.setdefault("commentary_covers", {})[str(paths.root)] = str(cover_path)
+    main_media.setdefault("commentary_subtitles", {})[str(paths.root)] = {
+        "source": "script_duration_estimate",
+        "final_video_offset_seconds": 0.5,
+        "source_video_path": str(preview_path),
+        "srt_path": str(srt_path),
+        "ass_path": str(paths.root / "final_subtitles.ass"),
+        "json_path": str(paths.final_subtitles["json"]),
+    }
     write_json(media_data, media_path)
     return final_path
 
