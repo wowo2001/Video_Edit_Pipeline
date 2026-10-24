@@ -261,15 +261,17 @@ Source title:
         return result
     def merge_english_subtitles_before_diarization(self, subtitles):
         """Select complete sentence groups before speaker diarization."""
-        prompt = """You are selecting natural English sentence boundaries in news subtitles.
+        prompt = """Group English subtitle fragments into individual grammatical sentences.
 Speaker identity is intentionally unavailable and must not be inferred.
 Return only JSON: {"groups": [[source_index, ...], ...]}.
 
 Rules:
 - Use every source index exactly once, in its original order.
 - Each group must contain adjacent source indices.
-- Combine fragments into a natural, complete English thought when possible.
-- Keep a fragment alone if combining would be unnatural.
+- Each group must form one grammatical sentence, not a paragraph or a complete speech.
+- Join adjacent fragments only to complete that sentence. Once the sentence is grammatically complete, start a new group for the next sentence.
+- Determine sentence boundaries from English grammar even when the input has no punctuation. Never merge separate sentences merely because they share a topic, argument, or speaker.
+- Keep an incomplete fragment alone if joining it to the next fragment would combine separate sentences or be grammatically unnatural.
 - Do not alter, repeat, translate, label speakers, or explain any text.
 - Do not use Markdown.
 

@@ -99,7 +99,8 @@ def concat_video_paths(video_paths, output_path, list_file):
             path = Path(video_path)
             if not path.exists():
                 raise FileNotFoundError(f"找不到待拼接视频: {path}")
-            file.write(f"file '{path.resolve()}'\n")
+            escaped_path = str(path.resolve()).replace("'", "'\\''")
+            file.write(f"file '{escaped_path}'\n")
 
     concat_videos_ffmpeg(list_file, output_path)
     list_file.unlink(missing_ok=True)
