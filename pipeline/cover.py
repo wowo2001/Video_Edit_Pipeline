@@ -51,13 +51,14 @@ def create_portrait_cover(title, output_path, avatar_path=DEFAULT_AVATAR, font_p
     # A dark fade connects the portrait and the title panel.
     shade = Image.new('RGBA', (W, H), (0,0,0,0))
     sd = ImageDraw.Draw(shade)
-    for y in range(1396, 1536):
-        sd.line((0,y,W,y), fill=(23,20,17,round(255*(y-1396)/139)))
+    for y in range(1376, 1536):
+        sd.line((0,y,W,y), fill=(23,20,17,min(255, round(255*(y-1376)/120))))
     canvas = Image.alpha_composite(canvas.convert('RGBA'), shade)
     draw = ImageDraw.Draw(canvas)
     lines, font = _title_layout(title, font_path)
     line_height = 136 if len(lines) == 2 else 112
-    start_y = 1584 if len(lines) <= 2 else 1556
+    # Place the first line just below the hands in the default portrait.
+    start_y = 1410
     for index, line in enumerate(lines):
         top = start_y + index * line_height
         color = '#FFD35A' if index == len(lines) - 1 else '#FFFFFF'

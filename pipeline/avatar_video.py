@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 AVATAR = ROOT / 'assets/Person_sitting_at_table_speaking_20261024200326.mp4'
 FONT = ROOT / 'assets/fonts/SmileySans-Oblique.otf'
 WIDTH, HEIGHT, FPS = 1080, 1920, 30
-FONT_SIZE = 54
+FONT_SIZE = 65
 
 
 def video_duration(path):
@@ -152,7 +152,7 @@ def render_avatar_layout(news_path, output_path, events, avatar_path=AVATAR):
     def decoder(path,size,loop=False):
         args=['ffmpeg','-v','error']
         if loop: args += ['-stream_loop','-1']
-        args += ['-i',str(path),'-an','-vf',f'scale={size[0]}:{size[1]},fps={FPS}',
+        args += ['-i',str(path),'-an','-vf',f'scale={size[0]}:{size[1]},fps={FPS}:eof_action=pass',
                  '-f','rawvideo','-pix_fmt','rgb24','pipe:1']
         return subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
     def read_frame(process,size):
@@ -180,8 +180,9 @@ def render_avatar_layout(news_path, output_path, events, avatar_path=AVATAR):
                     blur=bg.resize((270,480)).filter(ImageFilter.GaussianBlur(7)).resize((WIDTH,HEIGHT),Image.Resampling.BILINEAR)
                     blur=ImageEnhance.Brightness(blur).enhance(.82)
                     bg=Image.blend(bg,blur,amount)
-                width=round(540+540*amount); height=round(width*.75)
-                x=round(504*(1-amount)); y=round(1460*(1-amount)+555*amount)
+                # Narration: 594x446, with the border 32px from right and 52px from bottom.
+                width=round(594+486*amount); height=round(width*.75)
+                x=round(450*(1-amount)); y=round(1418*(1-amount)+555*amount)
                 box=(max(0,x-4),max(0,y-4),min(WIDTH,x+width+4),min(HEIGHT,y+height+4))
                 if amount<1:
                     region=bg.crop(box)
@@ -220,8 +221,8 @@ def burn_avatar_subtitles(layout_path, ass_path, final_path):
     return final_path
 
 
-def prepend_cover(body_path, cover_path, output_path, duration=.5):
-    """Add a silent cover before the already subtitled body; retain sync."""
+def prepend_cover(body_path, cover_path, output_path, duration=1.0):
+    """Add a silent cover and boost body audio by 20%; retain sync."""
     if duration <= 0:
         raise ValueError('封面时长必须大于零')
     if Path(body_path).resolve() == Path(output_path).resolve():
@@ -231,7 +232,8 @@ def prepend_cover(body_path, cover_path, output_path, duration=.5):
         f'trim=duration={duration},setpts=PTS-STARTPTS,format=yuv420p[cover];'
         f'[2:a]atrim=duration={duration},asetpts=PTS-STARTPTS[silence];'
         f'[1:v]setsar=1,fps={FPS},setpts=PTS-STARTPTS,format=yuv420p[body];'
-        '[1:a]aresample=48000,aformat=channel_layouts=stereo,asetpts=PTS-STARTPTS[audio];'
+        '[1:a]aresample=48000,aformat=channel_layouts=stereo,'
+        'volume=1.2,alimiter=limit=0.95:level=false:latency=true,asetpts=PTS-STARTPTS[audio];'
         '[cover][silence][body][audio]concat=n=2:v=1:a=1[v][a]'
     )
     subprocess.run(['ffmpeg','-v','warning','-y','-loop','1','-framerate',str(FPS),

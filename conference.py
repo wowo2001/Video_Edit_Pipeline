@@ -1325,7 +1325,7 @@ def create_commentary_short_video(paths: ProjectPaths) -> Path:
     render_avatar_layout(cropped_path, layout_path, events)
     print("========== 10.3 烧录得意黑字幕（程序换行） ==========", flush=True)
     burn_avatar_subtitles(layout_path, paths.root / "final_subtitles.ass", body_path)
-    print("========== 10.4 插入 0.5 秒片头封面 ==========", flush=True)
+    print("========== 10.4 插入 1 秒片头封面 ==========", flush=True)
     prepend_cover(body_path, cover_path, final_path)
     main_media["commentary_body_video_path"] = str(body_path)
     main_media["commentary_chinese_subtitles_path"] = str(srt_path)
@@ -1337,7 +1337,7 @@ def create_commentary_short_video(paths: ProjectPaths) -> Path:
     main_media.setdefault("commentary_covers", {})[str(paths.root)] = str(cover_path)
     main_media.setdefault("commentary_subtitles", {})[str(paths.root)] = {
         "source": "script_duration_estimate",
-        "final_video_offset_seconds": 0.5,
+        "final_video_offset_seconds": 1.0,
         "source_video_path": str(preview_path),
         "srt_path": str(srt_path),
         "ass_path": str(paths.root / "final_subtitles.ass"),
