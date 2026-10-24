@@ -47,6 +47,42 @@ DEFAULT_CONFERENCE_SOURCES = [
         "playlist_id": "PLvo1VRu7zepSeLhUdjq1dPfILDA_Ajgpu",
         "enabled": True,
     },
+    {
+        "name": "指定 YouTube 播放列表（A8S42iSH-Es）",
+        "playlist_id": "PLn2RjxYNpcayZxSQmTq_yw1iWAjlFrv8U",
+        "enabled": True,
+    },
+    {
+        "name": "指定 YouTube 播放列表（OeTRhAqo4gQ）",
+        "playlist_id": "PL7LZL9cKgj6Rp-_ZSEDxtH0s8O1IyunMk",
+        "enabled": True,
+    },
+    {
+        "name": "AFR Interviews（澳洲金融评论人物访谈）",
+        "playlist_id": "PLSrjl6O4Nd94",
+        "enabled": True,
+    },
+    {
+        "name": "The Issue（7NEWS 深度访谈）",
+        "playlist_id": "PLK4IVkm259BZsqGQWywq-wkspXEFBNh3R",
+        "enabled": True,
+    },
+    {
+        "name": "Rask · Australian Property Podcast",
+        "playlist_id": "PLECacouYcyPsf8T7pOrM7c0x1ChV_BPy4",
+        "enabled": True,
+    },
+    {
+        "name": "Property Investment Podcast Network",
+        "playlist_id": "PLZWLiY_OqG3Oa8oks3CW9qMSYwe-830MW",
+        "enabled": True,
+    },
+    {
+        "name": "National Press Club of Australia",
+        "channel_ref": "https://www.youtube.com/@NationalPressClubofAustralia",
+        "enabled": True,
+        "live_streams_only": False,
+    },
 ]
 SOURCES_PATH = Path("news_sources.json")
 CONFERENCE_SOURCES_PATH = Path("conference_sources.json")
@@ -67,9 +103,8 @@ SYDNEY_TZ = ZoneInfo("Australia/Sydney")
 def initialise_state() -> None:
     if "sources" not in st.session_state:
         st.session_state.sources = load_sources(SOURCES_PATH, DEFAULT_SOURCES)
-    # Conference production deliberately uses only the configured sources'
-    # archived live streams;
-    # keep it independent from any previously saved or in-session news sources.
+    # Keep configured conference channels and playlists independent from
+    # previously saved or in-session news sources.
     st.session_state.conference_sources = [
         source.copy() for source in DEFAULT_CONFERENCE_SOURCES
     ]
@@ -362,7 +397,7 @@ source_tab, candidate_tab, workflow_tab = st.tabs(["1. 新闻源", "2. 候选新
 with source_tab:
     st.subheader("YouTube 发布会源" if is_conference else "YouTube 新闻源")
     if is_conference:
-        st.write("固定使用 ABC 与 9 News 的 Live 标签页，以及指定播放列表；只显示最近发布的视频。")
+        st.write("固定使用 ABC 与 9 News 的 Live 标签页、National Press Club 全频道，以及指定播放列表；按所选天数显示最近发布的视频。")
     else:
         st.write("粘贴公开频道的网址、@handle 或 Channel ID；下一步会自动解析为 Channel ID。")
     if not YOUTUBE_API_KEY:
