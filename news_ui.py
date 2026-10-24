@@ -233,16 +233,14 @@ def screen_candidates(topics: list[str]) -> None:
         for result in results
         if isinstance(result, dict) and result.get("video_id")
     }
-    expected_ids = {item["video_id"] for item in st.session_state.candidates}
-    if set(result_by_id) != expected_ids:
-        raise ValueError("LLM 筛选结果的视频编号不完整，请重试")
-
     for item in st.session_state.candidates:
-        result = result_by_id[item["video_id"]]
-        item["relevant"] = bool(result.get("relevant"))
+        result = result_by_id.get(item["video_id"], {
+            "relevant": False, "reason": "模型未返回该视频的筛选结果",
+        })
         item["matched_topics"] = [
             topic for topic in result.get("matched_topics", []) if topic in topics
         ]
+        item["relevant"] = result.get("relevant") is True and bool(item["matched_topics"])
         item["reason"] = str(result.get("reason", ""))
 
 
@@ -352,17 +350,50 @@ def start_conference_workflow(title: str, advertisement: str) -> None:
     })
 
 
+def start_commentary_workflow(title: str, upload: bool, advertisement: str, angle: str) -> None:
+    selected = [item for item in st.session_state.candidates
+                if item['video_id'] in st.session_state.selected_video_ids]
+    if not selected:
+        raise ValueError("请至少勾选一条新闻")
+    run_id = f"commentary_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}"
+    run_dir = QUEUE_ROOT / run_id
+    run_dir.mkdir(parents=True, exist_ok=False)
+    task_file = run_dir / 'commentary_tasks.json'
+    log_file = run_dir / 'commentary.log'
+    workspace = (run_dir / 'workspace').resolve()
+    task = {'title': title.strip() or '新闻评论', 'angle': angle.strip(),
+            '广告': advertisement.strip(),
+            'sources': [{'url': item['url'], 'title': item['title']} for item in selected]}
+    task_file.write_text(json.dumps(task, ensure_ascii=False, indent=2), encoding='utf-8')
+    command = [sys.executable, '-u', '-m', 'experiments.news_commentary.pipeline',
+               '--tasks', str(task_file.resolve()), '--workspace', str(workspace)]
+    if upload:
+        command.append('--upload')
+    with log_file.open('w', encoding='utf-8') as output:
+        process = subprocess.Popen(command, cwd=Path.cwd(), stdout=output,
+            stderr=subprocess.STDOUT, text=True,
+            env={**os.environ, 'PYTHONIOENCODING': 'utf-8',
+                 'PATH': str(Path(sys.executable).parent) + os.pathsep + os.environ.get('PATH', '')})
+    st.session_state.workflow_runs.insert(0, {
+        'workflow': '新闻评论', 'run_id': run_id, 'pid': process.pid,
+        'started_at': datetime.now(SYDNEY_TZ).strftime('%Y-%m-%d %H:%M %Z'),
+        'count': len(selected), 'task_file': str(task_file), 'log_file': str(log_file),
+        'cost_file': str(workspace / 'cost_summary.json'),
+    })
+
+
 st.set_page_config(page_title="澳洲房东新闻选题", page_icon="🏠", layout="wide")
 initialise_state()
 
 st.title("🎬 澳洲新闻视频制作")
 mode = st.radio(
     "选择制作模式",
-    ("新闻翻译", "发布会政策解读"),
+    ("新闻翻译", "发布会政策解读", "新闻评论"),
     horizontal=True,
     key="production_mode",
 )
 is_conference = mode == "发布会政策解读"
+is_commentary = mode == "新闻评论"
 if st.session_state.get("active_mode") != mode:
     st.session_state.active_mode = mode
     st.session_state.candidates = []
@@ -374,7 +405,7 @@ if is_conference:
         "conference_sources", CONFERENCE_SOURCES_PATH, DEFAULT_CONFERENCE_SOURCES
     )
 else:
-    st.caption("从 YouTube 新闻源筛选与房产、租赁、福利相关的内容，再启动中文翻译视频工作流。")
+    st.caption("选择几条相关新闻，综合成一条新闻评论视频。" if is_commentary else "从 YouTube 新闻源筛选与房产、租赁、福利相关的内容，再启动中文翻译视频工作流。")
     source_key, source_path, source_defaults = "sources", SOURCES_PATH, DEFAULT_SOURCES
 sources = st.session_state[source_key]
 
@@ -511,9 +542,9 @@ with candidate_tab:
                         f"{format_video_duration(item.get('duration_seconds'))}"
                     )
                     if not is_conference:
-                        columns[1].write(f"主题：{'、'.join(item.get('matched_topics', [])) or '未明确'}  \\nAI 判断：{item.get('reason') or '相关'}")
+                        columns[1].write(f"主题：{'、'.join(item.get('matched_topics', [])) or '未明确'}  \nAI 判断：{item.get('reason') or '相关'}")
                     checked = columns[2].checkbox(
-                        "加入解读队列" if is_conference else "加入翻译队列",
+                        "加入评论素材" if is_commentary else ("加入解读队列" if is_conference else "加入翻译队列"),
                         value=item["video_id"] in st.session_state.selected_video_ids,
                         key=f"{mode}_select_{item['video_id']}",
                     )
@@ -525,8 +556,8 @@ with candidate_tab:
 with workflow_tab:
     st.subheader("制作队列")
     selected_count = len(st.session_state.selected_video_ids)
-    st.info(f"已选择 {selected_count} 条视频。" + ("每条都会建立独立工作区，并启动 conference.py；成片会自动上传 Google Drive。" if is_conference else "每条都会建立独立工作区，并启动 translate.py。"))
-    task_title = st.text_input("视频大标题", value="澳洲政策解读" if is_conference else "今日要闻", key=f"{mode}_title")
+    st.info(f"已选择 {selected_count} 条视频。" + ("这些素材将综合制作成一条评论视频。" if is_commentary else "每条都会建立独立工作区，并启动 conference.py；成片会自动上传 Google Drive。" if is_conference else "每条都会建立独立工作区，并启动 translate.py。"))
+    task_title = st.text_input("视频大标题", value="新闻评论" if is_commentary else ("澳洲政策解读" if is_conference else "今日要闻"), key=f"{mode}_title")
     advertisement = st.text_input(
         "广告文案",
         value="如果你想了解更多澳洲资讯，请关注土澳小红叔",
@@ -534,10 +565,13 @@ with workflow_tab:
         key=f"{mode}_advertisement",
     )
     upload_to_drive = False if is_conference else st.checkbox("完成后上传 Google Drive", value=True)
-    action_label = "启动已选发布会的政策解读制作" if is_conference else "启动已选视频的翻译工作流"
+    angle = st.text_area("评论方向（可选）", key="commentary_angle", placeholder="例如：这些报道共同说明了什么，对在澳华人有何影响？") if is_commentary else ""
+    action_label = "用已选新闻制作一条评论视频" if is_commentary else ("启动已选发布会的政策解读制作" if is_conference else "启动已选视频的翻译工作流")
     if st.button(action_label, disabled=selected_count == 0, type="primary"):
         try:
-            if is_conference:
+            if is_commentary:
+                start_commentary_workflow(task_title, upload_to_drive, advertisement, angle)
+            elif is_conference:
                 start_conference_workflow(task_title, advertisement)
             else:
                 start_translation_workflow(task_title, upload_to_drive, advertisement)
@@ -555,3 +589,5 @@ with workflow_tab:
                 )
                 st.caption(f"任务文件：{run['task_file']}")
                 st.caption(f"日志文件：{run['log_file']}")
+                if run.get("cost_file"):
+                    st.caption(f"费用明细：{run['cost_file']}")

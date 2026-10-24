@@ -327,7 +327,7 @@ Input:
     def screen_news_titles(self, videos, topics):
         """Classify YouTube news titles against the selected editorial topics."""
         prompt = """You are selecting Australian news videos for a Chinese-language
-landlord audience. Judge relevance from the title and channel only; do not invent
+audience according to their selected topics. Judge relevance from the title and channel only; do not invent
 facts that are not stated.
 
 Selected topics: """ + json.dumps(topics, ensure_ascii=False) + """
@@ -338,7 +338,9 @@ Return only JSON in this exact form:
 Rules:
 - Return every supplied video_id exactly once.
 - relevant is true only when the title is substantively connected to at least one
-  selected topic, or clearly affects Australian landlords, tenants, housing or welfare.
+  selected topic. Housing, rental, landlord or welfare news has no automatic exemption.
+  For example, if only 移民 is selected, Airbnb rental-rule changes are irrelevant
+  unless the title explicitly connects them to immigration, visas or migration policy.
 - Set relevant to false for any broad news roundup, bulletin, headlines package,
   news update, or multi-story compilation, even if its title mentions a selected
   topic. Examples include titles such as "news roundup", "top stories", "headlines",
@@ -346,6 +348,7 @@ Rules:
   "综合报道", "新闻汇总", "新闻简报", "新闻速览". Select videos focused on one
   identifiable story instead.
 - matched_topics must use only values from Selected topics.
+- If relevant is true, matched_topics must contain at least one selected topic.
 - reason must be concise Simplified Chinese (maximum 30 characters).
 - Do not use Markdown or add fields.
 
