@@ -80,25 +80,36 @@
       "module": "afr",
       "url": "https://www.afr.com/policy",
       "label": "AFR · Policy",
-      "enabled": true
+      "enabled": true,
+      "days": 3
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@ABCNewsAustralia",
       "label": "ABC News",
-      "enabled": true
+      "enabled": true,
+      "days": 3
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@9NewsAUS",
       "label": "9 News Australia",
-      "enabled": true
+      "enabled": true,
+      "days": 3
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@7news",
       "label": "7NEWS",
-      "enabled": true
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "nsw_gov",
+      "url": "https://www.nsw.gov.au/ministerial-releases",
+      "label": "NSW Media Release",
+      "enabled": true,
+      "days": 3
     }
   ],
   "职场": [
@@ -134,6 +145,13 @@
       "module": "afr",
       "url": "https://www.afr.com/work-and-careers/careers",
       "label": "AFR · Career",
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "nsw_gov",
+      "url": "https://www.nsw.gov.au/ministerial-releases",
+      "label": "NSW Media Release",
       "enabled": true,
       "days": 3
     }
