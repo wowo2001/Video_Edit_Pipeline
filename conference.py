@@ -1350,7 +1350,7 @@ def create_commentary_short_video(paths: ProjectPaths) -> Path:
 
 def upload_commentary_short_video(paths: ProjectPaths) -> str:
     """Upload the finished Parliament commentary to its existing Drive workflow."""
-    from services.google_drive import upload_to_drive
+    from services.google_drive import upload_to_drive, upload_covers_to_drive
 
     media_data = read_json(paths.media)
     main_media = media_data["main"]
@@ -1367,12 +1367,17 @@ def upload_commentary_short_video(paths: ProjectPaths) -> str:
         "video_path": str(video_path),
     }
     write_json(media_data, paths.media)
+    main_media["google_drive_covers"] = upload_covers_to_drive({
+        "竖版": main_media.get("commentary_cover_path"),
+        "横版": main_media.get("commentary_cover_landscape_path"),
+    }, folder_name, Path(filename).stem)
+    write_json(media_data, paths.media)
     return file_id
 
 
 def upload_all_candidate_topic_videos(paths: ProjectPaths) -> Path:
     """Upload every completed candidate-topic video with its own title-based filename."""
-    from services.google_drive import upload_to_drive
+    from services.google_drive import upload_to_drive, upload_covers_to_drive
 
     output_path = paths.root / "candidate_topic_outputs.json"
     if not output_path.exists():
@@ -1394,6 +1399,10 @@ def upload_all_candidate_topic_videos(paths: ProjectPaths) -> Path:
             "file_id": file_id,
             "filename": filename,
         }
+        item["google_drive_covers"] = upload_covers_to_drive({
+            "竖版": item.get("cover_path") or video_path.parent / "commentary_cover.png",
+            "横版": video_path.parent / "commentary_cover_landscape.png",
+        }, folder_name, Path(filename).stem)
         item["upload_status"] = "completed"
     write_json(output, output_path, ensure_ascii=False, indent=2)
     return output_path

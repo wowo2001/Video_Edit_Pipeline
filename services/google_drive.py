@@ -90,3 +90,18 @@ def _get_or_create_folder(service, folder_name, parent_id=None):
     ).execute()
 
     return folder["id"]
+
+def upload_covers_to_drive(covers, folder_name, title):
+    """Upload available cover images alongside the finished video."""
+    from pathlib import Path
+
+    uploaded = {}
+    for orientation, cover_path in covers.items():
+        if not cover_path or not Path(cover_path).is_file():
+            continue
+        filename = f"{title}_封面_{orientation}{Path(cover_path).suffix}"
+        print(f"上传封面: {filename}", flush=True)
+        file_id = upload_to_drive(str(cover_path), folder_name=folder_name, filename=filename)
+        uploaded[orientation] = dict(file_id=file_id, filename=filename,
+                                    folder_name=folder_name, image_path=str(cover_path))
+    return uploaded
