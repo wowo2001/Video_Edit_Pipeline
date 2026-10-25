@@ -199,10 +199,13 @@ def render_avatar_layout(news_path, output_path, events, avatar_path=AVATAR, *,
             stdin=subprocess.PIPE,stderr=log)
         try:
             last_visible_fg=None
-            for i in range(math.ceil(duration*FPS)):
+            # ffprobe rounds seconds to 6 decimals; discard only that rounding error.
+            frame_count = math.ceil(duration * FPS - FPS * 0.000001)
+            for i in range(frame_count):
                 bg=read_frame(avatar,(WIDTH,HEIGHT)); fg=read_frame(news,news_size)
                 if bg is None or fg is None:
-                    raise RuntimeError('布局解码提前结束')
+                    raise RuntimeError(f'布局解码提前结束：第 {i + 1}/{frame_count} 帧，'
+                                       f'素材={"avatar" if bg is None else "news"}')
                 if layout_events is None:
                     amount=layout_amount(i/FPS,intervals)
                     opacity=1.

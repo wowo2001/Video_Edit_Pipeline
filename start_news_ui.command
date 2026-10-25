@@ -39,6 +39,9 @@ if (( missing_keys )); then
     exit 1
 fi
 
+# Start/reuse the backend embedded by /news_comment.
+"$python_bin" -m services.news_comment_server || exit 1
+
 # Prevent idle system sleep while Streamlit runs; allow the display to sleep.
 /usr/bin/caffeinate -i "$python_bin" -m streamlit run "$PWD/news_ui.py"
 result=$?

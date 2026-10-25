@@ -1,0 +1,82 @@
+{
+  "房产": [
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@ABCNewsAustralia",
+      "label": "ABC News Australia",
+      "enabled": true
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@7news",
+      "label": "7NEWS",
+      "enabled": true
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/property/residential",
+      "label": "AFR · Property",
+      "enabled": true
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@9NewsAUS",
+      "label": "9 News Australia",
+      "enabled": true
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/property/commercial",
+      "label": "AFR · Property",
+      "enabled": true
+    },
+    {
+      "module": "nsw_gov",
+      "url": "https://www.nsw.gov.au/departments-and-agencies/fair-trading/news",
+      "label": "NSW Fair Trading",
+      "enabled": true
+    }
+  ],
+  "移民": [
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@SBSAustralia",
+      "label": "SBS Australia",
+      "enabled": true
+    }
+  ],
+  "税务": [
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/policy/tax-and-super",
+      "label": "AFR · Tax",
+      "enabled": true
+    }
+  ],
+  "经济": [
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/policy",
+      "label": "AFR · Policy",
+      "enabled": true
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@ABCNewsAustralia",
+      "label": "ABC News",
+      "enabled": true
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@9NewsAUS",
+      "label": "9 News Australia",
+      "enabled": true
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@7news",
+      "label": "7NEWS",
+      "enabled": true
+    }
+  ]
+}

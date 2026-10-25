@@ -34,19 +34,5 @@
     "channel_ref": "https://youtube.com/@10newsau",
     "enabled": true,
     "source_type": "video"
-  },
-  {
-    "name": "AFR · Property",
-    "channel_ref": "https://www.afr.com/property/residential",
-    "enabled": true,
-    "source_type": "article",
-    "topic": "房产"
-  },
-  {
-    "name": "AFR · Policy",
-    "channel_ref": "https://www.afr.com/policy",
-    "enabled": true,
-    "source_type": "article",
-    "topic": "财经"
   }
 ]

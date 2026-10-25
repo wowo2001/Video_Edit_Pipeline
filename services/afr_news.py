@@ -44,6 +44,10 @@ class _HeadlineParser(HTMLParser):
         if tag == 'a' and attrs.get('data-testid') == 'headlineLink':
             self.capture_title = True
             self.card['url'] = urljoin(self.url, attrs.get('href', ''))
+        if tag == 'img' and not self.card.get('thumbnail_url'):
+            image = attrs.get('src') or attrs.get('data-src')
+            if image and not image.startswith('data:'):
+                self.card['thumbnail_url'] = urljoin(self.url, image)
         if tag == 'time':
             self.capture_time = True
             self.card['time'] = attrs.get('datetime')
@@ -128,7 +132,7 @@ def article_candidates(items, days, now=None, *, topic="房产", source_name="AF
         candidates.append({
             'video_id': 'afr_' + hashlib.sha256(item['url'].encode()).hexdigest()[:16],
             'source_type': 'article', 'publisher': 'AFR', 'title': item['title'], 'url': item['url'],
-            'channel_name': source_name,
+            'channel_name': source_name, 'thumbnail_url': item.get('thumbnail_url'),
             'published_at': published.isoformat().replace('+00:00', 'Z'),
             'classified_topics': [topic], 'reason': f'{source_name} 栏目',
         })

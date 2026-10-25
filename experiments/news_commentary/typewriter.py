@@ -5,13 +5,13 @@ import argparse
 import math
 from pathlib import Path
 import subprocess
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def render_typewriter(text, audio, output, background=None, fps=30, *, publisher):
-    background = background or ROOT / 'assets/article_typewriter_background_1280x720.png'
+    background = background or ROOT / 'assets/afr_typewriter_background_blurred.png'
     font_path = str(ROOT / 'assets/fonts/SmileySans-Oblique.otf')
     font = ImageFont.truetype(font_path, 40)
     source_font = ImageFont.truetype(font_path, 48)
@@ -36,9 +36,8 @@ def render_typewriter(text, audio, output, background=None, fps=30, *, publisher
     per_page = math.ceil(len(lines)/page_count)
     pages = [lines[i:i+per_page] for i in range(0, len(lines), per_page)]
     weights = [sum(map(len, page)) for page in pages]
+    # Background assets already include the fixed text-area blur.
     base = Image.open(background).convert('RGBA').resize((1280,720))
-    box = (76, 142, 1204, 720)
-    base.paste(base.crop(box).filter(ImageFilter.GaussianBlur(10)), box)
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     codec = ['-c:v','libx264','-preset','fast','-crf','18','-pix_fmt','yuv420p']

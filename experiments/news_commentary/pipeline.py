@@ -82,10 +82,6 @@ def validate_plan(plan, catalog, advertisement=''):
             segment['narration'] = ''.join(part['text'] for part in parts)
         if not isinstance(segment.get('narration'), str) or not segment['narration'].strip():
             raise ValueError(f'段落 {number} 缺少解说')
-        if kind == 'with_dialogue' and not article:
-            speakers = {source['utterances'][i].get('attribute', {}).get('speaker') for i in indices}
-            if len(indices) > 5 or len(speakers) != 1 or speakers & {None, 'UNKNOWN', ''}:
-                raise ValueError(f'段落 {number} 原声必须来自同一个明确说话人')
         if segment.get('audience_question') and number != len(clean['segments']):
             raise ValueError('互动问题只能放在最后一段')
         segment['segment_id'] = number
@@ -123,10 +119,15 @@ def download_sources(config, root):
         if not marker.exists():
             print(f'[{sid}] download ({kind})', flush=True)
             if kind == 'article':
-                if urlparse(item['url']).hostname not in ('afr.com', 'www.afr.com'):
+                host = urlparse(item['url']).hostname
+                if host in ('afr.com', 'www.afr.com'):
+                    from services.afr_article import fetch_afr_article
+                    content = fetch_afr_article(item['url'])
+                elif host == 'www.nsw.gov.au':
+                    from services.nsw_gov import fetch_nsw_article
+                    content = fetch_nsw_article(item['url'])
+                else:
                     raise ValueError('该文章来源尚未接入下载模块')
-                from services.afr_article import fetch_afr_article
-                content = fetch_afr_article(item['url'])
                 (paths.root / 'article.txt').write_text(content, encoding='utf-8')
                 save({**item, 'source_id': sid, 'source_type': kind,
                       'content': content}, paths.root / 'article.json')

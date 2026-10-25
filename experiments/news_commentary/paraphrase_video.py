@@ -40,7 +40,8 @@ def prepare_paraphrase_videos(root):
                        'indices':indices,'text':text}
                 if article:
                     background = Path(source['context'].get('typewriter_background') or
-                        (ROOT/'assets/article_typewriter_background_1280x720.png' if ref['publisher']=='AFR' else ''))
+                        ({'AFR': ROOT/'assets/afr_typewriter_background_blurred.png',
+                          'NSW Government': ROOT/'assets/nsw_typewriter_background_blurred.png'}.get(ref['publisher'], '')))
                     if not background.is_file():
                         raise ValueError(f"请配置 {ref['publisher']} 的 typewriter_background")
                     ref.update(background=str(background),background_hash=hashlib.sha256(background.read_bytes()).hexdigest())
