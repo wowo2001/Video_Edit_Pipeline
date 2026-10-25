@@ -17,18 +17,21 @@ JOBS = {}
 RUNS = {}
 CONFIG = ROOT / 'sources.json'
 LOCK = Lock()
-TOPICS = ('房产', '移民', '税务', '经济')
+TOPICS = ('房产', '移民', '税务', '经济', '职场')
 MODULES = ('youtube', 'afr', 'the_australian', 'nsw_gov')
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store, max-age=0')
+        super().end_headers()
+
     def reply(self, status, payload):
         data = json.dumps(payload, ensure_ascii=False).encode()
         self.send_response(status)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
-        self.send_header('Cache-Control', 'no-store')
         self.send_header('Content-Length', str(len(data)))
         self.end_headers()
         self.wfile.write(data)

@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 from core.utils import ms_to_srt_time
 
 ROOT = Path(__file__).resolve().parents[1]
-AVATAR = ROOT / 'assets/Person_sitting_at_table_speaking_20261024200326.mp4'
+AVATAR = ROOT / 'assets/Man_speaking_to_camera_20261025235017_silent.mp4'
 FONT = ROOT / 'assets/fonts/SmileySans-Oblique.otf'
 WIDTH, HEIGHT, FPS = 1080, 1920, 30
 FONT_SIZE = 65

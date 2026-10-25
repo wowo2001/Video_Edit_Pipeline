@@ -352,7 +352,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--tasks', required=True, type=Path)
     parser.add_argument('--workspace', required=True, type=Path)
-    parser.add_argument('--step', choices=['all', 'download', 'transcribe', 'merge', 'speakers', 'section', 'prepare', 'plan', 'audio', 'paraphrase', 'produce', 'final', 'upload'], default='all')
+    parser.add_argument('--step', choices=['all', 'download', 'transcribe', 'merge', 'speakers', 'section', 'prepare', 'plan', 'audio', 'paraphrase', 'produce', 'final', 'final-landscape', 'landscape-layout', 'upload'], default='all')
     parser.add_argument('--upload', action='store_true', help='Upload after an all run')
     args = parser.parse_args()
     config = read_json(args.tasks)
@@ -398,12 +398,27 @@ def main():
     if args.step in ('all', 'produce'):
         from experiments.news_commentary.mixed_render import produce_mixed
         produce_mixed(root)
+    if args.step == 'landscape-layout':
+        from experiments.news_commentary.layout import build_layout_timeline
+        from pipeline.landscape_avatar import render_landscape_layout
+        timeline = build_layout_timeline(root)
+        output = render_landscape_layout(root / 'commentary_preview_horizontal.mp4',
+            root / 'commentary_avatar_landscape.mp4', timeline['events'],
+            transition_seconds=timeline['config']['transition_seconds'])
+        media = read_json(paths.media)
+        media['main']['commentary_landscape_layout_path'] = str(output)
+        save(media, paths.media)
     if args.step in ('all', 'final'):
         from experiments.news_commentary.mixed_render import final_mixed
         final_mixed(root)
+    if args.step in ('all', 'final', 'final-landscape'):
+        from experiments.news_commentary.mixed_render import final_landscape
+        final_landscape(root)
     if args.step == 'upload' or (args.step == 'all' and args.upload):
         from conference import upload_commentary_short_video
         upload_commentary_short_video(paths)
+        from experiments.news_commentary.mixed_render import upload_landscape
+        upload_landscape(root)
     print(f'实验阶段完成: {args.step}，工作区: {root}', flush=True)
 
 

@@ -1,9 +1,10 @@
 """Generate a standalone portrait cover without re-encoding video."""
+import re
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_AVATAR = ROOT / "assets/red_hair_uncle_avatar.png"
+DEFAULT_AVATAR = ROOT / "assets/uncle_computer_portrait.png"
 DEFAULT_FONT = ROOT / "assets/fonts/SmileySans-Oblique.otf"
 
 
@@ -68,6 +69,55 @@ def create_portrait_cover(title, output_path, avatar_path=DEFAULT_AVATAR, font_p
         draw.text((x+3,y+5), line, font=font, fill='#000000', stroke_width=2)
         draw.text((x,y), line, font=font, fill=color, stroke_width=1)
     canvas.convert("RGB").save(output_path)
+    return output_path
+
+
+def create_landscape_cover(title, output_path,
+                           avatar_path=ROOT / 'assets/uncle_computer_landscape.png',
+                           font_path=DEFAULT_FONT):
+    """1920x1080 companion cover: full title left, presenter right."""
+    text = str(title).strip()
+    if not text:
+        raise ValueError('封面标题不能为空')
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    canvas = ImageOps.fit(Image.open(avatar_path).convert('RGB'), (1920, 1080),
+                          method=Image.Resampling.LANCZOS).convert('RGBA')
+    shade = Image.new('RGBA', canvas.size)
+    draw = ImageDraw.Draw(shade)
+    for x in range(1200):
+        alpha = round(205 * (1 - min(1, max(0, (x - 420) / 780))) ** 1.2)
+        draw.line((x, 0, x, 1080), fill=(12, 18, 22, alpha))
+    canvas = Image.alpha_composite(canvas, shade)
+    draw = ImageDraw.Draw(canvas)
+    # Fit the complete title in the left area; prefer punctuation when wrapping.
+    for size in range(110, 9, -1):
+        font = ImageFont.truetype(str(font_path), size)
+        lines = []
+        paragraphs = re.findall(r'[A-Za-z][A-Za-z0-9 &.-]*(?=[\u4e00-\u9fff])|[^，：；。！？、,;:!?\n]+[，：；。！？、,;:!?]?', text)
+        for paragraph in paragraphs:
+            remaining = paragraph
+            while remaining:
+                end = 1
+                while end < len(remaining) and draw.textbbox((0, 0), remaining[:end+1], font=font)[2] <= 650:
+                    end += 1
+                if end < len(remaining):
+                    breaks = [i+1 for i in range(end) if remaining[i] in '，：；。！？、,;:!? ']
+                    if breaks and breaks[-1] >= end * .55:
+                        end = breaks[-1]
+                lines.append(remaining[:end])
+                remaining = remaining[end:]
+        heights = [draw.textbbox((0, 0), line, font=font)[3] - draw.textbbox((0, 0), line, font=font)[1] for line in lines]
+        if len(lines) <= 3 and sum(heights) + 30 * (len(lines)-1) <= 620:
+            break
+    y = (1080 - sum(heights) - 30 * (len(lines)-1)) // 2
+    for index, (line, height) in enumerate(zip(lines, heights)):
+        box = draw.textbbox((0, 0), line, font=font)
+        draw.text((85-box[0], y-box[1]), line, font=font,
+                  fill='#FFD35A' if index == len(lines)-1 else '#FFFFFF',
+                  stroke_width=1, stroke_fill='#29231b')
+        y += height + 30
+    canvas.convert('RGB').save(output_path)
     return output_path
 
 

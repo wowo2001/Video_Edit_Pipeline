@@ -1,5 +1,7 @@
 """Unified entrypoint for the commentary workbench."""
 from urllib.parse import urlsplit
+from pathlib import Path
+import hashlib
 import streamlit as st
 import streamlit.components.v1 as components
 from services.news_comment_server import ensure_running
@@ -17,4 +19,6 @@ else:
     # Use the address the visitor used, including when visiting from a phone.
     hostname = urlsplit('//' + st.context.headers.get('Host', 'localhost:8501')).hostname
     host = f'[{hostname}]' if ':' in hostname else hostname
-    components.iframe(f'http://{host}:8510/news_comment', height=1500, scrolling=True)
+    page_file = Path(__file__).resolve().parents[1] / 'experiments/news_commentary/ui_demo/index.html'
+    version = hashlib.sha256(page_file.read_bytes()).hexdigest()[:12]
+    components.iframe(f'http://{host}:8510/news_comment?v={version}', height=1500, scrolling=True)

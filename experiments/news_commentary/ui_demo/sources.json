@@ -50,7 +50,29 @@
       "module": "afr",
       "url": "https://www.afr.com/policy/tax-and-super",
       "label": "AFR · Tax",
-      "enabled": true
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@ABCNewsAustralia",
+      "label": "ABC News",
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@9NewsAUS",
+      "label": "9 News Australia",
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@7news",
+      "label": "7NEWS",
+      "enabled": true,
+      "days": 3
     }
   ],
   "经济": [
@@ -77,6 +99,43 @@
       "url": "https://www.youtube.com/@7news",
       "label": "7NEWS",
       "enabled": true
+    }
+  ],
+  "职场": [
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@ABCNewsAustralia",
+      "label": "ABC News",
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@9NewsAUS",
+      "label": "9 News Australia",
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@7news",
+      "label": "7NEWS",
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/work-and-careers/workplace",
+      "label": "AFR · Workplace",
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/work-and-careers/careers",
+      "label": "AFR · Career",
+      "enabled": true,
+      "days": 3
     }
   ]
 }

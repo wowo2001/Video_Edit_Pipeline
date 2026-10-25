@@ -15,7 +15,7 @@ def ready():
     try:
         with urlopen(URL + '/api/sources', timeout=1) as response:
             data = json.load(response)
-        return isinstance(data, dict) and all(topic in data for topic in ('房产', '移民', '税务', '经济'))
+        return isinstance(data, dict) and all(topic in data for topic in ('房产', '移民', '税务', '经济', '职场'))
     except (OSError, ValueError):
         return False
 

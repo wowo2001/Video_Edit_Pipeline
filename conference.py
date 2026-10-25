@@ -1298,7 +1298,7 @@ def write_commentary_chinese_subtitles(paths: ProjectPaths, preview_path: Path) 
 def create_commentary_short_video(paths: ProjectPaths) -> Path:
     """Compose animated avatar/news layout, then burn script-derived subtitles."""
     from pipeline.avatar_video import render_avatar_layout, burn_avatar_subtitles, prepend_cover
-    from pipeline.cover import create_portrait_cover
+    from pipeline.cover import create_portrait_cover, create_landscape_cover
 
     media_data, media_path = _read_workspace_media(paths)
     main_media = media_data["main"]
@@ -1312,6 +1312,7 @@ def create_commentary_short_video(paths: ProjectPaths) -> Path:
                       if item.get("topic_id") == selection.get("selected_topic_id")), {})
     subtitle = str(candidate.get("title") or plan.get("title") or main_media.get("task_subtitle") or "")
     cover_path = create_portrait_cover(subtitle, paths.root / "commentary_cover.png")
+    landscape_cover = create_landscape_cover(subtitle, paths.root / "commentary_cover_landscape.png")
     layout_path = paths.root / "commentary_avatar_layout.mp4"
     body_path = paths.root / "commentary_body.mp4"
     final_path = paths.root / "commentary_news.mp4"
@@ -1324,6 +1325,8 @@ def create_commentary_short_video(paths: ProjectPaths) -> Path:
     burn_avatar_subtitles(layout_path, paths.root / "final_subtitles.ass", body_path)
     print("========== 10.4 插入 1 秒片头封面 ==========", flush=True)
     prepend_cover(body_path, cover_path, final_path)
+    main_media["commentary_cover_path"] = str(cover_path)
+    main_media["commentary_cover_landscape_path"] = str(landscape_cover)
     main_media["commentary_body_video_path"] = str(body_path)
     main_media["commentary_chinese_subtitles_path"] = str(srt_path)
     main_media.pop("commentary_cropped_4_3_video_path", None)
