@@ -1,0 +1,9 @@
+{
+  "bridge": "none",
+  "commentary": "none",
+  "dialogue": "large",
+  "audience_question": "none",
+  "transition_seconds": 0.5,
+  "video_paraphrase": "large",
+  "article_paraphrase": "large"
+}

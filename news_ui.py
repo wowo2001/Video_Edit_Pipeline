@@ -101,8 +101,16 @@ SYDNEY_TZ = ZoneInfo("Australia/Sydney")
 
 
 def initialise_state() -> None:
+    for key in ("afr_listing_cache", "title_classification_cache", "title_embeddings_cache", "title_clusters_cache", "article_candidate_scope"):
+        st.session_state.pop(key, None)
     if "sources" not in st.session_state:
         st.session_state.sources = load_sources(SOURCES_PATH, DEFAULT_SOURCES)
+    if not st.session_state.get('unified_article_sources_v1'):
+        configured = load_sources(SOURCES_PATH, DEFAULT_SOURCES)
+        existing = {source.get('channel_ref') for source in st.session_state.sources}
+        st.session_state.sources.extend(source for source in configured
+                                        if source.get('source_type') == 'article' and source.get('channel_ref') not in existing)
+        st.session_state.unified_article_sources_v1 = True
     # Keep configured conference channels and playlists independent from
     # previously saved or in-session news sources.
     st.session_state.conference_sources = [
@@ -114,6 +122,10 @@ def initialise_state() -> None:
         source.setdefault("enabled", True)
     if "candidates" not in st.session_state:
         st.session_state.candidates = []
+    # Migrate candidates already loaded in this browser session.
+    for item in st.session_state.candidates:
+        if item.get('source_type') == 'afr':
+            item.update(source_type='article', publisher='AFR')
     if "selected_video_ids" not in st.session_state:
         st.session_state.selected_video_ids = set()
     if "workflow_runs" not in st.session_state:
@@ -162,6 +174,8 @@ def save_sources(source_key: str, path: Path, defaults: list[dict]) -> None:
             "name": source["name"].strip(),
             "channel_ref": source["channel_ref"].strip(),
             "enabled": bool(source["enabled"]),
+            "source_type": source.get("source_type", "video"),
+            "topic": source.get("topic", "房产"),
         }
         for source in st.session_state[source_key]
         if source["name"].strip() or source["channel_ref"].strip()
@@ -171,43 +185,60 @@ def save_sources(source_key: str, path: Path, defaults: list[dict]) -> None:
 
 
 def fetch_recent_news(days: int, sources: list[dict]) -> None:
-    client = YouTubeNews(YOUTUBE_API_KEY)
+    client = YouTubeNews(YOUTUBE_API_KEY) if YOUTUBE_API_KEY else None
     enabled_sources = [source for source in sources if source["enabled"]]
-    if not enabled_sources:
+    if not enabled_sources :
         raise ValueError("请至少启用一个新闻源")
 
     candidates = []
     st.session_state.source_errors = []
     for source in enabled_sources:
-        channel_ref = str(source.get("channel_ref") or "").strip()
-        playlist_id = str(source.get("playlist_id") or "").strip()
-        if not channel_ref and not playlist_id:
-            error = f"新闻源“{source['name'] or '未命名'}”缺少频道网址、@handle 或播放列表 ID"
-            st.session_state.source_errors.append(error)
-            log_ui_event(f"跳过来源：{error}")
-            continue
-
-        source_name = source["name"] or "未命名"
-        log_ui_event(f"正在拉取来源：{source_name}")
+        name = source.get('name') or '未命名'
+        log_ui_event(f'正在拉取来源：{name}')
         try:
-            source_candidates = client.recent_videos(source, days)
+            if source.get('source_type', 'video') == 'article':
+                from services.afr_news import fetch_afr_news, article_candidates
+                url = source['channel_ref'].strip()
+                listing = fetch_afr_news(url)
+                skipped = []
+                rows = article_candidates(listing, days, topic=source.get('topic', '房产'),
+                                          source_name=name, skipped=skipped)
+                if skipped:
+                    log_ui_event(f'{name}：跳过 {len(skipped)} 篇缺少有效时间的文章')
+                log_ui_event(f'{name}：列表 {len(listing)} 篇，时间范围内 {len(rows)} 篇，无需 LLM 分类')
+                if listing and not rows:
+                    st.info(f'{name} 已读取 {len(listing)} 篇，但最近 {days} 天内没有有效日期的文章。请扩大左侧时间范围后重新拉取。')
+            else:
+                if client is None:
+                    raise ValueError('未配置 YOUTUBE_API_KEY')
+                rows = client.recent_videos(source, days)
+                for item in rows:
+                    item['source_type'] = 'video'
+            candidates.extend(rows)
+            log_ui_event(f'来源完成：{name}，{len(rows)} 条')
         except Exception as error:
-            message = f"{source_name}：{type(error).__name__}: {error}"
+            message = f'{name}：{type(error).__name__}: {error}'
             st.session_state.source_errors.append(message)
-            log_ui_event(f"来源失败，已跳过：{message}")
-            continue
-        candidates.extend(source_candidates)
-        log_ui_event(f"来源完成：{source_name}，{len(source_candidates)} 条")
-
-    if not candidates:
-        raise RuntimeError("所有 YouTube 来源均未能返回视频；请查看执行日志中的来源错误。")
-
-    try:
-        client.add_video_durations(candidates)
-    except Exception as error:
-        message = f"视频时长读取失败，将以“时长未知”继续：{type(error).__name__}: {error}"
-        st.session_state.source_errors.append(message)
-        log_ui_event(message)
+            log_ui_event(f'来源失败，已跳过：{message}')
+    videos = [item for item in candidates if item.get('source_type') == 'video']
+    if videos:
+        try:
+            client.add_video_durations(videos)
+        except Exception as error:
+            message = f'视频时长读取失败，将以未知时长继续：{error}'
+            st.session_state.source_errors.append(message)
+            log_ui_event(message)
+    unique = {}
+    for item in candidates:
+        key = item['video_id']
+        if key in unique:
+            unique[key]['classified_topics'] = list(dict.fromkeys(
+                unique[key].get('classified_topics', []) + item.get('classified_topics', [])))
+        else:
+            unique[key] = item
+    candidates = list(unique.values())
+    if not candidates and st.session_state.source_errors:
+        raise RuntimeError('未取得候选新闻，请查看来源错误。')
     st.session_state.candidates = sorted(candidates, key=lambda item: item["published_at"], reverse=True)
     st.session_state.selected_video_ids = set()
 
@@ -225,23 +256,32 @@ def screen_candidates(topics: list[str]) -> None:
             "title": item["title"],
             "published_at": item["published_at"],
         }
-        for item in st.session_state.candidates
+        for item in st.session_state.candidates if item.get("source_type") != "article"
     ]
-    results = ChatGPT().screen_news_titles(llm_input, topics)
+    results = ChatGPT().screen_news_titles(llm_input, TOPIC_OPTIONS) if llm_input else []
     result_by_id = {
         result.get("video_id"): result
         for result in results
         if isinstance(result, dict) and result.get("video_id")
     }
     for item in st.session_state.candidates:
+        if item.get("source_type") == "article":
+            continue
         result = result_by_id.get(item["video_id"], {
             "relevant": False, "reason": "模型未返回该视频的筛选结果",
         })
-        item["matched_topics"] = [
-            topic for topic in result.get("matched_topics", []) if topic in topics
-        ]
-        item["relevant"] = result.get("relevant") is True and bool(item["matched_topics"])
+        item["classified_topics"] = [
+            topic for topic in (result.get("matched_topics") or []) if topic in TOPIC_OPTIONS
+        ] if result.get("relevant") is True else []
         item["reason"] = str(result.get("reason", ""))
+    filter_candidate_topics(topics)
+
+
+def filter_candidate_topics(topics):
+    for item in st.session_state.candidates:
+        if "classified_topics" in item:
+            item["matched_topics"] = [t for t in item["classified_topics"] if t in topics]
+            item["relevant"] = bool(item["matched_topics"])
 
 
 def format_sydney_time(timestamp: str) -> str:
@@ -363,7 +403,9 @@ def start_commentary_workflow(title: str, upload: bool, advertisement: str, angl
     workspace = (run_dir / 'workspace').resolve()
     task = {'title': title.strip() or '新闻评论', 'angle': angle.strip(),
             '广告': advertisement.strip(),
-            'sources': [{'url': item['url'], 'title': item['title']} for item in selected]}
+            'sources': [{'url': item['url'], 'title': item['title'],
+                         'source_type': item.get('source_type', 'video'),
+                         'publisher': item.get('publisher') or item['channel_name']} for item in selected]}
     task_file.write_text(json.dumps(task, ensure_ascii=False, indent=2), encoding='utf-8')
     command = [sys.executable, '-u', '-m', 'experiments.news_commentary.pipeline',
                '--tasks', str(task_file.resolve()), '--workspace', str(workspace)]
@@ -380,6 +422,65 @@ def start_commentary_workflow(title: str, upload: bool, advertisement: str, angl
         'count': len(selected), 'task_file': str(task_file), 'log_file': str(log_file),
         'cost_file': str(workspace / 'cost_summary.json'),
     })
+
+
+@st.cache_resource
+def title_embedding_service():
+    from services.text_embedding_service import TextEmbeddingService
+    return TextEmbeddingService()
+
+
+def encode_news_titles(titles):
+    return title_embedding_service().encode(list(titles))
+
+
+def cluster_news_titles(titles_and_ids, similarity):
+    from services.news_title_clusters import group_titles
+    items = [{'video_id': vid, 'title': title} for vid, title in titles_and_ids]
+    return group_titles(items, encode_news_titles(tuple(i['title'] for i in items)), similarity)
+
+
+def update_commentary_selection(video_id, widget_key):
+    selected = st.session_state.selected_video_ids
+    if st.session_state[widget_key]:
+        selected.add(video_id)
+    else:
+        selected.discard(video_id)
+    # Synchronize every occurrence before Streamlit redraws widgets.
+    for key in list(st.session_state):
+        if key.startswith('commentary_group_') and key.endswith('_' + video_id):
+            st.session_state[key] = video_id in selected
+
+
+def render_commentary_groups(items):
+    similarity = st.slider('标题分组相似度', 0.60, 0.95, 0.75, 0.01,
+                           help='调高分组更细，调低会把更多相关新闻放在一起。')
+    try:
+        with st.spinner('正在按标题分组…'):
+            pool = [i for i in st.session_state.candidates if i.get('classified_topics')]
+            if not pool:
+                pool = items
+            groups_result = cluster_news_titles(tuple(sorted((i['video_id'], i['title']) for i in pool)), similarity)
+            visible = {i['video_id']: i for i in items}
+            groups = [{'title': g['title'], 'items': [visible[i['video_id']] for i in g['items'] if i['video_id'] in visible]} for g in groups_result]
+            groups = [g for g in groups if g['items']]
+    except Exception as error:
+        st.warning(f'标题分组暂不可用，先显示全部候选：{error}')
+        groups = [{'title': '全部候选新闻', 'items': items}]
+    st.caption(f'{len(groups)} 组 · {len(items)} 条新闻。同一新闻可出现在多个组，选择状态同步，制作时去重。')
+    for number, group in enumerate(groups):
+        with st.container(border=True):
+            st.markdown(f"**{group['title']}**")
+            st.caption(f"{len(group['items'])} 条相关报道")
+            for item in group['items']:
+                left, right = st.columns([5, 1])
+                left.markdown(f"[{item['title']}]({item['url']})")
+                kind = '文章' if item.get('source_type') == 'article' else format_video_duration(item.get('duration_seconds'))
+                left.caption(f"{item['channel_name']} · {format_sydney_time(item['published_at'])} · {kind}")
+                key = f"commentary_group_{number}_{item['video_id']}"
+                st.session_state[key] = item['video_id'] in st.session_state.selected_video_ids
+                right.checkbox('加入评论素材', key=key, on_change=update_commentary_selection,
+                               args=(item['video_id'], key))
 
 
 st.set_page_config(page_title="澳洲房东新闻选题", page_icon="🏠", layout="wide")
@@ -416,21 +517,24 @@ with st.sidebar:
     selected_topics = []
     if not is_conference:
         st.subheader("关注主题")
-        st.caption("拉取后由 Luna 根据勾选主题筛选视频标题。")
+        st.caption("拉取或重新分类时由 Luna 处理全部视频标题；切换主题只筛选当前结果。")
         selected_topics = [
             topic for topic in TOPIC_OPTIONS
             if st.checkbox(topic, value=True, key=f"topic_{topic}")
         ]
     st.caption(f"本地时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
+if not is_conference:
+    filter_candidate_topics(selected_topics)
+
 source_tab, candidate_tab, workflow_tab = st.tabs(["1. 新闻源", "2. 候选新闻", "3. 工作流队列"])
 
 with source_tab:
-    st.subheader("YouTube 发布会源" if is_conference else "YouTube 新闻源")
+    st.subheader("YouTube 发布会源" if is_conference else "新闻源（视频 / 文章）")
     if is_conference:
         st.write("固定使用 ABC 与 9 News 的 Live 标签页、National Press Club 全频道，以及指定播放列表；按所选天数显示最近发布的视频。")
     else:
-        st.write("粘贴公开频道的网址、@handle 或 Channel ID；下一步会自动解析为 Channel ID。")
+        st.write("视频源填写 YouTube 频道网址；文章源填写 AFR 栏目网址。统一按所选天数拉取，文章按栏目主题归类，无需 LLM，每次点击拉取都会重新读取列表。")
     if not YOUTUBE_API_KEY:
         st.warning("未配置 YOUTUBE_API_KEY，暂时无法拉取 YouTube 新闻。")
     if not OPENAI_API_KEY:
@@ -438,7 +542,7 @@ with source_tab:
     if st.button(
         "拉取发布会视频" if is_conference else "拉取并 AI 筛选新闻",
         type="primary",
-        disabled=not bool(YOUTUBE_API_KEY and OPENAI_API_KEY),
+        disabled=not any(source.get("enabled") for source in sources),
     ):
         st.session_state.ui_events = []
         try:
@@ -446,11 +550,11 @@ with source_tab:
                 status.write("正在解析频道并拉取 YouTube 公开视频…")
                 log_ui_event("开始拉取 YouTube 新闻")
                 fetch_recent_news(days, sources)
-                log_ui_event(f"YouTube 拉取完成：{len(st.session_state.candidates)} 条")
+                log_ui_event(f"新闻拉取完成：{len(st.session_state.candidates)} 条")
                 if is_conference:
                     status.update(label="发布会视频拉取完成", state="complete", expanded=False)
                 else:
-                    status.write(f"已拉取 {len(st.session_state.candidates)} 条，正在交给 Luna 筛选标题…")
+                    status.write(f"已拉取 {len(st.session_state.candidates)} 条，正在将全部视频标题交给 Luna 分类…")
                     screen_candidates(selected_topics)
                     log_ui_event("Luna 标题筛选完成")
                     status.update(label="新闻筛选完成", state="complete", expanded=False)
@@ -458,14 +562,14 @@ with source_tab:
                 st.success(f"已按发布时间拉取 {len(st.session_state.candidates)} 条视频。")
             else:
                 relevant_count = sum(item.get("relevant", False) for item in st.session_state.candidates)
-                st.success(f"已拉取 {len(st.session_state.candidates)} 条新闻；Luna 筛出 {relevant_count} 条相关候选。")
+                st.success(f"已拉取 {len(st.session_state.candidates)} 条新闻；按主题筛出 {relevant_count} 条相关候选。")
         except Exception as error:
             log_ui_event(f"失败：{type(error).__name__}: {error}")
             st.error(f"新闻筛选失败：{type(error).__name__}: {error}")
     if is_conference:
         st.caption(f"计划拉取最近 {days} 天的公开视频；不进行 LLM 标题或主题筛选。")
     else:
-        st.caption(f"计划拉取最近 {days} 天的公开视频，并按主题“{'、'.join(selected_topics) or '未选择'}”筛选。")
+        st.caption(f"计划拉取最近 {days} 天的视频和文章，并按主题“{'、'.join(selected_topics) or '未选择'}”筛选。")
     st.divider()
     if is_conference:
         st.caption("固定来源")
@@ -482,9 +586,12 @@ with source_tab:
         for index, source in enumerate(sources):
             with st.container(border=True):
                 left, middle, right, remove = st.columns([1.4, 2.4, 0.8, 0.5])
-                source["name"] = left.text_input("频道名称", value=source["name"], key=f"{source_key}_name_{index}")
+                source["source_type"] = st.selectbox("内容类型", ["video", "article"], index=1 if source.get("source_type") == "article" else 0, format_func=lambda value: "文章" if value == "article" else "视频", key=f"{source_key}_type_{index}")
+                if source["source_type"] == "article":
+                    source["topic"] = st.selectbox("栏目主题", TOPIC_OPTIONS, index=TOPIC_OPTIONS.index(source.get("topic", "房产")), key=f"{source_key}_article_topic_{index}")
+                source["name"] = left.text_input("来源名称", value=source["name"], key=f"{source_key}_name_{index}")
                 source["channel_ref"] = middle.text_input(
-                    "频道网址或 @handle", value=source["channel_ref"], key=f"{source_key}_channel_{index}",
+                    "来源网址或 @handle", value=source["channel_ref"], key=f"{source_key}_channel_{index}",
                     placeholder="例如 https://youtube.com/@ABCNewsAustralia 或 @ABCNewsAustralia",
                 )
                 source["enabled"] = right.checkbox("启用", value=source["enabled"], key=f"{source_key}_enabled_{index}")
@@ -506,10 +613,10 @@ with candidate_tab:
     if not st.session_state.candidates:
         st.info("尚未拉取视频。拉取后勾选要制作的内容。" if is_conference else "尚未拉取新闻。拉取后，使用 AI 按当前主题筛选并勾选要制作的视频。")
     else:
-        if not is_conference and st.button("按当前主题重新 AI 筛选", type="secondary", disabled=not bool(OPENAI_API_KEY)):
+        if not is_conference and st.button("重新分类全部新闻", type="secondary", disabled=not bool(OPENAI_API_KEY)):
             try:
                 log_ui_event("开始按当前主题重新调用 Luna 筛选")
-                with st.status("Luna 正在筛选标题…", expanded=False) as status:
+                with st.status("正在重新分类全部视频标题…", expanded=False) as status:
                     screen_candidates(selected_topics)
                     status.update(label="Luna 筛选完成", state="complete", expanded=False)
                 log_ui_event("Luna 重新筛选完成")
@@ -528,10 +635,14 @@ with candidate_tab:
                 st.caption(f"按发布时间显示 {len(relevant)} 条视频；未进行 AI 筛选。")
             else:
                 irrelevant_count = len(screened) - len(relevant)
-                st.caption(f"AI 筛选结果：{len(relevant)} 条相关，{irrelevant_count} 条未选中。只显示相关内容。")
+                st.caption(f"主题筛选结果：{len(relevant)} 条相关，{irrelevant_count} 条未选中。只显示相关内容。")
+            article_count = sum(item.get('source_type') == 'article' for item in relevant)
+            st.caption(f"当前显示：{len(relevant) - article_count} 条视频 · {article_count} 篇文章")
             if not relevant:
                 st.info("没有标题与当前主题相关；可修改主题后重新筛选。")
-            for item in relevant:
+            if is_commentary and relevant:
+                render_commentary_groups(relevant)
+            for item in ([] if is_commentary else relevant):
                 with st.container(border=True):
                     columns = st.columns([0.7, 4.3, 1.2])
                     if item.get("thumbnail_url"):
@@ -556,7 +667,7 @@ with candidate_tab:
 with workflow_tab:
     st.subheader("制作队列")
     selected_count = len(st.session_state.selected_video_ids)
-    st.info(f"已选择 {selected_count} 条视频。" + ("这些素材将综合制作成一条评论视频。" if is_commentary else "每条都会建立独立工作区，并启动 conference.py；成片会自动上传 Google Drive。" if is_conference else "每条都会建立独立工作区，并启动 translate.py。"))
+    st.info(f"已选择 {selected_count} 条素材。" + ("这些素材将综合制作成一条评论视频。" if is_commentary else "每条都会建立独立工作区，并启动 conference.py；成片会自动上传 Google Drive。" if is_conference else "每条都会建立独立工作区，并启动 translate.py。"))
     task_title = st.text_input("视频大标题", value="新闻评论" if is_commentary else ("澳洲政策解读" if is_conference else "今日要闻"), key=f"{mode}_title")
     advertisement = st.text_input(
         "广告文案",

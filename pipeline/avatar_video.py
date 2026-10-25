@@ -145,7 +145,23 @@ def layout_amount(t, intervals, transition=.5):
                 for a,b in intervals), default=0)
 
 
-def render_avatar_layout(news_path, output_path, events, avatar_path=AVATAR):
+def window_state(t, events, transition=.5):
+    """Return (large amount, opacity). None anchors at the same small-window box."""
+    for index,event in enumerate(events):
+        if event['start'] <= t < event['end']:
+            mode=event['mode']
+            previous=events[index-1]['mode'] if index else 'none'
+            target=(float(mode=='large'),float(mode!='none'))
+            origin=(float(previous=='large'),float(previous!='none'))
+            seconds=min(transition,event['end']-event['start'])
+            u=1 if seconds<=0 else min(1,max(0,(t-event['start'])/seconds))
+            u=u*u*(3-2*u)
+            return tuple(a+(b-a)*u for a,b in zip(origin,target))
+    return 0.,0.
+
+
+def render_avatar_layout(news_path, output_path, events, avatar_path=AVATAR, *,
+                         layout_events=None, transition_seconds=.5):
     """Composite clean news footage; subtitles are added in a separate final pass."""
     duration = video_duration(news_path)
     result = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0',
@@ -182,11 +198,22 @@ def render_avatar_layout(news_path, output_path, events, avatar_path=AVATAR):
             '-crf','20','-pix_fmt','yuv420p','-c:a','copy','-movflags','+faststart',str(output_path)],
             stdin=subprocess.PIPE,stderr=log)
         try:
+            last_visible_fg=None
             for i in range(math.ceil(duration*FPS)):
                 bg=read_frame(avatar,(WIDTH,HEIGHT)); fg=read_frame(news,news_size)
                 if bg is None or fg is None:
                     raise RuntimeError('布局解码提前结束')
-                amount=layout_amount(i/FPS,intervals)
+                if layout_events is None:
+                    amount=layout_amount(i/FPS,intervals)
+                    opacity=1.
+                else:
+                    amount,opacity=window_state(i/FPS,layout_events,transition_seconds)
+                    current=next((e for e in layout_events if e['start']<=i/FPS<e['end']),None)
+                    if current and current['mode']=='none' and last_visible_fg is not None:
+                        fg=last_visible_fg
+                    elif current and current['mode']!='none':
+                        last_visible_fg=fg
+                clean_bg=bg.copy() if opacity<1 else None
                 if amount:
                     blur=bg.resize((270,480)).filter(ImageFilter.GaussianBlur(7)).resize((WIDTH,HEIGHT),Image.Resampling.BILINEAR)
                     blur=ImageEnhance.Brightness(blur).enhance(.82)
@@ -199,6 +226,8 @@ def render_avatar_layout(news_path, output_path, events, avatar_path=AVATAR):
                     region=bg.crop(box)
                     bg.paste(Image.blend(region,Image.new('RGB',region.size,'white'),1-amount),box[:2])
                 bg.paste(fg.resize((width,height),Image.Resampling.LANCZOS),(x,y))
+                if opacity<1:
+                    bg=Image.blend(clean_bg,bg,opacity)
                 encoder.stdin.write(bg.tobytes())
                 if i % (FPS*10)==0:
                     print(f'画中画布局合成: {i/FPS:.0f}/{duration:.1f} 秒',flush=True)

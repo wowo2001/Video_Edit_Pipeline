@@ -347,7 +347,7 @@ Rules:
   "news bulletin", "latest news", "news update", or Chinese equivalents such as
   "综合报道", "新闻汇总", "新闻简报", "新闻速览". Select videos focused on one
   identifiable story instead.
-- matched_topics must use only values from Selected topics.
+- matched_topics must include ALL substantively matching topics from Selected topics, not just one best match.
 - If relevant is true, matched_topics must contain at least one selected topic.
 - reason must be concise Simplified Chinese (maximum 30 characters).
 - Do not use Markdown or add fields.

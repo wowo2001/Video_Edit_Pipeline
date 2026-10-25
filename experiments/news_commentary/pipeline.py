@@ -5,6 +5,7 @@ import copy
 import json
 import shutil
 from pathlib import Path
+from urllib.parse import urlparse
 
 from core.path import ProjectPaths
 from core.utils import read_json, write_json, safe_json_parse
@@ -22,6 +23,18 @@ class Planner(ChatGPT):
         return safe_json_parse(self._complete(build_prompt(catalog, angle, advertisement)))
 
 
+def expand_indices(indices, count):
+    """Expand inclusive LLM endpoints; also accept previously saved index lists."""
+    if (not isinstance(indices, list) or not indices
+            or any(type(i) is not int or i < 0 or i >= count for i in indices)):
+        raise ValueError('引用索引无效或越界')
+    if len(indices) == 2:
+        if indices[0] > indices[1]:
+            raise ValueError('引用起点不能大于终点')
+        return list(range(indices[0], indices[1] + 1))
+    return indices
+
+
 def validate_plan(plan, catalog, advertisement=''):
     sources = {s['source_id']: s for s in catalog}
     if not isinstance(plan, dict) or not str(plan.get('title', '')).strip() or not plan.get('segments'):
@@ -30,12 +43,17 @@ def validate_plan(plan, catalog, advertisement=''):
     clean = copy.deepcopy(plan)
     for number, segment in enumerate(clean['segments'], 1):
         source = sources.get(segment.get('source_id'))
-        indices = segment.pop('subtitle_indices', None)
         kind = segment.get('type')
         if source is None or kind not in ('narration_only', 'with_dialogue'):
             raise ValueError(f'段落 {number} 来源或类型无效')
+        article = source.get('source_type') == 'article'
+        rows = source['article_paragraphs'] if article else source['utterances']
+        indices = segment.pop('paragraph_indices' if article else 'subtitle_indices', None)
+        if article and indices is None:
+            indices = segment.pop('subtitle_indices', None)
+        indices = expand_indices(indices, len(rows))
         if (not isinstance(indices, list) or not indices or
-            any(type(i) is not int or i < 0 or i >= len(source['utterances']) for i in indices) or
+            any(type(i) is not int or i < 0 or i >= len(rows) for i in indices) or
             indices != list(range(indices[0], indices[-1] + 1))):
             raise ValueError(f'段落 {number} 字幕索引无效或不连续')
         keys = {(segment['source_id'], i) for i in indices}
@@ -56,63 +74,253 @@ def validate_plan(plan, catalog, advertisement=''):
                         raise ValueError(f'段落 {number} 转述缺少证据')
                     for reference in evidence:
                         origin = sources.get(reference.get('source_id'))
-                        refs = reference.get('subtitle_indices')
-                        if (origin is None or not isinstance(refs, list) or not refs or
-                            any(type(i) is not int or i < 0 or i >= len(origin['utterances']) for i in refs)):
-                            raise ValueError(f'段落 {number} 转述证据编号无效')
+                        if origin is None:
+                            raise ValueError(f'段落 {number} 转述来源无效')
+                        field = 'paragraph_indices' if origin.get('source_type') == 'article' else 'subtitle_indices'
+                        rows_count = len(origin.get('article_paragraphs', origin.get('utterances', [])))
+                        reference[field] = expand_indices(reference.get(field), rows_count)
             segment['narration'] = ''.join(part['text'] for part in parts)
         if not isinstance(segment.get('narration'), str) or not segment['narration'].strip():
             raise ValueError(f'段落 {number} 缺少解说')
-        if kind == 'with_dialogue':
+        if kind == 'with_dialogue' and not article:
             speakers = {source['utterances'][i].get('attribute', {}).get('speaker') for i in indices}
             if len(indices) > 5 or len(speakers) != 1 or speakers & {None, 'UNKNOWN', ''}:
                 raise ValueError(f'段落 {number} 原声必须来自同一个明确说话人')
         if segment.get('audience_question') and number != len(clean['segments']):
             raise ValueError('互动问题只能放在最后一段')
         segment['segment_id'] = number
-        segment['dialogue_subtitle_indices' if kind == 'with_dialogue' else 'visual_subtitle_indices'] = indices
+        segment['source_type'] = source.get('source_type', 'video')
+        segment['publisher'] = source.get('publisher', '')
+        if article:
+            segment['paragraph_indices'] = indices
+            segment['visual_mode'] = 'article_typewriter' if kind == 'with_dialogue' else 'publisher_logo'
+            if kind == 'with_dialogue':
+                segment['original_text'] = '\n\n'.join(rows[i]['text'] for i in indices)
+        else:
+            segment['dialogue_subtitle_indices' if kind == 'with_dialogue' else 'visual_subtitle_indices'] = indices
+    if advertisement and not any(s.get('advertisement') is True for s in clean['segments']):
+        matches = [s for s in clean['segments'] if advertisement.strip() in s['narration']]
+        if len(matches) == 1:
+            matches[0]['advertisement'] = True
     if advertisement and sum(s.get('advertisement') is True for s in clean['segments']) != 1:
         raise ValueError('广告必须恰好植入一次')
     return clean
 
 
+def source_type(item):
+    return item.get('source_type') or ('article' if urlparse(item['url']).hostname in
+                                     ('afr.com', 'www.afr.com') else 'video')
+
+
+def download_sources(config, root):
+    """Download each source without transcription, planning or rendering."""
+    downloads = []
+    for number, item in enumerate(config['sources'], 1):
+        sid = f'source_{number:02d}'
+        paths = ProjectPaths(root / 'sources' / sid)
+        kind = source_type(item)
+        marker = paths.root / '.download.done'
+        if not marker.exists():
+            print(f'[{sid}] download ({kind})', flush=True)
+            if kind == 'article':
+                if urlparse(item['url']).hostname not in ('afr.com', 'www.afr.com'):
+                    raise ValueError('该文章来源尚未接入下载模块')
+                from services.afr_article import fetch_afr_article
+                content = fetch_afr_article(item['url'])
+                (paths.root / 'article.txt').write_text(content, encoding='utf-8')
+                save({**item, 'source_id': sid, 'source_type': kind,
+                      'content': content}, paths.root / 'article.json')
+            elif kind == 'video':
+                from conference import ParliamentVideoPipeline
+                ParliamentVideoPipeline(paths).download_sources_and_captions(
+                    item['url'], config.get('title', '新闻评论'), item.get('title'))
+            else:
+                raise ValueError(f'不支持的素材类型：{kind}')
+            marker.touch()
+        else:
+            print(f'[{sid}] download 已完成，复用本地素材', flush=True)
+        downloads.append({**item, 'source_id': sid, 'source_type': kind,
+                          'workspace': str(paths.root),
+                          'content_path': str(paths.root / 'article.txt' if kind == 'article' else paths.video)})
+        save(downloads, root / 'downloaded_sources.json')
+
+
+def transcribe_sources(config, root):
+    from conference import transcribe_parliament_english_subtitles
+    for number, item in enumerate(config['sources'], 1):
+        sid = f'source_{number:02d}'
+        if source_type(item) == 'article':
+            print(f'[{sid}] 文章保留原文，跳过语音识别', flush=True)
+            continue
+        paths = ProjectPaths(root / 'sources' / sid)
+        marker = paths.root / '.transcribe.done'
+        if marker.exists():
+            print(f'[{sid}] transcribe 已完成，复用识别结果', flush=True)
+            continue
+        print(f'[{sid}] transcribe (火山 en-US)', flush=True)
+        transcribe_parliament_english_subtitles(paths)
+        marker.touch()
+
+
+def merge_sources(config, root):
+    from conference import merge_english_subtitles_before_diarization
+    for number, item in enumerate(config['sources'], 1):
+        sid = f'source_{number:02d}'
+        if source_type(item) == 'article':
+            print(f'[{sid}] 文章保留原文，跳过短句整合', flush=True)
+            continue
+        paths = ProjectPaths(root / 'sources' / sid)
+        marker = paths.root / '.merge.done'
+        if marker.exists():
+            print(f'[{sid}] merge 已完成，复用整合结果', flush=True)
+            continue
+        print(f'[{sid}] merge (按语法整合英文短句)', flush=True)
+        merge_english_subtitles_before_diarization(paths)
+        marker.touch()
+
+
+def process_source_speakers(config, root):
+    from conference import (classify_speakers, classify_speaker_genders,
+                            recognise_parliament_speakers)
+    for number, item in enumerate(config['sources'], 1):
+        sid = f'source_{number:02d}'
+        if source_type(item) == 'article':
+            print(f'[{sid}] 文章保留原文，跳过说话人处理', flush=True)
+            continue
+        paths = ProjectPaths(root / 'sources' / sid)
+        for name, action in [('speakers', classify_speakers),
+                             ('gender', classify_speaker_genders),
+                             ('recognise', recognise_parliament_speakers)]:
+            marker = paths.root / f'.{name}.done'
+            if marker.exists():
+                print(f'[{sid}] {name} 已完成，复用结果', flush=True)
+                continue
+            print(f'[{sid}] {name}', flush=True)
+            action(paths)
+            marker.touch()
+
+
+def section_sources(config, root):
+    from conference import segment_parliament_content
+    from experiments.news_commentary.article_sections import segment_article_content
+    for number, item in enumerate(config['sources'], 1):
+        sid = f'source_{number:02d}'
+        paths = ProjectPaths(root / 'sources' / sid)
+        marker = paths.root / '.summary.done'
+        if marker.exists():
+            print(f'[{sid}] summary 已完成，复用分段结果', flush=True)
+            continue
+        print(f'[{sid}] section ({source_type(item)})', flush=True)
+        if source_type(item) == 'article':
+            segment_article_content(paths)
+        else:
+            segment_parliament_content(paths)
+        marker.touch()
+
+
 def prepare_sources(config, root):
-    from conference import (ParliamentVideoPipeline, merge_english_subtitles_before_diarization,
-        classify_speakers, classify_speaker_genders, recognise_parliament_speakers,
-        segment_parliament_content, transcribe_parliament_english_subtitles)
+    for action in (download_sources, transcribe_sources, merge_sources,
+                   process_source_speakers, section_sources):
+        action(config, root)
+        from experiments.news_commentary.costs import summarize
+        summarize(root)
+    build_source_catalog(config, root)
+
+
+def build_source_catalog(config, root):
     catalog = []
     for number, item in enumerate(config['sources'], 1):
         sid = f'source_{number:02d}'
         paths = ProjectPaths(root / 'sources' / sid)
-        # Stage markers are written only after successful completion; failed stages retry.
-        def stage(name, action):
-            marker = paths.root / f'.{name}.done'
-            if not marker.exists():
-                print(f'[{sid}] {name}', flush=True)
-                action()
-                marker.touch()
-                from experiments.news_commentary.costs import summarize
-                summarize(root)
-        stage('download', lambda: ParliamentVideoPipeline(paths).download_sources_and_captions(
-            item['url'], config.get('title', '新闻评论'), item.get('title')))
-        stage('transcribe', lambda: transcribe_parliament_english_subtitles(paths))
-        stage('merge', lambda: merge_english_subtitles_before_diarization(paths))
-        stage('speakers', lambda: classify_speakers(paths))
-        stage('gender', lambda: classify_speaker_genders(paths))
-        stage('recognise', lambda: recognise_parliament_speakers(paths))
-        stage('summary', lambda: segment_parliament_content(paths))
-        catalog.append({'source_id': sid, 'url': item['url'], 'workspace': str(paths.root),
-                        'context': read_json(paths.media)['main'].get('source_context', {}),
-                        'paragraphs': read_json(paths.root / 'content_segments.json')['segments'],
-                        'utterances': read_json(paths.subtitles['json'])['utterances']})
+        sections = read_json(paths.root / 'content_segments.json')
+        kind = source_type(item)
+        source = {'source_id': sid, 'source_type': kind, 'url': item['url'],
+                  'workspace': str(paths.root), 'paragraphs': sections['segments']}
+        if kind == 'article':
+            article = read_json(paths.root / 'article.json')
+            source['context'] = {k: v for k, v in article.items() if k != 'content'}
+            source['publisher'] = article.get('publisher', '')
+            source['article_paragraphs'] = sections['paragraphs']
+        else:
+            source['context'] = read_json(paths.media)['main'].get('source_context', {})
+            source['publisher'] = item.get('publisher') or source['context'].get('channel', '')
+            source['utterances'] = read_json(paths.subtitles['json'])['utterances']
+        catalog.append(source)
     save(catalog, root / 'source_catalog.json')
+    return catalog
+
+
+def prepare_article_quote(segment, source, paths):
+    """Represent an article quote as a translated, evidence-backed narration part."""
+    if source.get('source_type') != 'article' or segment['type'] != 'with_dialogue':
+        return
+    indices = segment['paragraph_indices']
+    original = '\n\n'.join(source['article_paragraphs'][i]['text'] for i in indices)
+    result = ChatGPT(usage_report_path=paths.llm_cost_report).translate_subtitles(
+        [{'index': 0, 'text': original}])
+    translations = result.get('translations', [])
+    if (len(translations) != 1 or translations[0].get('index') != 0
+            or not isinstance(translations[0].get('text'), str)
+            or not translations[0]['text'].strip()):
+        raise ValueError('文章引用翻译缺少有效中文文本')
+    parts = segment.setdefault('narration_parts', [{'kind': 'bridge', 'text': segment['narration']}])
+    parts.append({'kind': 'paraphrase', 'role': 'article_quote',
+                  'text': translations[0]['text'].strip(), 'original_text': original,
+                  'evidence': [{'source_id': source['source_id'], 'paragraph_indices': indices}]})
+    segment.update(type='narration_only', original_type='with_dialogue', original_text=original,
+                   narration=''.join(part['text'] for part in parts))
+
+
+def generate_audio(root):
+    from conference import translate_commentary_dialogue
+    from experiments.news_commentary.part_tts import generate_part_tts
+    catalog = {s['source_id']: s for s in read_json(root / 'source_catalog.json')}
+    plan = read_json(root / 'commentary_plan.json')
+    for segment in plan['segments']:
+        source = catalog[segment['source_id']]
+        paths = ProjectPaths(root / 'render_segments' / f"{segment['segment_id']:02d}")
+        prepare_article_quote(segment, source, paths)
+        save(plan, root / 'commentary_plan.json')
+        inputs = {k: segment.get(k) for k in ('source_id', 'type', 'narration',
+            'audience_question', 'dialogue_subtitle_indices', 'paragraph_indices', 'original_text')}
+        inputs['narration_parts'] = [{k: p.get(k) for k in ('kind', 'role', 'text', 'evidence')}
+                                     for p in segment.get('narration_parts', [])]
+        inputs['tts_mode'] = 'parts_v2_article_quote_female'
+        completed = paths.root / 'audio_completed_input.json'
+        if completed.exists() and read_json(completed) == inputs:
+            segment.update(read_json(paths.root / 'commentary_plan.json')['segments'][0])
+            print(f"段落 {segment['segment_id']} 复用已完成配音", flush=True)
+            continue
+        print(f"段落 {segment['segment_id']} 翻译与配音 ({source.get('source_type', 'video')})", flush=True)
+        save({'title': plan['title'], 'segments': [segment]}, paths.root / 'commentary_plan.json')
+        if source.get('source_type') == 'article':
+            save({'main': {'source_context': source['context']}}, paths.media)
+            save([], paths.root / 'dialogue_dubbing.json')
+        else:
+            src = ProjectPaths(source['workspace'])
+            shutil.copy2(src.subtitles['json'], paths.subtitles['json'])
+            shutil.copy2(src.media, paths.media)
+            old = read_json(completed) if completed.exists() else {}
+            reuse_dialogue = (old.get('source_id') == inputs['source_id'] and
+                              old.get('dialogue_subtitle_indices') == inputs['dialogue_subtitle_indices'] and
+                              (paths.root / 'dialogue_dubbing.json').exists())
+            if not reuse_dialogue:
+                translate_commentary_dialogue(paths)
+        generate_part_tts(paths)
+        segment.update(read_json(paths.root / 'commentary_plan.json')['segments'][0])
+        save(inputs, completed)
+        save(plan, root / 'commentary_plan.json')
+    save(plan, root / 'commentary_plan.json')
 
 
 def produce(root, config):
-    from conference import translate_commentary_dialogue, generate_commentary_tts
     from conference import crossfade_preview_clips
     from experiments.news_commentary.render import render_segment
     catalog = {s['source_id']: s for s in read_json(root / 'source_catalog.json')}
+    plan = read_json(root / 'commentary_plan.json')
+    if any(catalog[s['source_id']].get('source_type') == 'article' for s in plan['segments']):
+        raise ValueError('文章画面渲染尚未接入；可先运行 --step audio')
+    generate_audio(root)
     plan = read_json(root / 'commentary_plan.json')
     output_dir = root / 'commentary_preview_segments'
     output_dir.mkdir(exist_ok=True)
@@ -128,8 +336,6 @@ def produce(root, config):
         shutil.copy2(src.subtitles['json'], paths.subtitles['json'])
         shutil.copy2(src.media, paths.media)
         save({'title': plan['title'], 'segments': [segment]}, paths.root / 'commentary_plan.json')
-        translate_commentary_dialogue(paths)
-        generate_commentary_tts(paths)
         render_segment(paths)
         rendered = read_json(paths.root / 'commentary_plan.json')['segments'][0]
         segment.update(rendered)
@@ -145,7 +351,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--tasks', required=True, type=Path)
     parser.add_argument('--workspace', required=True, type=Path)
-    parser.add_argument('--step', choices=['all', 'prepare', 'plan', 'produce', 'final', 'upload'], default='all')
+    parser.add_argument('--step', choices=['all', 'download', 'transcribe', 'merge', 'speakers', 'section', 'prepare', 'plan', 'audio', 'paraphrase', 'produce', 'final', 'upload'], default='all')
     parser.add_argument('--upload', action='store_true', help='Upload after an all run')
     args = parser.parse_args()
     config = read_json(args.tasks)
@@ -163,19 +369,37 @@ def main():
     save(config, saved_config)
     if not paths.media.exists():
         save({'sources': config['sources'], 'main': {'task_title': config.get('title', '新闻评论')}}, paths.media)
+    if args.step == 'download':
+        download_sources(config, root)
+    if args.step == 'transcribe':
+        transcribe_sources(config, root)
+    if args.step == 'merge':
+        merge_sources(config, root)
+    if args.step == 'speakers':
+        process_source_speakers(config, root)
+    if args.step == 'section':
+        section_sources(config, root)
     if args.step in ('all', 'prepare'):
         prepare_sources(config, root)
     if args.step in ('all', 'plan'):
-        catalog = read_json(root / 'source_catalog.json')
+        catalog = build_source_catalog(config, root)
         result = Planner(usage_report_path=paths.llm_cost_report).plan_parliament_commentary(
             catalog, config.get('angle', ''), config.get('广告', ''))
         save(result, root / 'commentary_plan_raw.json')
         save(validate_plan(result, catalog, config.get('广告', '')), root / 'commentary_plan.json')
+    if args.step in ('all', 'audio'):
+        generate_audio(root)
+    if args.step in ('all', 'paraphrase'):
+        from experiments.news_commentary.paraphrase_video import prepare_paraphrase_videos
+        prepare_paraphrase_videos(root)
+        from experiments.news_commentary.layout import build_layout_timeline
+        build_layout_timeline(root)
     if args.step in ('all', 'produce'):
-        produce(root, config)
+        from experiments.news_commentary.mixed_render import produce_mixed
+        produce_mixed(root)
     if args.step in ('all', 'final'):
-        from conference import create_commentary_short_video
-        create_commentary_short_video(paths)
+        from experiments.news_commentary.mixed_render import final_mixed
+        final_mixed(root)
     if args.step == 'upload' or (args.step == 'all' and args.upload):
         from conference import upload_commentary_short_video
         upload_commentary_short_video(paths)
