@@ -191,7 +191,7 @@ def render_avatar_layout(news_path, output_path, events, avatar_path=AVATAR, *,
     avatar=decoder(avatar_path,(WIDTH,HEIGHT),True)
     news=decoder(news_path,news_size)
     log_path=output_path.with_suffix('.log')
-    with log_path.open('w') as log:
+    with log_path.open('w', encoding='utf-8') as log:
         encoder=subprocess.Popen(['ffmpeg','-v','error','-y','-f','rawvideo','-pix_fmt','rgb24',
             '-s',f'{WIDTH}x{HEIGHT}','-r',str(FPS),'-i','pipe:0','-i',str(news_path),
             '-map','0:v','-map','1:a:0','-t',str(duration),'-c:v','libx264','-preset','fast',

@@ -37,7 +37,7 @@ def render_landscape_layout(news_path, output_path, events, avatar_path=DEFAULT_
     position = (width-inset[0]-margin, height-inset[1]-margin)
     processes = []
     log_path = output_path.with_suffix('.log')
-    with log_path.open('w') as log:
+    with log_path.open('w', encoding='utf-8') as log:
         def decoder(path, loop=False):
             args = ['ffmpeg', '-v', 'error']
             if loop:
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--avatar', type=Path, default=DEFAULT_AVATAR)
     args = parser.parse_args()
-    timeline = json.loads(args.timeline.read_text())
+    timeline = json.loads(args.timeline.read_text(encoding='utf-8'))
     render_landscape_layout(args.news, args.output, timeline['events'], args.avatar,
         transition_seconds=timeline.get('config', {}).get('transition_seconds', .5))
 
@@ -175,7 +175,7 @@ def burn_landscape_subtitles(layout_path, ass_path, output_path):
             ), encoding='utf-8')
         else:
             filters = '[0:v]ass=filename=captions.ass:fontsdir=fonts[v]'
-        (folder/'filters.txt').write_text(filters)
+        (folder/'filters.txt').write_text(filters, encoding='utf-8')
         subprocess.run(['ffmpeg','-v','error','-y','-i',str(Path(layout_path).resolve()),
             '-filter_complex_script','filters.txt','-map','[v]','-map','0:a:0?',
             '-c:v','libx264','-preset','fast','-crf','20','-pix_fmt','yuv420p',

@@ -91,7 +91,7 @@ def prepare_paraphrase_videos(root):
                     clips.append(clip)
                     cursor+=duration
                 listing=folder/'concat.txt'
-                listing.write_text(''.join(f"file '{p.name}'\n" for p in clips))
+                listing.write_text(''.join(f"file '{p.name}'\n" for p in clips), encoding='utf-8')
                 # Keep the original part audio once, avoiding accumulated AAC joins.
                 run(['-f','concat','-safe',0,'-i',listing,'-i',audio,'-map','0:v','-map','1:a',
                      '-c:v','copy','-c:a','aac','-t',seconds,'-movflags','+faststart',output])

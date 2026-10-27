@@ -49,7 +49,8 @@ def fetch_news(body, log=lambda message: None):
                 rows=fetch_nsw_news(url,days,log=log)
                 output=Path('work/news_comment_ui/nsw_articles');output.mkdir(parents=True,exist_ok=True)
                 for row in rows:
-                    (output/(row['video_id']+'.json')).write_text(json.dumps(row,ensure_ascii=False,indent=2))
+                    (output/(row['video_id']+'.json')).write_text(
+                        json.dumps(row, ensure_ascii=False, indent=2), encoding='utf-8')
             elif source['module']=='afr':
                 if urlparse(url).hostname not in ('afr.com','www.afr.com'):raise ValueError('AFR 模组需要 AFR 栏目网址')
                 rows=article_candidates(fetch_afr_news(url),days,topic=body['topic'],source_name=name)

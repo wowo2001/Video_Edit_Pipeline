@@ -25,7 +25,7 @@ def ensure_running():
         return URL
     log_path = ROOT / 'work/news_comment_ui/server.log'
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    with log_path.open('a') as log:
+    with log_path.open('a', encoding='utf-8') as log:
         process = subprocess.Popen(
             [sys.executable, '-u', str(ROOT/'experiments/news_commentary/ui_demo/server.py')],
             cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,

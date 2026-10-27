@@ -77,8 +77,12 @@ def fetch_nsw_news(url=DEFAULT_URL, days=30, *, include_content=True, now=None, 
                 if not hits:
                     if offset<total:raise RuntimeError('NSW 分页提前结束')
                     break
+                duplicate = False
                 for hit in hits:
-                    if hit['_id'] in seen:raise RuntimeError('NSW 分页重复，无法保证结果完整')
+                    if hit['_id'] in seen:
+                        log('NSW 分页重复，停止继续翻页并返回已抓取的部分结果')
+                        duplicate = True
+                        break
                     seen.add(hit['_id']);src=hit['_source']
                     def first(key,default=''):
                         value=src.get(key,default)
@@ -91,6 +95,8 @@ def fetch_nsw_news(url=DEFAULT_URL, days=30, *, include_content=True, now=None, 
                         'source_type':'article','publisher':'NSW Government','channel_name':'NSW Government',
                         'title':first('title'),'url':link,'published_at':datetime.combine(date,datetime.min.time(),TZ).isoformat(),
                         'content':''}
+                if duplicate:
+                    break
                 offset+=len(hits);log(f'NSW 列表已读取 {offset}/{total} 条')
                 if offset>=total:break
             rows=list(items.values())
@@ -110,5 +116,5 @@ if __name__=='__main__':
     parser.add_argument('--output',type=Path,required=True)
     args=parser.parse_args();rows=fetch_nsw_news(args.url,args.days)
     args.output.parent.mkdir(parents=True,exist_ok=True)
-    args.output.write_text(json.dumps(rows,ensure_ascii=False,indent=2)+'\n')
+    args.output.write_text(json.dumps(rows,ensure_ascii=False,indent=2)+'\n', encoding='utf-8')
     print(f'完成：{len(rows)} 篇，保存至 {args.output}')

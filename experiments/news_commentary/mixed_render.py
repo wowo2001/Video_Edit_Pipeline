@@ -59,7 +59,7 @@ def produce_mixed(root):
     combined=audio_parts[0]
     for item in audio_parts[1:]:combined+=item
     combined.export(directory/'body.wav',format='wav')
-    (directory/'concat.txt').write_text(''.join(f"file '{p.name}'\n" for p in clips))
+    (directory/'concat.txt').write_text(''.join(f"file '{p.name}'\n" for p in clips), encoding='utf-8')
     run(['-f','concat','-safe',0,'-i',directory/'concat.txt','-i',directory/'body.wav',
          '-map','0:v','-map','1:a','-c:v','copy','-c:a','aac','-t',cursor,'-movflags','+faststart',root/'commentary_preview_horizontal.mp4'])
     write_json(subtitles,root/'part_subtitle_events.json',ensure_ascii=False,indent=2)

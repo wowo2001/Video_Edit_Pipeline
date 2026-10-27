@@ -86,7 +86,7 @@ class Handler(SimpleHTTPRequestHandler):
                 task_path=job/'commentary_tasks.json';task_path.write_text(json.dumps(task,ensure_ascii=False,indent=2), encoding='utf-8')
                 command=[sys.executable,'-u','-m','experiments.news_commentary.pipeline','--tasks',str(task_path.resolve()),'--workspace',str((job/'workspace').resolve())]
                 if body.get('upload'):command.append('--upload')
-                with (job/'commentary.log').open('w') as output:
+                with (job/'commentary.log').open('w', encoding='utf-8') as output:
                     process=subprocess.Popen(command,stdout=output,stderr=subprocess.STDOUT,start_new_session=True,
                         env={**os.environ,'PATH':str(Path(sys.executable).parent)+os.pathsep+os.environ.get('PATH','')})
                 RUNS[job.name]={'process':process,'path':job/'commentary.log'}
