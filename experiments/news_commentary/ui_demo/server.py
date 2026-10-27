@@ -53,7 +53,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(200 if job else 404, job or {'error':'任务不存在'})
         if self.path == '/api/sources':
             with LOCK:
-                self.reply(200, json.loads(CONFIG.read_text()))
+                self.reply(200, json.loads(CONFIG.read_text(encoding='utf-8')))
         else:
             super().do_GET()
 
@@ -83,7 +83,7 @@ class Handler(SimpleHTTPRequestHandler):
                 job.mkdir(parents=True)
                 task={'title':body.get('title') or '新闻评论','angle':body.get('angle',''),'广告':body.get('advertisement',''),
                       'sources':[{'url':r['url'],'title':r['title'],'source_type':r['type'],'publisher':r['publisher']} for r in items]}
-                task_path=job/'commentary_tasks.json';task_path.write_text(json.dumps(task,ensure_ascii=False,indent=2))
+                task_path=job/'commentary_tasks.json';task_path.write_text(json.dumps(task,ensure_ascii=False,indent=2), encoding='utf-8')
                 command=[sys.executable,'-u','-m','experiments.news_commentary.pipeline','--tasks',str(task_path.resolve()),'--workspace',str((job/'workspace').resolve())]
                 if body.get('upload'):command.append('--upload')
                 with (job/'commentary.log').open('w') as output:
@@ -104,10 +104,10 @@ class Handler(SimpleHTTPRequestHandler):
                 if not 1 <= source['days'] <= 30:
                     raise ValueError('时间范围必须为1至30天')
             with LOCK:
-                data = json.loads(CONFIG.read_text())
+                data = json.loads(CONFIG.read_text(encoding='utf-8'))
                 data[topic] = sources
                 temporary = CONFIG.with_suffix('.tmp')
-                temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2)+'\n')
+                temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
                 os.replace(temporary, CONFIG)
             self.reply(200, {'saved': True})
         except (ValueError, TypeError) as error:

@@ -20,4 +20,9 @@ if not defined OPENAI_API_KEY (
 
 set "PYTHONIOENCODING=utf-8"
 cd /d "%~dp0"
+
+rem The Streamlit page embeds the commentary workbench from port 8510.
+rem Start (or reuse) that local backend before launching the UI.
+start "News Commentary Backend" /b "%~dp0.venv\Scripts\python.exe" -m services.news_comment_server
+timeout /t 1 /nobreak >nul
 "%~dp0.venv\Scripts\python.exe" -m streamlit run "%~dp0news_ui.py"
