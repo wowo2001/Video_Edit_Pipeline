@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[2]
 def render_typewriter(text, audio, output, background=None, fps=30, *, publisher):
     background = background or ROOT / 'assets/afr_typewriter_background_blurred.png'
     font_path = str(ROOT / 'assets/fonts/SmileySans-Oblique.otf')
-    font = ImageFont.truetype(font_path, 40)
-    source_font = ImageFont.truetype(font_path, 48)
+    font = ImageFont.truetype(font_path, 50)
+    source_font = ImageFont.truetype(font_path, 58)
     duration = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries',
         'format=duration', '-of', 'default=nw=1:nk=1', str(audio)], text=True))
     if not text.strip() or duration <= 0:
@@ -32,7 +32,9 @@ def render_typewriter(text, audio, output, background=None, fps=30, *, publisher
                 line = candidate
         if line:
             lines.append(line)
-    page_count = math.ceil(len(lines)/7)
+    line_height = 67
+    # Reserve the last row for the larger publisher credit.
+    page_count = math.ceil(len(lines)/6)
     per_page = math.ceil(len(lines)/page_count)
     pages = [lines[i:i+per_page] for i in range(0, len(lines), per_page)]
     weights = [sum(map(len, page)) for page in pages]
@@ -58,12 +60,12 @@ def render_typewriter(text, audio, output, background=None, fps=30, *, publisher
             image = base.copy()
             draw = ImageDraw.Draw(image)
             for line_number, line in enumerate(pages[index]):
-                draw.text((100,146+57*line_number),line[:max(0,remaining)],font=font,fill='#30343B')
+                draw.text((100,146+line_height*line_number),line[:max(0,remaining)],font=font,fill='#30343B')
                 remaining -= len(line)
                 if remaining<0:
                     break
             if index == len(pages)-1 and remaining >= 0 and publisher:
-                draw.text((100, 146+57*len(pages[index])+14), '--'+publisher,
+                draw.text((100, 146+line_height*len(pages[index])+14), '--'+publisher,
                           font=source_font, fill='#FFD400', stroke_width=1, stroke_fill='#343434')
             process.stdin.write(image.tobytes())
     finally:

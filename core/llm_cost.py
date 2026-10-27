@@ -10,6 +10,8 @@ from core.utils import read_json, write_json
 # Values are currency units per one million tokens.
 MODEL_PRICING = {
     "openai": {
+        "gpt-6-luna": {"currency": "USD", "input": 0.1, "cached_input": 0.01, "output": 0.5},
+        "gpt-6.1-sol": {"currency": "USD", "input": 2.0, "cached_input": 0.1, "output": 10.0},
         "gpt-5.6-sol": {"currency": "USD", "input": 5.0, "cached_input": 0.5, "output": 30.0},
         "gpt-5.6-terra": {"currency": "USD", "input": 2.0, "cached_input": 0.2, "output": 12.0},
         "gpt-5.6-luna": {"currency": "USD", "input": 0.2, "cached_input": 0.02, "output": 1.2},

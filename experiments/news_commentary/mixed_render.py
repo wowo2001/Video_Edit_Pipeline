@@ -115,7 +115,7 @@ WrapStyle: 2
 ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Smiley Sans Oblique,72,&H005AD3FF,&H005AD3FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,1,2,80,480,184,1
+Style: Default,Smiley Sans Oblique,72,&H005AD3FF,&H005AD3FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,1,8,80,480,824,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 '''

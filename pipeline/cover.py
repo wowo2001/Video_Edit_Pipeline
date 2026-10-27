@@ -105,10 +105,13 @@ def create_landscape_cover(title, output_path,
                     breaks = [i+1 for i in range(end) if remaining[i] in '，：；。！？、,;:!? ']
                     if breaks and breaks[-1] >= end * .55:
                         end = breaks[-1]
+                # Keep closing punctuation on this line, even just beyond the width limit.
+                while end < len(remaining) and remaining[end] in '，：；。！？、,;:!?）》】」』”’…':
+                    end += 1
                 lines.append(remaining[:end])
                 remaining = remaining[end:]
         heights = [draw.textbbox((0, 0), line, font=font)[3] - draw.textbbox((0, 0), line, font=font)[1] for line in lines]
-        if len(lines) <= 3 and sum(heights) + 30 * (len(lines)-1) <= 620:
+        if sum(heights) + 30 * (len(lines)-1) <= 620:
             break
     y = (1080 - sum(heights) - 30 * (len(lines)-1)) // 2
     for index, (line, height) in enumerate(zip(lines, heights)):

@@ -4,45 +4,122 @@
       "module": "youtube",
       "url": "https://www.youtube.com/@ABCNewsAustralia",
       "label": "ABC News Australia",
-      "enabled": true
+      "enabled": true,
+      "days": 3
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@7news",
       "label": "7NEWS",
-      "enabled": true
+      "enabled": true,
+      "days": 3
     },
     {
       "module": "afr",
       "url": "https://www.afr.com/property/residential",
       "label": "AFR · Property",
-      "enabled": true
+      "enabled": true,
+      "days": 10
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@9NewsAUS",
       "label": "9 News Australia",
-      "enabled": true
+      "enabled": true,
+      "days": 3
     },
     {
       "module": "afr",
       "url": "https://www.afr.com/property/commercial",
       "label": "AFR · Property",
-      "enabled": true
+      "enabled": true,
+      "days": 10
     },
     {
       "module": "nsw_gov",
       "url": "https://www.nsw.gov.au/departments-and-agencies/fair-trading/news",
       "label": "NSW Fair Trading",
-      "enabled": true
+      "enabled": true,
+      "days": 30
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@Cotality_AU/videos",
+      "label": "CoreLogic",
+      "enabled": true,
+      "days": 30
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/the-afr-view",
+      "label": "AFR · View",
+      "enabled": true,
+      "days": 30
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/playlist?list=PLECacouYcyPsf8T7pOrM7c0x1ChV_BPy4",
+      "label": "Rask",
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@60MinutesAU",
+      "label": "60 Minutes",
+      "enabled": true,
+      "days": 3
     }
   ],
   "移民": [
     {
+      "module": "home_affairs_minister",
+      "url": "https://minister.homeaffairs.gov.au/ministers-for-home-affairs/the-hon-tony-burke-mp",
+      "label": "Home Affairs · Tony Burke",
+      "enabled": true,
+      "days": 30
+    },
+    {
       "module": "youtube",
       "url": "https://www.youtube.com/@SBSAustralia",
       "label": "SBS Australia",
-      "enabled": true
+      "enabled": true,
+      "days": 5
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@ABCNewsAustralia",
+      "label": "ABC News",
+      "enabled": true,
+      "days": 5
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@9NewsAUS",
+      "label": "9 News",
+      "enabled": true,
+      "days": 5
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@7news",
+      "label": "7 News",
+      "enabled": true,
+      "days": 5
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/the-afr-view",
+      "label": "AFR · View",
+      "enabled": true,
+      "days": 15
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@60MinutesAU",
+      "label": "60 Minutes",
+      "enabled": true,
+      "days": 3
     }
   ],
   "税务": [
@@ -73,6 +150,13 @@
       "label": "7NEWS",
       "enabled": true,
       "days": 3
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/the-afr-view",
+      "label": "AFR · View",
+      "enabled": true,
+      "days": 3
     }
   ],
   "经济": [
@@ -81,33 +165,47 @@
       "url": "https://www.afr.com/policy",
       "label": "AFR · Policy",
       "enabled": true,
-      "days": 3
+      "days": 15
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@ABCNewsAustralia",
       "label": "ABC News",
       "enabled": true,
-      "days": 3
+      "days": 5
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@9NewsAUS",
       "label": "9 News Australia",
       "enabled": true,
-      "days": 3
+      "days": 5
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@7news",
       "label": "7NEWS",
       "enabled": true,
-      "days": 3
+      "days": 5
     },
     {
       "module": "nsw_gov",
       "url": "https://www.nsw.gov.au/ministerial-releases",
       "label": "NSW Media Release",
+      "enabled": true,
+      "days": 15
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/the-afr-view",
+      "label": "AFR · View",
+      "enabled": true,
+      "days": 15
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@60MinutesAU",
+      "label": "60 Minutes",
       "enabled": true,
       "days": 3
     }
@@ -118,40 +216,61 @@
       "url": "https://www.youtube.com/@ABCNewsAustralia",
       "label": "ABC News",
       "enabled": true,
-      "days": 3
+      "days": 5
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@9NewsAUS",
       "label": "9 News Australia",
       "enabled": true,
-      "days": 3
+      "days": 5
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@7news",
       "label": "7NEWS",
       "enabled": true,
-      "days": 3
+      "days": 5
     },
     {
       "module": "afr",
       "url": "https://www.afr.com/work-and-careers/workplace",
       "label": "AFR · Workplace",
       "enabled": true,
-      "days": 3
+      "days": 15
     },
     {
       "module": "afr",
       "url": "https://www.afr.com/work-and-careers/careers",
       "label": "AFR · Career",
       "enabled": true,
-      "days": 3
+      "days": 16
     },
     {
       "module": "nsw_gov",
       "url": "https://www.nsw.gov.au/ministerial-releases",
       "label": "NSW Media Release",
+      "enabled": true,
+      "days": 15
+    },
+    {
+      "module": "fair_work",
+      "url": "https://www.fairwork.gov.au/newsroom/media-releases",
+      "label": "Fair Work",
+      "enabled": true,
+      "days": 30
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/the-afr-view",
+      "label": "AFR · View",
+      "enabled": true,
+      "days": 15
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@60MinutesAU",
+      "label": "60 Minutes",
       "enabled": true,
       "days": 3
     }

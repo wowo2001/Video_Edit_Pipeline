@@ -38,6 +38,12 @@ def fetch_news(body, log=lambda message: None):
                 config={'name':name,'channel_ref':url,'playlist_id':playlist,'live_streams_only':parsed.path.endswith(('/streams','/live'))}
                 rows=client.recent_videos(config,days);client.add_video_durations(rows)
                 for row in rows:row['source_type']='video'
+            elif source['module']=='fair_work':
+                from services.fair_work import fetch_fair_work_news
+                rows=fetch_fair_work_news(url,days,log=log)
+            elif source['module']=='home_affairs_minister':
+                from services.home_affairs_minister import fetch_home_affairs_news
+                rows=fetch_home_affairs_news(url,days,log=log)
             elif source['module']=='nsw_gov':
                 from services.nsw_gov import fetch_nsw_news
                 rows=fetch_nsw_news(url,days,log=log)

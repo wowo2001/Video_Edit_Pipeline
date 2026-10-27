@@ -18,7 +18,12 @@ def save(value, path):
 
 
 class Planner(ChatGPT):
-    # Reuse the conference model routing/cost accounting, with an independent prompt.
+    # Keep commentary planning independent of the shared conference routing.
+    def __init__(self, usage_report_path=None):
+        super().__init__(usage_report_path=usage_report_path)
+        self.config = {**self.config, 'models': {
+            **self.config['models'], 'plan_parliament_commentary': 'gpt-6.1-sol'}}
+
     def plan_parliament_commentary(self, catalog, angle='', advertisement=''):
         return safe_json_parse(self._complete(build_prompt(catalog, angle, advertisement)))
 
@@ -105,7 +110,8 @@ def validate_plan(plan, catalog, advertisement=''):
 
 def source_type(item):
     return item.get('source_type') or ('article' if urlparse(item['url']).hostname in
-                                     ('afr.com', 'www.afr.com') else 'video')
+                                     ('afr.com', 'www.afr.com', 'www.nsw.gov.au', 'www.fairwork.gov.au',
+                                      'minister.homeaffairs.gov.au') else 'video')
 
 
 def download_sources(config, root):
@@ -123,9 +129,15 @@ def download_sources(config, root):
                 if host in ('afr.com', 'www.afr.com'):
                     from services.afr_article import fetch_afr_article
                     content = fetch_afr_article(item['url'])
+                elif host == 'www.fairwork.gov.au':
+                    from services.fair_work import fetch_fair_work_article
+                    content = fetch_fair_work_article(item['url'])
                 elif host == 'www.nsw.gov.au':
                     from services.nsw_gov import fetch_nsw_article
                     content = fetch_nsw_article(item['url'])
+                elif host == 'minister.homeaffairs.gov.au':
+                    from services.home_affairs_minister import fetch_home_affairs_article
+                    content = fetch_home_affairs_article(item['url'])
                 else:
                     raise ValueError('该文章来源尚未接入下载模块')
                 (paths.root / 'article.txt').write_text(content, encoding='utf-8')
@@ -180,6 +192,28 @@ def merge_sources(config, root):
         marker.touch()
 
 
+def ensure_video_source_context(paths, item):
+    """Recover missing YouTube context from the selected source's known metadata."""
+    media = read_json(paths.media)
+    main = media['main']
+    if main.get('source_context'):
+        return
+    title = item.get('title') or main.get('task_subtitle')
+    if not title:
+        from conference import record_source_metadata
+        record_source_metadata(paths)
+        return
+    main['source_context'] = {
+        'title': title,
+        'channel': item.get('publisher') or '',
+        'published_at': item.get('published_at'),
+        'webpage_url': item['url'],
+        'metadata_source': 'selected_source',
+    }
+    save(media, paths.media)
+    print('YouTube 元数据缺失，使用选材时已有的标题和来源', flush=True)
+
+
 def process_source_speakers(config, root):
     from conference import (classify_speakers, classify_speaker_genders,
                             recognise_parliament_speakers)
@@ -189,6 +223,7 @@ def process_source_speakers(config, root):
             print(f'[{sid}] 文章保留原文，跳过说话人处理', flush=True)
             continue
         paths = ProjectPaths(root / 'sources' / sid)
+        ensure_video_source_context(paths, item)
         for name, action in [('speakers', classify_speakers),
                              ('gender', classify_speaker_genders),
                              ('recognise', recognise_parliament_speakers)]:

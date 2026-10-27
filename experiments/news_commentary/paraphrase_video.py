@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+from urllib.parse import urlparse
 from core.utils import read_json, write_json
 from experiments.news_commentary.typewriter import render_typewriter, ROOT
 
@@ -39,9 +40,13 @@ def prepare_paraphrase_videos(root):
                        'publisher':source.get('publisher',''), 'url':source['url'],
                        'indices':indices,'text':text}
                 if article:
-                    background = Path(source['context'].get('typewriter_background') or
+                    federal_background = (ROOT/'assets/australian_government_typewriter_background_blurred.png'
+                        if urlparse(ref['url']).hostname == 'minister.homeaffairs.gov.au' else '')
+                    background = Path(source['context'].get('typewriter_background') or federal_background or
                         ({'AFR': ROOT/'assets/afr_typewriter_background_blurred.png',
-                          'NSW Government': ROOT/'assets/nsw_typewriter_background_blurred.png'}.get(ref['publisher'], '')))
+                          'NSW Government': ROOT/'assets/nsw_typewriter_background_blurred.png',
+                          'Fair Work Ombudsman': ROOT/'assets/australian_government_typewriter_background_blurred.png'
+                          }.get(ref['publisher'], '')))
                     if not background.is_file():
                         raise ValueError(f"请配置 {ref['publisher']} 的 typewriter_background")
                     ref.update(background=str(background),background_hash=hashlib.sha256(background.read_bytes()).hexdigest())

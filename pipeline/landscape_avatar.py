@@ -128,9 +128,9 @@ def burn_landscape_subtitles(layout_path, ass_path, output_path):
         shutil.copy2(ass_path, folder/'captions.ass')
         (folder/'fonts').mkdir()
         shutil.copy2(FONT, folder/'fonts'/FONT.name)
-        # Group cue intervals by line count; the bottom edge stays with the ASS baseline.
+        # Group cue intervals by line count and follow the ASS vertical alignment.
         cues = {}
-        font_size, margin_v = 72, 184
+        font_size, margin_v, alignment = 72, 824, 8
         def seconds(value):
             h, m, sec = value.split(':')
             return int(h)*3600 + int(m)*60 + float(sec)
@@ -138,24 +138,41 @@ def burn_landscape_subtitles(layout_path, ass_path, output_path):
             if line.startswith('Style: Default,'):
                 fields = line.split(':', 1)[1].strip().split(',')
                 font_size, margin_v = float(fields[2]), int(fields[21])
+                alignment = int(fields[18])
             elif line.startswith('Dialogue:'):
                 fields = line.split(':', 1)[1].strip().split(',', 9)
                 count = fields[9].count(r'\N') + 1
                 cues.setdefault(count, []).append((seconds(fields[1]), seconds(fields[2])))
         if cues:
-            parts = ['[0:v]split=' + str(len(cues)+1) + '[base]' +
+            commands = []
+            parts = ['[0:v]sendcmd=f=commands.txt,split=' + str(len(cues)+1) + '[base]' +
                      ''.join(f'[crop{i}]' for i in range(len(cues))) + ';']
             previous = 'base'
             for i, (count, intervals) in enumerate(sorted(cues.items())):
                 band_height = round(font_size * count + 24)
-                top = 1080 - margin_v - round(font_size * count) - 12
-                enabled = '+'.join(f'gte(t,{start:.3f})*lt(t,{end:.3f})' for start, end in intervals)
+                top = (margin_v - 12 if alignment in (7, 8, 9) else
+                       1080 - margin_v - round(font_size * count) - 12)
+                # Merge touching/overlapping cues so boundaries cannot toggle twice.
+                merged = []
+                for start, end in sorted(intervals):
+                    if end <= start:
+                        continue
+                    if merged and start <= merged[-1][1]:
+                        merged[-1][1] = max(merged[-1][1], end)
+                    else:
+                        merged.append([start, end])
+                for start, end in merged:
+                    commands.append((start, f'overlay@caption{i} enable 1'))
+                    commands.append((end, f'overlay@caption{i} enable 0'))
                 parts.append(f'[crop{i}]crop=1400:{band_height}:60:{top},boxblur=18:2,'
                     f'drawbox=x=0:y=0:w=iw:h=ih:color=black@0.15:t=fill[band{i}];')
-                parts.append(f"[{previous}][band{i}]overlay=60:{top}:enable='{enabled}'[layer{i}];")
+                parts.append(f"[{previous}][band{i}]overlay@caption{i}=60:{top}:enable=0[layer{i}];")
                 previous = f'layer{i}'
             parts.append(f'[{previous}]ass=filename=captions.ass:fontsdir=fonts[v]')
             filters = ''.join(parts)
+            (folder/'commands.txt').write_text(''.join(
+                f'{time:.3f} {command};\n' for time, command in sorted(commands)
+            ), encoding='utf-8')
         else:
             filters = '[0:v]ass=filename=captions.ass:fontsdir=fonts[v]'
         (folder/'filters.txt').write_text(filters)

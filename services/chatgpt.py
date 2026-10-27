@@ -31,22 +31,22 @@ PROVIDERS = {
     "openai": {
         "api_key": OPENAI_API_KEY,
         "models": {
-            "generate_script": "gpt-5.6-luna", "fix_subtitles": "gpt-5.6-luna",
-            "recognise_speaker": "gpt-5.6-terra", "generate_story": "gpt-5.6-terra",
+            "generate_script": "gpt-6-luna", "fix_subtitles": "gpt-6-luna",
+            "recognise_speaker": "gpt-6.1-sol", "generate_story": "gpt-6.1-sol",
             "select_scene": "gpt-5.6-sol",
-            "split_scene_segment": "gpt-5.6-terra", "refine_narration": "gpt-5.6-terra",
-            "generate_hook": "gpt-5.6-luna",
-            "translate_subtitles": "gpt-5.6-terra",
-            "rewrite_australian_news_subtitle": "gpt-5.6-terra",
-            "merge_english_subtitles_before_diarization": "gpt-5.6-terra",
-            "translate_chinese_subtitles": "gpt-5.6-luna",
-            "merge_chinese_subtitles_before_diarization": "gpt-5.6-terra",
-            "recognise_parliament_speakers": "gpt-5.6-terra",
-            "segment_parliament_content": "gpt-5.6-terra",
-            "select_chinese_australia_topic": "gpt-5.6-terra",
-            "plan_parliament_commentary": "gpt-5.6-terra",
-            "screen_news_titles": "gpt-5.6-luna",
-            "plan_translation_advertisement": "gpt-5.6-terra",
+            "split_scene_segment": "gpt-6.1-sol", "refine_narration": "gpt-6.1-sol",
+            "generate_hook": "gpt-6-luna",
+            "translate_subtitles": "gpt-6.1-sol",
+            "rewrite_australian_news_subtitle": "gpt-6.1-sol",
+            "merge_english_subtitles_before_diarization": "gpt-6.1-sol",
+            "translate_chinese_subtitles": "gpt-6-luna",
+            "merge_chinese_subtitles_before_diarization": "gpt-6.1-sol",
+            "recognise_parliament_speakers": "gpt-6.1-sol",
+            "segment_parliament_content": "gpt-6.1-sol",
+            "select_chinese_australia_topic": "gpt-6.1-sol",
+            "plan_parliament_commentary": "gpt-6.1-sol",
+            "screen_news_titles": "gpt-6-luna",
+            "plan_translation_advertisement": "gpt-6.1-sol",
         },
     },
     "ali": {
@@ -210,10 +210,12 @@ class ChatGPT:
     def translate_subtitles(self, subtitles):
         """Translate subtitle text while preserving the caller's ordering."""
         prompt = """Translate each English subtitle into concise, natural Simplified Chinese.
-Keep all person names, place names (including countries, states, cities, and
-suburbs), and company names exactly as written in the source. Do not translate
-or transliterate these names, or add Chinese names in parentheses. Translate
-the surrounding text normally. Apply this rule to both translations and subtitle.
+Keep person names, city and suburb names, other place names, and company names
+exactly as written in the source. Exception: translate country, state, province,
+and territory names into Chinese. Do not translate or transliterate the names
+that must remain in the original language, or add Chinese names in parentheses.
+Translate the surrounding text normally. Apply these rules to both translations
+and subtitle.
 The source is Australian news. Unless the source explicitly identifies another
 country or currency, interpret `dollar`/`dollars` as Australian dollars and
 translate it as `澳元`, not `美元`. Preserve any explicitly stated currency,
