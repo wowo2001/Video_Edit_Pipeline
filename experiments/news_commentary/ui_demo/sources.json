@@ -84,28 +84,28 @@
       "url": "https://www.youtube.com/@SBSAustralia",
       "label": "SBS Australia",
       "enabled": true,
-      "days": 5
+      "days": 3
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@ABCNewsAustralia",
       "label": "ABC News",
       "enabled": true,
-      "days": 5
+      "days": 3
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@9NewsAUS",
       "label": "9 News",
       "enabled": true,
-      "days": 5
+      "days": 3
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@7news",
       "label": "7 News",
       "enabled": true,
-      "days": 5
+      "days": 3
     },
     {
       "module": "afr",
@@ -119,7 +119,7 @@
       "url": "https://www.youtube.com/@60MinutesAU",
       "label": "60 Minutes",
       "enabled": true,
-      "days": 5
+      "days": 3
     }
   ],
   "税务": [
@@ -172,21 +172,21 @@
       "url": "https://www.youtube.com/@ABCNewsAustralia",
       "label": "ABC News",
       "enabled": true,
-      "days": 5
+      "days": 3
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@9NewsAUS",
       "label": "9 News Australia",
       "enabled": true,
-      "days": 5
+      "days": 3
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@7news",
       "label": "7NEWS",
       "enabled": true,
-      "days": 5
+      "days": 3
     },
     {
       "module": "nsw_gov",
@@ -207,7 +207,7 @@
       "url": "https://www.youtube.com/@60MinutesAU",
       "label": "60 Minutes",
       "enabled": true,
-      "days": 5
+      "days": 3
     }
   ],
   "职场": [
@@ -216,21 +216,21 @@
       "url": "https://www.youtube.com/@ABCNewsAustralia",
       "label": "ABC News",
       "enabled": true,
-      "days": 5
+      "days": 3
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@9NewsAUS",
       "label": "9 News Australia",
       "enabled": true,
-      "days": 5
+      "days": 3
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@7news",
       "label": "7NEWS",
       "enabled": true,
-      "days": 5
+      "days": 3
     },
     {
       "module": "afr",

@@ -74,7 +74,8 @@ def final_mixed(root):
     layout=paths.root/'commentary_avatar_layout.mp4'
     body=paths.root/'commentary_body.mp4';final=paths.root/'commentary_news.mp4'
     cover=create_portrait_cover(plan['title'],paths.root/'commentary_cover.png')
-    landscape_cover=create_landscape_cover(plan['title'],paths.root/'commentary_cover_landscape.png')
+    landscape_cover=create_landscape_cover(plan.get('cover_title') or plan['title'],
+                                            paths.root/'commentary_cover_landscape.png')
     render_layout(preview,layout,paths.root)
     write_script_subtitles(read_json(paths.root/'part_subtitle_events.json'),paths.final_subtitles['srt'],
                            paths.root/'final_subtitles.ass',paths.final_subtitles['json'])
@@ -129,7 +130,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     body = root/'commentary_body_landscape.mp4'
     burn_landscape_subtitles(layout, ass, body)
     plan = read_json(root/'commentary_plan.json')
-    cover = create_landscape_cover(plan['title'], root/'commentary_cover_landscape.png')
+    cover = create_landscape_cover(plan.get('cover_title') or plan['title'],
+                                   root/'commentary_cover_landscape.png')
     final = root/'commentary_news_landscape.mp4'
     run(['-loop',1,'-framerate',30,'-i',cover,'-i',body,'-f','lavfi','-i','anullsrc=r=48000:cl=stereo',
         '-filter_complex',
