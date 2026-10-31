@@ -13,7 +13,10 @@ from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, TimeoutError as BrowserTimeout
 
 
-_BODY = 'article [class$="-articleBody"]'
+# AFR currently serves both its standard article template (body under
+# <article>) and a feature template (body under <main>, with no <article>).
+# Keep the suffix match because the class prefix is generated per build.
+_BODY = 'article [class$="-articleBody"], main [class$="-articleBody"]'
 
 
 def _body_text(page):

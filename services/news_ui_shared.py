@@ -91,7 +91,7 @@ QUEUE_ROOT = Path("work/news_ui_queue")
 # 后台可编辑的主题清单：增删此列表即可更新前端复选框。
 TOPIC_OPTIONS = [
     "房产",
-    "移民",
+    "签证",
     "生活",
     "财经",
     "政治",

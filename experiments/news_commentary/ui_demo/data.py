@@ -65,7 +65,11 @@ def fetch_news(body, log=lambda message: None):
             message=f"{source.get('label') or source['url']}：{error}"
             errors.append(message);log("抓取失败："+message)
     items=sorted(result.values(),key=lambda r:r['published_at'],reverse=True)
-    filtered=screen_topic(items,body['topic'],log)
+    if body.get('screen', True):
+        filtered=screen_topic(items,body['topic'],log)
+    else:
+        log(f'只拉取：{body["topic"]}，跳过 Luna 主题筛选，保留 {len(items)} 条报道')
+        filtered=items
     return {'items':filtered,'errors':errors,'fetched_count':len(items),'filtered_count':len(filtered)}
 
 

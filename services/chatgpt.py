@@ -341,8 +341,9 @@ Rules:
 - Return every supplied video_id exactly once.
 - relevant is true only when the title is substantively connected to at least one
   selected topic. Housing, rental, landlord or welfare news has no automatic exemption.
-  For example, if only 移民 is selected, Airbnb rental-rule changes are irrelevant
-  unless the title explicitly connects them to immigration, visas or migration policy.
+  For example, if only 签证 is selected, Airbnb rental-rule changes are irrelevant
+  unless the title explicitly connects them to visa rules, eligibility,
+  applications or visa-holder rights.
 - Set relevant to false for any broad news roundup, bulletin, headlines package,
   news update, or multi-story compilation, even if its title mentions a selected
   topic. Examples include titles such as "news roundup", "top stories", "headlines",

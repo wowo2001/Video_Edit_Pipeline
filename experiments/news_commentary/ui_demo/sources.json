@@ -19,7 +19,7 @@
       "url": "https://www.afr.com/property/residential",
       "label": "AFR · Property",
       "enabled": true,
-      "days": 10
+      "days": 15
     },
     {
       "module": "youtube",
@@ -33,7 +33,7 @@
       "url": "https://www.afr.com/property/commercial",
       "label": "AFR · Property",
       "enabled": true,
-      "days": 10
+      "days": 15
     },
     {
       "module": "nsw_gov",
@@ -54,7 +54,7 @@
       "url": "https://www.afr.com/the-afr-view",
       "label": "AFR · View",
       "enabled": true,
-      "days": 30
+      "days": 16
     },
     {
       "module": "youtube",
@@ -69,9 +69,60 @@
       "label": "60 Minutes",
       "enabled": true,
       "days": 3
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/chanticleer",
+      "label": "AFR View",
+      "enabled": true,
+      "days": 3
     }
   ],
-  "移民": [
+  "生活": [
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@ABCNewsAustralia",
+      "label": "ABC News Australia",
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@7news",
+      "label": "7NEWS",
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@9NewsAUS",
+      "label": "9 News Australia",
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/the-afr-view",
+      "label": "AFR · View",
+      "enabled": true,
+      "days": 16
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@60MinutesAU",
+      "label": "60 Minutes",
+      "enabled": true,
+      "days": 3
+    },
+    {
+      "module": "nsw_gov",
+      "url": "https://www.nsw.gov.au/ministerial-releases",
+      "label": "NSW Media Release",
+      "enabled": true,
+      "days": 3
+    }
+  ],
+  "签证": [
     {
       "module": "home_affairs_minister",
       "url": "https://minister.homeaffairs.gov.au/ministers-for-home-affairs/the-hon-tony-burke-mp",
@@ -120,6 +171,13 @@
       "label": "60 Minutes",
       "enabled": true,
       "days": 3
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/chanticleer",
+      "label": "AFR View",
+      "enabled": true,
+      "days": 15
     }
   ],
   "税务": [
@@ -162,7 +220,7 @@
   "经济": [
     {
       "module": "afr",
-      "url": "https://www.afr.com/policy",
+      "url": "https://www.afr.com/policy/economy",
       "label": "AFR · Policy",
       "enabled": true,
       "days": 15
@@ -208,6 +266,13 @@
       "label": "60 Minutes",
       "enabled": true,
       "days": 3
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/chanticleer",
+      "label": "AFR View",
+      "enabled": true,
+      "days": 15
     }
   ],
   "职场": [

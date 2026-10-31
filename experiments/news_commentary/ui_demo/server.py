@@ -17,7 +17,7 @@ JOBS = {}
 RUNS = {}
 CONFIG = ROOT / 'sources.json'
 LOCK = Lock()
-TOPICS = ('房产', '移民', '税务', '经济', '职场')
+TOPICS = ('房产', '生活', '签证', '税务', '经济', '职场')
 MODULES = ('youtube', 'afr', 'the_australian', 'nsw_gov', 'fair_work',
            'home_affairs_minister')
 
