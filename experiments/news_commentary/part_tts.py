@@ -5,7 +5,6 @@ from pydub import AudioSegment
 from core.utils import read_json, write_json
 from services.volcengine import Volcengine
 from conference import NARRATOR_TTS_VOICE, FEMALE_DIALOGUE_TTS_VOICES
-from pipeline.audio import boost_tts_audio
 
 
 def generate_part_tts(paths):
@@ -17,12 +16,11 @@ def generate_part_tts(paths):
     tts = Volcengine()
 
     def generate(text, voice, label):
-        digest = hashlib.sha256((voice+'\n'+text).encode()).hexdigest()[:16]
+        digest = hashlib.sha256(('original_volume_v1\n'+voice+'\n'+text).encode()).hexdigest()[:16]
         target = directory / f'{label}_{digest}.mp3'
         marker = target.with_suffix('.done')
         if not target.exists() or not marker.exists():
             tts.generate_tts(text, target, speaker=voice)
-            boost_tts_audio(target)
             marker.touch()
         return target
 
@@ -49,15 +47,13 @@ def generate_part_tts(paths):
         segment.update(narration_parts=parts,narration=''.join(p['text'] for p in parts),
                        narration_audio_path=str(target),narration_duration_ms=round(samples/24))
         if segment.get('audience_question'):
-            old = segment.get('audience_question_audio_path')
-            target = Path(old) if old and Path(old).exists() else generate(
+            target = generate(
                 segment['audience_question'],NARRATOR_TTS_VOICE,f'segment_{number:02d}_question')
             segment.update(audience_question_audio_path=str(target),
                            audience_question_duration_ms=len(AudioSegment.from_file(target)))
         if segment['type']=='with_dialogue':
             dub = next(r for r in records if r['segment_id']==number)
-            old = dub.get('audio_path')
-            target = Path(old) if old and Path(old).exists() else generate(
+            target = generate(
                 dub['chinese_text'],dub['voice'],f'segment_{number:02d}_dialogue')
             dub.update(audio_path=str(target),duration_ms=len(AudioSegment.from_file(target)))
             segment['dubbed_dialogue'].update(audio_path=str(target),duration_ms=dub['duration_ms'])

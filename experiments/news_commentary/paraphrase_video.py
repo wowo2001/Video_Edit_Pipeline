@@ -33,8 +33,8 @@ def prepare_paraphrase_videos(root):
             for evidence in part['evidence']:
                 source = catalog[evidence['source_id']]
                 article = source.get('source_type')=='article'
-                rows = source['article_paragraphs'] if article else source['utterances']
-                indices = evidence['paragraph_indices' if article else 'subtitle_indices']
+                rows = source['article_sentences'] if article else source['utterances']
+                indices = evidence['sentence_indices' if article else 'subtitle_indices']
                 text = '\n\n'.join(rows[i]['text'] for i in indices)
                 ref = {'source_id':source['source_id'], 'source_type':source.get('source_type','video'),
                        'publisher':source.get('publisher',''), 'url':source['url'],

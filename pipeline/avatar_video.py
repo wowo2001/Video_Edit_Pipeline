@@ -264,8 +264,8 @@ def burn_avatar_subtitles(layout_path, ass_path, final_path):
     return final_path
 
 
-def prepend_cover(body_path, cover_path, output_path, duration=1.0):
-    """Add a silent cover and boost body audio by 20%; retain sync."""
+def prepend_cover(body_path, cover_path, output_path, duration=1.0, audio_volume=1.2):
+    """Add a silent cover with configurable body audio gain; retain sync."""
     if duration <= 0:
         raise ValueError('封面时长必须大于零')
     if Path(body_path).resolve() == Path(output_path).resolve():
@@ -276,7 +276,7 @@ def prepend_cover(body_path, cover_path, output_path, duration=1.0):
         f'[2:a]atrim=duration={duration},asetpts=PTS-STARTPTS[silence];'
         f'[1:v]setsar=1,fps={FPS},setpts=PTS-STARTPTS,format=yuv420p[body];'
         '[1:a]aresample=48000,aformat=channel_layouts=stereo,'
-        'volume=1.2,alimiter=limit=0.95:level=false:latency=true,asetpts=PTS-STARTPTS[audio];'
+        f'volume={audio_volume},alimiter=limit=0.95:level=false:latency=true,asetpts=PTS-STARTPTS[audio];'
         '[cover][silence][body][audio]concat=n=2:v=1:a=1[v][a]'
     )
     subprocess.run(['ffmpeg','-v','warning','-y','-loop','1','-framerate',str(FPS),

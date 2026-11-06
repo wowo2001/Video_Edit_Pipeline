@@ -52,10 +52,8 @@ def validate_plan(plan, catalog, advertisement=''):
         if source is None or kind not in ('narration_only', 'with_dialogue'):
             raise ValueError(f'段落 {number} 来源或类型无效')
         article = source.get('source_type') == 'article'
-        rows = source['article_paragraphs'] if article else source['utterances']
-        indices = segment.pop('paragraph_indices' if article else 'subtitle_indices', None)
-        if article and indices is None:
-            indices = segment.pop('subtitle_indices', None)
+        rows = source['article_sentences'] if article else source['utterances']
+        indices = segment.pop('sentence_indices' if article else 'subtitle_indices', None)
         indices = expand_indices(indices, len(rows))
         if (not isinstance(indices, list) or not indices or
             any(type(i) is not int or i < 0 or i >= len(rows) for i in indices) or
@@ -81,8 +79,8 @@ def validate_plan(plan, catalog, advertisement=''):
                         origin = sources.get(reference.get('source_id'))
                         if origin is None:
                             raise ValueError(f'段落 {number} 转述来源无效')
-                        field = 'paragraph_indices' if origin.get('source_type') == 'article' else 'subtitle_indices'
-                        rows_count = len(origin.get('article_paragraphs', origin.get('utterances', [])))
+                        field = 'sentence_indices' if origin.get('source_type') == 'article' else 'subtitle_indices'
+                        rows_count = len(origin.get('article_sentences', origin.get('utterances', [])))
                         reference[field] = expand_indices(reference.get(field), rows_count)
             segment['narration'] = ''.join(part['text'] for part in parts)
         if not isinstance(segment.get('narration'), str) or not segment['narration'].strip():
@@ -93,7 +91,7 @@ def validate_plan(plan, catalog, advertisement=''):
         segment['source_type'] = source.get('source_type', 'video')
         segment['publisher'] = source.get('publisher', '')
         if article:
-            segment['paragraph_indices'] = indices
+            segment['sentence_indices'] = indices
             segment['visual_mode'] = 'article_typewriter' if kind == 'with_dialogue' else 'publisher_logo'
             if kind == 'with_dialogue':
                 segment['original_text'] = '\n\n'.join(rows[i]['text'] for i in indices)
@@ -236,27 +234,9 @@ def process_source_speakers(config, root):
             marker.touch()
 
 
-def section_sources(config, root):
-    from conference import segment_parliament_content
-    from experiments.news_commentary.article_sections import segment_article_content
-    for number, item in enumerate(config['sources'], 1):
-        sid = f'source_{number:02d}'
-        paths = ProjectPaths(root / 'sources' / sid)
-        marker = paths.root / '.summary.done'
-        if marker.exists():
-            print(f'[{sid}] summary 已完成，复用分段结果', flush=True)
-            continue
-        print(f'[{sid}] section ({source_type(item)})', flush=True)
-        if source_type(item) == 'article':
-            segment_article_content(paths)
-        else:
-            segment_parliament_content(paths)
-        marker.touch()
-
-
 def prepare_sources(config, root):
     for action in (download_sources, transcribe_sources, merge_sources,
-                   process_source_speakers, section_sources):
+                   process_source_speakers):
         action(config, root)
         from experiments.news_commentary.costs import summarize
         summarize(root)
@@ -264,19 +244,21 @@ def prepare_sources(config, root):
 
 
 def build_source_catalog(config, root):
+    from experiments.news_commentary.article_sentences import split_article_sentences
     catalog = []
     for number, item in enumerate(config['sources'], 1):
         sid = f'source_{number:02d}'
         paths = ProjectPaths(root / 'sources' / sid)
-        sections = read_json(paths.root / 'content_segments.json')
         kind = source_type(item)
         source = {'source_id': sid, 'source_type': kind, 'url': item['url'],
-                  'workspace': str(paths.root), 'paragraphs': sections['segments']}
+                  'workspace': str(paths.root)}
         if kind == 'article':
             article = read_json(paths.root / 'article.json')
             source['context'] = {k: v for k, v in article.items() if k != 'content'}
             source['publisher'] = article.get('publisher', '')
-            source['article_paragraphs'] = sections['paragraphs']
+            source['article_sentences'] = split_article_sentences(article['content'])
+            if not source['article_sentences']:
+                raise ValueError(f'{sid} 文章正文为空')
         else:
             source['context'] = read_json(paths.media)['main'].get('source_context', {})
             source['publisher'] = item.get('publisher') or source['context'].get('channel', '')
@@ -290,8 +272,8 @@ def prepare_article_quote(segment, source, paths):
     """Represent an article quote as a translated, evidence-backed narration part."""
     if source.get('source_type') != 'article' or segment['type'] != 'with_dialogue':
         return
-    indices = segment['paragraph_indices']
-    original = '\n\n'.join(source['article_paragraphs'][i]['text'] for i in indices)
+    indices = segment['sentence_indices']
+    original = '\n\n'.join(source['article_sentences'][i]['text'] for i in indices)
     result = ChatGPT(usage_report_path=paths.llm_cost_report).translate_subtitles(
         [{'index': 0, 'text': original}])
     translations = result.get('translations', [])
@@ -302,7 +284,7 @@ def prepare_article_quote(segment, source, paths):
     parts = segment.setdefault('narration_parts', [{'kind': 'bridge', 'text': segment['narration']}])
     parts.append({'kind': 'paraphrase', 'role': 'article_quote',
                   'text': translations[0]['text'].strip(), 'original_text': original,
-                  'evidence': [{'source_id': source['source_id'], 'paragraph_indices': indices}]})
+                  'evidence': [{'source_id': source['source_id'], 'sentence_indices': indices}]})
     segment.update(type='narration_only', original_type='with_dialogue', original_text=original,
                    narration=''.join(part['text'] for part in parts))
 
@@ -318,10 +300,10 @@ def generate_audio(root):
         prepare_article_quote(segment, source, paths)
         save(plan, root / 'commentary_plan.json')
         inputs = {k: segment.get(k) for k in ('source_id', 'type', 'narration',
-            'audience_question', 'dialogue_subtitle_indices', 'paragraph_indices', 'original_text')}
+            'audience_question', 'dialogue_subtitle_indices', 'sentence_indices', 'original_text')}
         inputs['narration_parts'] = [{k: p.get(k) for k in ('kind', 'role', 'text', 'evidence')}
                                      for p in segment.get('narration_parts', [])]
-        inputs['tts_mode'] = 'parts_v2_article_quote_female'
+        inputs['tts_mode'] = 'parts_v3_original_volume'
         completed = paths.root / 'audio_completed_input.json'
         if completed.exists() and read_json(completed) == inputs:
             segment.update(read_json(paths.root / 'commentary_plan.json')['segments'][0])
@@ -387,7 +369,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--tasks', required=True, type=Path)
     parser.add_argument('--workspace', required=True, type=Path)
-    parser.add_argument('--step', choices=['all', 'download', 'transcribe', 'merge', 'speakers', 'section', 'prepare', 'plan', 'audio', 'paraphrase', 'produce', 'final', 'final-landscape', 'landscape-layout', 'upload'], default='all')
+    parser.add_argument('--step', choices=['all', 'download', 'transcribe', 'merge', 'speakers', 'prepare', 'plan', 'audio', 'paraphrase', 'produce', 'final', 'final-landscape', 'landscape-layout', 'upload'], default='all')
     parser.add_argument('--upload', action='store_true', help='Upload after an all run')
     args = parser.parse_args()
     config = read_json(args.tasks)
@@ -413,8 +395,6 @@ def main():
         merge_sources(config, root)
     if args.step == 'speakers':
         process_source_speakers(config, root)
-    if args.step == 'section':
-        section_sources(config, root)
     if args.step in ('all', 'prepare'):
         prepare_sources(config, root)
     if args.step in ('all', 'plan'):

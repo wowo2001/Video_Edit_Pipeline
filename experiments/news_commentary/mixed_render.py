@@ -8,6 +8,24 @@ from experiments.news_commentary.paraphrase_video import run
 from experiments.news_commentary.layout import build_layout_timeline
 
 
+def speed_up_final(video):
+    """Speed up a freshly rendered deliverable, including its burned subtitles."""
+    video = Path(video)
+    temporary = video.with_name(f'{video.stem}_speed_tmp.mp4')
+    print(f'最终成片调整为 1.4 倍速: {video.name}', flush=True)
+    try:
+        run(['-i', video, '-filter_complex',
+             '[0:v:0]setpts=(PTS-STARTPTS)/1.4[v];'
+             '[0:a:0]asetpts=PTS-STARTPTS,atempo=1.4[a]',
+             '-map', '[v]', '-map', '[a]',
+             '-c:v', 'libx264', '-preset', 'fast', '-crf', 20,
+             '-pix_fmt', 'yuv420p', '-r', 30,
+             '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', temporary])
+        temporary.replace(video)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def produce_mixed(root):
     root=Path(root)
     plan=read_json(root/'commentary_plan.json')
@@ -80,7 +98,8 @@ def final_mixed(root):
     write_script_subtitles(read_json(paths.root/'part_subtitle_events.json'),paths.final_subtitles['srt'],
                            paths.root/'final_subtitles.ass',paths.final_subtitles['json'])
     burn_avatar_subtitles(layout,paths.root/'final_subtitles.ass',body)
-    prepend_cover(body,cover,final)
+    prepend_cover(body,cover,final,audio_volume=1.0)
+    speed_up_final(final)
     media=read_json(paths.media);media['main'].update(commentary_news_video_path=str(final),
         commentary_body_video_path=str(body),commentary_vertical_video_path=str(layout),
         commentary_chinese_subtitles_path=str(paths.final_subtitles['srt']),
@@ -138,11 +157,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         '[0:v]scale=1920:1080,setsar=1,trim=duration=1,setpts=PTS-STARTPTS,format=yuv420p[c];'
         '[2:a]atrim=duration=1,asetpts=PTS-STARTPTS[s];'
         '[1:v]fps=30,setsar=1,setpts=PTS-STARTPTS,format=yuv420p[v];'
-        '[1:a]aresample=48000,aformat=channel_layouts=stereo,volume=1.2,'
+        '[1:a]aresample=48000,aformat=channel_layouts=stereo,'
         'alimiter=limit=0.95:level=false:latency=true,asetpts=PTS-STARTPTS[a];'
         '[c][s][v][a]concat=n=2:v=1:a=1[outv][outa]',
         '-map','[outv]','-map','[outa]','-c:v','libx264','-preset','fast','-crf',20,
         '-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart',final])
+    speed_up_final(final)
     paths = ProjectPaths(root)
     media = read_json(paths.media)
     media['main'].update(commentary_landscape_video_path=str(final),

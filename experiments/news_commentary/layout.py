@@ -33,8 +33,8 @@ def build_layout_timeline(root, config_path=CONFIG_PATH):
                 for ref in references:
                     src=catalog[ref['source_id']]
                     article=src.get('source_type')=='article'
-                    rows=src['article_paragraphs'] if article else src['utterances']
-                    ids=ref['paragraph_indices' if article else 'subtitle_indices']
+                    rows=src['article_sentences'] if article else src['utterances']
+                    ids=ref['sentence_indices' if article else 'subtitle_indices']
                     weights.append(len('\n\n'.join(rows[i]['text'] for i in ids)))
                 used=0
                 for n,(ref,weight) in enumerate(zip(references,weights)):

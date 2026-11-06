@@ -5,35 +5,35 @@
       "url": "https://www.youtube.com/@ABCNewsAustralia",
       "label": "ABC News Australia",
       "enabled": true,
-      "days": 3
+      "days": 2
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@7news",
       "label": "7NEWS",
       "enabled": true,
-      "days": 3
+      "days": 2
     },
     {
       "module": "afr",
       "url": "https://www.afr.com/property/residential",
       "label": "AFR · Property",
       "enabled": true,
-      "days": 15
+      "days": 10
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@9NewsAUS",
       "label": "9 News Australia",
       "enabled": true,
-      "days": 3
+      "days": 2
     },
     {
       "module": "afr",
       "url": "https://www.afr.com/property/commercial",
       "label": "AFR · Property",
       "enabled": true,
-      "days": 15
+      "days": 10
     },
     {
       "module": "nsw_gov",
@@ -54,14 +54,14 @@
       "url": "https://www.afr.com/the-afr-view",
       "label": "AFR · View",
       "enabled": true,
-      "days": 16
+      "days": 10
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/playlist?list=PLECacouYcyPsf8T7pOrM7c0x1ChV_BPy4",
       "label": "Rask",
       "enabled": true,
-      "days": 3
+      "days": 2
     },
     {
       "module": "youtube",
@@ -75,7 +75,7 @@
       "url": "https://www.afr.com/chanticleer",
       "label": "AFR View",
       "enabled": true,
-      "days": 3
+      "days": 10
     }
   ],
   "生活": [
@@ -84,28 +84,28 @@
       "url": "https://www.youtube.com/@ABCNewsAustralia",
       "label": "ABC News Australia",
       "enabled": true,
-      "days": 3
+      "days": 2
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@7news",
       "label": "7NEWS",
       "enabled": true,
-      "days": 3
+      "days": 2
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@9NewsAUS",
       "label": "9 News Australia",
       "enabled": true,
-      "days": 3
+      "days": 2
     },
     {
       "module": "afr",
       "url": "https://www.afr.com/the-afr-view",
       "label": "AFR · View",
       "enabled": true,
-      "days": 16
+      "days": 10
     },
     {
       "module": "youtube",
@@ -119,7 +119,14 @@
       "url": "https://www.nsw.gov.au/ministerial-releases",
       "label": "NSW Media Release",
       "enabled": true,
-      "days": 3
+      "days": 10
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/chanticleer",
+      "label": "AFR View",
+      "enabled": true,
+      "days": 10
     }
   ],
   "签证": [
@@ -186,7 +193,7 @@
       "url": "https://www.afr.com/policy/tax-and-super",
       "label": "AFR · Tax",
       "enabled": true,
-      "days": 3
+      "days": 15
     },
     {
       "module": "youtube",
@@ -214,7 +221,14 @@
       "url": "https://www.afr.com/the-afr-view",
       "label": "AFR · View",
       "enabled": true,
-      "days": 3
+      "days": 15
+    },
+    {
+      "module": "afr",
+      "url": "https://www.afr.com/chanticleer",
+      "label": "AFR View",
+      "enabled": true,
+      "days": 15
     }
   ],
   "经济": [
@@ -223,42 +237,42 @@
       "url": "https://www.afr.com/policy/economy",
       "label": "AFR · Policy",
       "enabled": true,
-      "days": 15
+      "days": 10
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@ABCNewsAustralia",
       "label": "ABC News",
       "enabled": true,
-      "days": 3
+      "days": 2
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@9NewsAUS",
       "label": "9 News Australia",
       "enabled": true,
-      "days": 3
+      "days": 2
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@7news",
       "label": "7NEWS",
       "enabled": true,
-      "days": 3
+      "days": 2
     },
     {
       "module": "nsw_gov",
       "url": "https://www.nsw.gov.au/ministerial-releases",
       "label": "NSW Media Release",
       "enabled": true,
-      "days": 15
+      "days": 10
     },
     {
       "module": "afr",
       "url": "https://www.afr.com/the-afr-view",
       "label": "AFR · View",
       "enabled": true,
-      "days": 15
+      "days": 10
     },
     {
       "module": "youtube",
@@ -272,7 +286,7 @@
       "url": "https://www.afr.com/chanticleer",
       "label": "AFR View",
       "enabled": true,
-      "days": 15
+      "days": 10
     }
   ],
   "职场": [
@@ -309,7 +323,7 @@
       "url": "https://www.afr.com/work-and-careers/careers",
       "label": "AFR · Career",
       "enabled": true,
-      "days": 16
+      "days": 15
     },
     {
       "module": "nsw_gov",
@@ -323,7 +337,7 @@
       "url": "https://www.fairwork.gov.au/newsroom/media-releases",
       "label": "Fair Work",
       "enabled": true,
-      "days": 30
+      "days": 15
     },
     {
       "module": "afr",
