@@ -13,9 +13,9 @@ URL = 'http://127.0.0.1:8510'
 
 def ready():
     try:
-        with urlopen(URL + '/api/sources', timeout=1) as response:
+        with urlopen(URL + '/api/topics', timeout=1) as response:
             data = json.load(response)
-        return isinstance(data, dict) and all(topic in data for topic in ('房产', '生活', '签证', '税务', '经济', '职场'))
+        return isinstance(data, dict) and bool(data)
     except (OSError, ValueError):
         return False
 

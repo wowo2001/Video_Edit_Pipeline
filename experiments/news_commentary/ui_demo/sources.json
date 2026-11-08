@@ -92,7 +92,7 @@
       "days": 2
     }
   ],
-  "生活": [
+  "社会": [
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@ABCNewsAustralia",
@@ -408,6 +408,22 @@
       "label": "60 Minutes",
       "enabled": true,
       "days": 3
+    }
+  ],
+  "日本经济": [
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@ANNnewsCH",
+      "label": "ANNnewsCH",
+      "enabled": true,
+      "days": 1
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@ntv_news",
+      "label": "ntv_news",
+      "enabled": true,
+      "days": 1
     }
   ]
 }

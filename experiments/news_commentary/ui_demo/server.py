@@ -17,7 +17,7 @@ JOBS = {}
 RUNS = {}
 CONFIG = ROOT / 'sources.json'
 LOCK = Lock()
-TOPICS = ('房产', '生活', '签证', '税务', '经济', '职场')
+from experiments.news_commentary.ui_demo.topics import load_topics, task_sources
 MODULES = ('cis', 'youtube', 'afr', 'the_australian', 'nsw_gov', 'fair_work',
            'home_affairs_minister')
 
@@ -51,6 +51,8 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path.startswith('/api/jobs/'):
             job = JOBS.get(self.path.rsplit('/',1)[-1])
             return self.reply(200 if job else 404, job or {'error':'任务不存在'})
+        if self.path == '/api/topics':
+            return self.reply(200, load_topics())
         if self.path == '/api/sources':
             with LOCK:
                 self.reply(200, json.loads(CONFIG.read_text(encoding='utf-8')))
@@ -82,7 +84,7 @@ class Handler(SimpleHTTPRequestHandler):
                 job=Path('work/news_ui_queue')/('commentary_'+datetime.now().strftime('%Y%m%d_%H%M%S')+'_'+uuid.uuid4().hex[:8])
                 job.mkdir(parents=True)
                 task={'title':body.get('title') or '新闻评论','angle':body.get('angle',''),'广告':body.get('advertisement',''),
-                      'sources':[{'url':r['url'],'title':r['title'],'source_type':r['type'],'publisher':r['publisher']} for r in items]}
+                      'sources':task_sources(items)}
                 task_path=job/'commentary_tasks.json';task_path.write_text(json.dumps(task,ensure_ascii=False,indent=2), encoding='utf-8')
                 command=[sys.executable,'-u','-m','experiments.news_commentary.pipeline','--tasks',str(task_path.resolve()),'--workspace',str((job/'workspace').resolve())]
                 if body.get('upload'):command.append('--upload')
@@ -92,7 +94,7 @@ class Handler(SimpleHTTPRequestHandler):
                 RUNS[job.name]={'process':process,'path':job/'commentary.log'}
                 return self.reply(200,{'pid':process.pid,'log':str(job/'commentary.log'),'run_id':job.name})
             topic, sources = body.get('topic'), body.get('sources')
-            if topic not in TOPICS or not isinstance(sources, list):
+            if topic not in load_topics() or not isinstance(sources, list):
                 raise ValueError('主题或来源格式无效')
             for source in sources:
                 if (not isinstance(source, dict) or source.get('module') not in MODULES

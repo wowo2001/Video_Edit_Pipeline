@@ -397,7 +397,7 @@ def merge_english_subtitles_before_diarization(paths: ProjectPaths) -> Path:
     return paths.subtitles["json"]
 
 
-def transcribe_parliament_english_subtitles(paths: ProjectPaths) -> Path:
+def transcribe_parliament_english_subtitles(paths: ProjectPaths, language="en-US") -> Path:
     """Create the shared English subtitle timeline from the source audio.
 
     Parliament videos often have incomplete or overly fragmented YouTube
@@ -413,12 +413,12 @@ def transcribe_parliament_english_subtitles(paths: ProjectPaths) -> Path:
     else:
         print(f"复用已有原始音轨: {paths.audio}")
 
-    Volcengine().transcribe_audio(paths.audio, paths.subtitles, language="en-US")
+    Volcengine().transcribe_audio(paths.audio, paths.subtitles, language=language)
     media_data["main"]["source_audio_path"] = str(paths.audio)
     media_data["main"]["subtitles"] = {
         "srt_path": str(paths.subtitles["srt"]),
         "json_path": str(paths.subtitles["json"]),
-        "source": "volcengine_en-US",
+        "source": f"volcengine_{language}",
     }
     write_json(media_data, paths.media)
     return paths.subtitles["json"]

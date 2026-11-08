@@ -326,13 +326,14 @@ Input:
             raise ValueError("中文短句整合结果必须包含 groups")
         return result["groups"]
 
-    def screen_news_titles(self, videos, topics):
+    def screen_news_titles(self, videos, topics, topic_descriptions=None):
         """Classify YouTube news titles against the selected editorial topics."""
-        prompt = """You are selecting Australian news videos for a Chinese-language
+        prompt = """You are selecting news articles and videos for a Chinese-language
 audience according to their selected topics. Judge relevance from the title and channel only; do not invent
 facts that are not stated.
 
-Selected topics: """ + json.dumps(topics, ensure_ascii=False) + """
+Selected topics: """ + json.dumps(topics, ensure_ascii=False) + "\nTopic criteria: " + json.dumps(topic_descriptions or {}, ensure_ascii=False) + """
+Use the topic criteria to determine scope. matched_topics must use the exact selected topic names.
 
 Return only JSON in this exact form:
 {"results":[{"video_id":"...","relevant":true,"matched_topics":["..."],"reason":"简短中文理由"}]}

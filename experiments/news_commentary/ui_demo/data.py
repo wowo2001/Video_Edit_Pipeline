@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from config import YOUTUBE_API_KEY
+from experiments.news_commentary.ui_demo.topics import load_topics
 from services.youtube_news import YouTubeNews
 from services.afr_news import fetch_afr_news, article_candidates
 from services.chatgpt import ChatGPT
@@ -85,7 +86,7 @@ def screen_topic(items, topic, log=lambda message: None):
     COST.parent.mkdir(parents=True,exist_ok=True)
     results=ChatGPT(usage_report_path=COST).screen_news_titles([
         {'video_id':r['id'],'title':r['title'],'channel':r['source'],
-         'source_type':r['type'],'published_at':r['published_at']} for r in items], [topic])
+         'source_type':r['type'],'published_at':r['published_at']} for r in items], [topic], topic_descriptions={topic: load_topics()[topic]["prompt"]})
     mapping={r.get('video_id'):r for r in results if isinstance(r,dict)}
     selected=[]
     for item in items:
@@ -101,7 +102,7 @@ def group_news(body, log=lambda message: None):
     items=body['items'];by_id={r['id']:r for r in items}
     if not items:return {'groups':[]}
     llm=ChatGPT();model=llm.config['models']['screen_news_titles']
-    prompt=PROMPT+'\n当前主题：'+body['topic']+'\n新闻：'+json.dumps([{'id':r['id'],'title':r['title'],'source':r['source']} for r in items],ensure_ascii=False)
+    prompt=PROMPT+'\n当前主题：'+body['topic']+'\n主题范围：'+load_topics()[body['topic']]['prompt']+'\n新闻：'+json.dumps([{'id':r['id'],'title':r['title'],'source':r['source']} for r in items],ensure_ascii=False)
     log(f'开始 Luna 分组：{len(items)} 条报道')
     response=llm.client.chat.completions.create(model=model,messages=[{'role':'user','content':prompt}])
     COST.parent.mkdir(parents=True,exist_ok=True)

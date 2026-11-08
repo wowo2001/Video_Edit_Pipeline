@@ -180,8 +180,9 @@ def transcribe_sources(config, root):
         if marker.exists():
             print(f'[{sid}] transcribe 已完成，复用识别结果', flush=True)
             continue
-        print(f'[{sid}] transcribe (火山 en-US)', flush=True)
-        transcribe_parliament_english_subtitles(paths)
+        language = item.get('asr_language', 'en-US')
+        print(f'[{sid}] transcribe (火山 {language})', flush=True)
+        transcribe_parliament_english_subtitles(paths, language=language)
         marker.touch()
 
 
