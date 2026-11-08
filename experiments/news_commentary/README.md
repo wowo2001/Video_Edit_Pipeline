@@ -13,9 +13,9 @@ PATH="$PWD/venv/bin:$PATH" venv/bin/python -m experiments.news_commentary.pipeli
   --workspace work/news_commentary/trial_01
 ```
 
-默认制作但不上传。需要制作后上传时加 `--upload`。
+默认制作但不上传。需要制作后上传 Google Drive 并公开发布到 YouTube 时加 `--upload`。
 
-阶段可选 `--step download|transcribe|merge|speakers|prepare|plan|audio|paraphrase|produce|final|upload`，默认 `all`：
+阶段可选 `--step download|transcribe|merge|speakers|prepare|plan|audio|paraphrase|produce|final|upload|upload-youtube`，默认 `all`：
 
 - download：仅下载素材。视频沿用 conference 下载；AFR 使用环境变量账号登录，保存 `article.txt` 和 `article.json`。`downloaded_sources.json` 记录类型和本地路径。已完成的下载会复用。
 - transcribe：仅对已下载的视频调用火山英文识别（en-US）；AFR 原文不变，跳过识别。成功后重跑复用结果。
@@ -25,8 +25,9 @@ PATH="$PWD/venv/bin:$PATH" venv/bin/python -m experiments.news_commentary.pipeli
 - plan：从视频字幕和文章原文重建 source_catalog.json，GPT 直接读取文章编号句子，以及视频完整字幕、时间戳和说话人信息，输出主线和跨来源证据。视频使用 subtitle_indices，文章使用 sentence_indices；文章引用原文由程序取回，标记为 publisher_logo 或 article_typewriter。此阶段不翻译、不配音、不渲染。
 - audio：仅翻译视频人物引用并生成全部中文 TTS（含文章解说及结尾互动），不渲染；完整成功的段落按输入复用。文章原文引用的配音入口待接入。
 - produce：按分段音频串联转述素材、人物发言及串联画面，使用累计帧边界避免漂移；不重做翻译和配音。先运行 audio、paraphrase。
-- final：读取 layout_config.json 的 none/small/large 规则，合成头像动画，再按分段时间生成字幕、烧录、加入1秒封面和最终音量设置。横屏和竖屏成片最后统一加速至 1.4 倍，音频保持原音调，烧录字幕同步加速，封面时长变为约 0.71 秒。上传使用加速后的成片；中间素材及独立字幕文件保留原始时间轴，重跑 final 不会累加倍速。
-- upload：上传最终成片到 title 指定的 Drive 文件夹。
+- final：读取 layout_config.json 的 none/small/large 规则，合成头像动画，再按分段时间生成字幕、烧录、加入1秒封面和最终音量设置。横屏成片最后加速至 1.4 倍；竖屏先按 1.4 倍计算含封面的成片时长：不超过 180 秒就用 1.4 倍；超过时，若 1.6 倍能压到 180 秒，则将原片秒数 / 180 向上取到两位小数作为倍速；否则仍用 1.4 倍。不设置输出时长截断限制，保留完整内容。音频保持原音调，烧录字幕和封面同步变速。上传使用加速后的成片；中间素材及独立字幕文件保留原始时间轴，重跑 final 不会累加倍速。
+- upload：上传横竖成片和封面到 Drive，然后公开发布到已授权的 YouTube 频道，使用规划 AI 生成的 tags。
+- upload-youtube：仅重试 YouTube 发布，复用已上传视频 ID，继续处理封面；不重复执行 Drive 上传。
 
 `prepare` 已成功的单源步骤用标记跳过；其他阶段显式执行会重做，可能再次调用收费服务。
 修改输入请换工作区，避免混用已有结果。改规划后从 produce 重做；只改布局从 final 重做。
@@ -53,4 +54,10 @@ AFR 当前已接入 download 阶段，并在 transcribe 阶段跳过识别；混
 
 文章在构建素材目录时由本地代码直接拆句，保存为 `source_catalog.json` 的 `article_sentences`；规划及转述证据使用 `sentence_indices`。独立小标题作为单独单位保留。视频和文章均不生成 section 或分段摘要，不读取 `content_segments.json`。已有任务切换到新流程需重新运行 plan 及后续步骤。
 
-新闻评论配音保留 TTS 原始音量，横竖成片不再增加音量，保留不自动增益的峰值限制。播放速度仍为 1.4 倍。音频缓存已换版本；旧任务需从 audio 开始重做后续阶段才能去掉之前的配音增益。
+新闻评论配音保留 TTS 原始音量，横竖成片不再增加音量，保留不自动增益的峰值限制。横屏速度为 1.4 倍，竖屏按三分钟规则自动选择倍速。音频缓存已换版本；旧任务需从 audio 开始重做后续阶段才能去掉之前的配音增益。
+
+YouTube 上传前使用 ffprobe 检查最终竖屏成片实际时长（含封面）：超过 180 秒跳过竖屏视频及封面，并记录 skipped；180 秒以内（含）正常上传。横屏照常发布，Google Drive 仍保存两个版本。
+
+布局独立控制文章引用：`article_quote` 对应 `role=article_quote`，当前为 `large`；普通文章转述 `article_paraphrase` 和视频转述 `video_paraphrase` 均为 `none`。横竖屏共用此配置。
+
+CIS Opinions 已接入：来源模组选 `CIS Opinions`，URL 为 `https://www.cis.org.au/commentary/opinions/`。`services.cis.fetch_cis_news(url, days=3, *, now=None, log=print)` 返回与其他文章模组相同的候选字段，按悉尼日期筛选、分页和去重；`fetch_cis_article(url)` 返回纯正文字符串。文章引用使用独立纯色背景和 CIS 来源标注。

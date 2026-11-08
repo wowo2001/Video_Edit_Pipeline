@@ -43,7 +43,8 @@ def prepare_paraphrase_videos(root):
                     federal_background = (ROOT/'assets/australian_government_typewriter_background_blurred.png'
                         if urlparse(ref['url']).hostname == 'minister.homeaffairs.gov.au' else '')
                     background = Path(source['context'].get('typewriter_background') or federal_background or
-                        ({'AFR': ROOT/'assets/afr_typewriter_background_blurred.png',
+                        ({'Centre for Independent Studies': ROOT/'assets/cis_typewriter_background.png',
+                          'AFR': ROOT/'assets/afr_typewriter_background_blurred.png',
                           'NSW Government': ROOT/'assets/nsw_typewriter_background_blurred.png',
                           'Fair Work Ombudsman': ROOT/'assets/australian_government_typewriter_background_blurred.png'
                           }.get(ref['publisher'], '')))

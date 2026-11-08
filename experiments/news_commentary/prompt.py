@@ -36,7 +36,7 @@ PROMPT = """你是做中文新闻评论视频的主播。综合输入的相关�
 文章转述：
 {"kind":"paraphrase","text":"文章内容的中文转述","evidence":[{"source_id":"source_02","sentence_indices":[8,10]}]}
 
-只输出JSON，顶层包含 title、summary、segments。每个 segment 包含 source_id、type、purpose、narration_parts，以及对应来源的 subtitle_indices 或 sentence_indices。
+只输出JSON，顶层包含 title、summary、tags、segments。tags 为 5–10 个适合 YouTube 的标签字符串，围绕本片实际主题、涉及人物或机构和地区生成，中英文可混用；不要加 #、不要重复或使用无关热门词，总长度（含分隔符）不超过 400 字符。每个 segment 包含 source_id、type、purpose、narration_parts，以及对应来源的 subtitle_indices 或 sentence_indices。
 输出前检查：每个 paraphrase 都有自己的非空 evidence；每个 evidence 都有 source_id 和匹配来源类型的首尾索引；不要因外层已有索引而省略它。
 输入：
 """

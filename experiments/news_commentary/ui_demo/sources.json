@@ -12,7 +12,7 @@
       "url": "https://www.youtube.com/@7news",
       "label": "7NEWS",
       "enabled": true,
-      "days": 2
+      "days": 1
     },
     {
       "module": "afr",
@@ -76,6 +76,20 @@
       "label": "AFR View",
       "enabled": true,
       "days": 10
+    },
+    {
+      "module": "youtube",
+      "url": "https://youtube.com/@news24",
+      "label": "News24",
+      "enabled": true,
+      "days": 2
+    },
+    {
+      "module": "youtube",
+      "url": "https://youtube.com/@financialreview",
+      "label": "AFR",
+      "enabled": true,
+      "days": 2
     }
   ],
   "生活": [
@@ -125,6 +139,20 @@
       "module": "afr",
       "url": "https://www.afr.com/chanticleer",
       "label": "AFR View",
+      "enabled": true,
+      "days": 10
+    },
+    {
+      "module": "youtube",
+      "url": "https://youtube.com/@news24",
+      "label": "News24",
+      "enabled": true,
+      "days": 2
+    },
+    {
+      "module": "cis",
+      "url": "https://www.cis.org.au/commentary/opinions/",
+      "label": "CIS",
       "enabled": true,
       "days": 10
     }
@@ -221,14 +249,21 @@
       "url": "https://www.afr.com/the-afr-view",
       "label": "AFR · View",
       "enabled": true,
-      "days": 15
+      "days": 10
     },
     {
       "module": "afr",
       "url": "https://www.afr.com/chanticleer",
       "label": "AFR View",
       "enabled": true,
-      "days": 15
+      "days": 10
+    },
+    {
+      "module": "cis",
+      "url": "https://www.cis.org.au/commentary/opinions/",
+      "label": "CIS",
+      "enabled": true,
+      "days": 10
     }
   ],
   "经济": [
@@ -287,6 +322,27 @@
       "label": "AFR View",
       "enabled": true,
       "days": 10
+    },
+    {
+      "module": "youtube",
+      "url": "https://youtube.com/@financialreview",
+      "label": "AFR",
+      "enabled": true,
+      "days": 10
+    },
+    {
+      "module": "cis",
+      "url": "https://www.cis.org.au/commentary/opinions/",
+      "label": "CIS",
+      "enabled": true,
+      "days": 10
+    },
+    {
+      "module": "youtube",
+      "url": "https://youtube.com/@news24",
+      "label": "News24",
+      "enabled": true,
+      "days": 2
     }
   ],
   "职场": [

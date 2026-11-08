@@ -7,7 +7,7 @@ CONFIG_PATH = Path(__file__).with_name('layout_config.json')
 
 def build_layout_timeline(root, config_path=CONFIG_PATH):
     config = read_json(config_path)
-    kinds = ('bridge','commentary','video_paraphrase','article_paraphrase','dialogue','audience_question')
+    kinds = ('bridge','commentary','video_paraphrase','article_paraphrase','article_quote','dialogue','audience_question')
     if any(config[k] not in ('none','small','large') for k in kinds):
         raise ValueError('布局只能是 none、small 或 large')
     if config['transition_seconds'] < 0:
@@ -39,7 +39,10 @@ def build_layout_timeline(root, config_path=CONFIG_PATH):
                 used=0
                 for n,(ref,weight) in enumerate(zip(references,weights)):
                     end=round(duration*sum(weights[:n+1])/sum(weights))
-                    kind='article_paraphrase' if catalog[ref['source_id']].get('source_type')=='article' else 'video_paraphrase'
+                    if catalog[ref['source_id']].get('source_type') == 'article':
+                        kind = 'article_quote' if part.get('role') == 'article_quote' else 'article_paraphrase'
+                    else:
+                        kind = 'video_paraphrase'
                     add(kind,end-used,**{**metadata,'source_id':ref['source_id'],'evidence_index':n})
                     used=end
             else:

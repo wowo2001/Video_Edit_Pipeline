@@ -1,5 +1,7 @@
 """Render part-level commentary using the existing audio and evidence assets."""
 import math
+import subprocess
+from decimal import Decimal, ROUND_CEILING
 from pathlib import Path
 from pydub import AudioSegment
 from core.utils import read_json, write_json
@@ -8,15 +10,35 @@ from experiments.news_commentary.paraphrase_video import run
 from experiments.news_commentary.layout import build_layout_timeline
 
 
-def speed_up_final(video):
+PORTRAIT_TARGET_SECONDS = 180.0
+
+
+def portrait_speed(duration):
+    """Keep 1.4 unless a speed up to 1.6 can bring an overlong video to three minutes."""
+    if not math.isfinite(duration) or duration <= 0:
+        raise ValueError('成片时长必须为正数')
+    required = max(Decimal('1.4'), Decimal(str(duration)) / Decimal(str(PORTRAIT_TARGET_SECONDS)))
+    if required > Decimal('1.6'):
+        return 1.4
+    return float(required.quantize(Decimal('0.01'), rounding=ROUND_CEILING))
+
+
+def speed_up_final(video, *, portrait=False):
     """Speed up a freshly rendered deliverable, including its burned subtitles."""
     video = Path(video)
+    speed = 1.4
+    if portrait:
+        duration = float(subprocess.check_output([
+            'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1', str(video)], text=True))
+        speed = portrait_speed(duration)
+        print(f'竖屏原片 {duration:.3f} 秒，预计输出 {duration / speed:.3f} 秒', flush=True)
     temporary = video.with_name(f'{video.stem}_speed_tmp.mp4')
-    print(f'最终成片调整为 1.4 倍速: {video.name}', flush=True)
+    print(f'最终成片调整为 {speed:.2f} 倍速: {video.name}', flush=True)
     try:
         run(['-i', video, '-filter_complex',
-             '[0:v:0]setpts=(PTS-STARTPTS)/1.4[v];'
-             '[0:a:0]asetpts=PTS-STARTPTS,atempo=1.4[a]',
+             f'[0:v:0]setpts=(PTS-STARTPTS)/{speed:.2f}[v];'
+             f'[0:a:0]asetpts=PTS-STARTPTS,atempo={speed:.2f}[a]',
              '-map', '[v]', '-map', '[a]',
              '-c:v', 'libx264', '-preset', 'fast', '-crf', 20,
              '-pix_fmt', 'yuv420p', '-r', 30,
@@ -24,6 +46,7 @@ def speed_up_final(video):
         temporary.replace(video)
     finally:
         temporary.unlink(missing_ok=True)
+    return speed
 
 
 def produce_mixed(root):
@@ -99,9 +122,10 @@ def final_mixed(root):
                            paths.root/'final_subtitles.ass',paths.final_subtitles['json'])
     burn_avatar_subtitles(layout,paths.root/'final_subtitles.ass',body)
     prepend_cover(body,cover,final,audio_volume=1.0)
-    speed_up_final(final)
+    speed = speed_up_final(final, portrait=True)
     media=read_json(paths.media);media['main'].update(commentary_news_video_path=str(final),
         commentary_body_video_path=str(body),commentary_vertical_video_path=str(layout),
+        commentary_portrait_speed=speed,
         commentary_chinese_subtitles_path=str(paths.final_subtitles['srt']),
         news_title=plan['title'],news_subtitle=plan['title'],
         commentary_cover_path=str(cover),commentary_cover_landscape_path=str(landscape_cover))

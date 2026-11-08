@@ -38,6 +38,9 @@ def fetch_news(body, log=lambda message: None):
                 config={'name':name,'channel_ref':url,'playlist_id':playlist,'live_streams_only':parsed.path.endswith(('/streams','/live'))}
                 rows=client.recent_videos(config,days);client.add_video_durations(rows)
                 for row in rows:row['source_type']='video'
+            elif source['module']=='cis':
+                from services.cis import fetch_cis_news
+                rows=fetch_cis_news(url,days,log=log)
             elif source['module']=='fair_work':
                 from services.fair_work import fetch_fair_work_news
                 rows=fetch_fair_work_news(url,days,log=log)
@@ -54,7 +57,10 @@ def fetch_news(body, log=lambda message: None):
             elif source['module']=='afr':
                 if urlparse(url).hostname not in ('afr.com','www.afr.com'):raise ValueError('AFR 模组需要 AFR 栏目网址')
                 rows=article_candidates(fetch_afr_news(url),days,topic=body['topic'],source_name=name)
-            else: raise ValueError('澳大利亚人报模组尚未接入，请先使用 YouTube 或 AFR')
+            elif source['module']=='the_australian':
+                raise ValueError('澳大利亚人报模组尚未接入')
+            else:
+                raise ValueError(f"未知来源模组：{source['module']}，请检查来源配置并重启后台服务")
             log(f'抓取成功：{name}，{len(rows)} 条')
             for row in rows:
                 item=dict(id=row['video_id'],title=row['title'],url=row['url'],source=row['channel_name'],

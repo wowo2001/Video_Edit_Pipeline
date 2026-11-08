@@ -1,0 +1,17 @@
+{
+  "video_path": "work/your_job/workspace/commentary_news_landscape.mp4",
+  "title": "新闻标题",
+  "channel_id": "UCGTnz6vvLd3upDsDS0uYwNw",
+  "description": "视频简介及素材来源链接",
+  "thumbnail_path": "work/your_job/workspace/commentary_cover_landscape.png",
+  "privacy": "public",
+  "tags": ["澳洲", "新闻评论"],
+  "category_id": "25",
+  "language": "zh",
+  "made_for_kids": false,
+  "contains_synthetic_media": true,
+  "notify_subscribers": false,
+  "client_secrets": "auth/youtube_client.json",
+  "token_path": "auth/youtube_token.json",
+  "processing_timeout": 600
+}

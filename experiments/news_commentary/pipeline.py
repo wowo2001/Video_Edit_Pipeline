@@ -44,8 +44,16 @@ def validate_plan(plan, catalog, advertisement=''):
     sources = {s['source_id']: s for s in catalog}
     if not isinstance(plan, dict) or not str(plan.get('title', '')).strip() or not plan.get('segments'):
         raise ValueError('规划缺少标题或段落')
+    tags = plan.get('tags')
+    if (not isinstance(tags, list) or not 5 <= len(tags) <= 10
+            or any(not isinstance(tag, str) or not tag.strip() or '#' in tag for tag in tags)):
+        raise ValueError('规划需要 5–10 个非空 YouTube 标签，不含 #')
+    tags = [tag.strip() for tag in tags]
+    if len({tag.casefold() for tag in tags}) != len(tags) or len(','.join(tags)) > 400:
+        raise ValueError('YouTube 标签不能重复，总长度不能超过 400 字符')
     used = set()
     clean = copy.deepcopy(plan)
+    clean['tags'] = tags
     for number, segment in enumerate(clean['segments'], 1):
         source = sources.get(segment.get('source_id'))
         kind = segment.get('type')
@@ -108,7 +116,7 @@ def validate_plan(plan, catalog, advertisement=''):
 
 def source_type(item):
     return item.get('source_type') or ('article' if urlparse(item['url']).hostname in
-                                     ('afr.com', 'www.afr.com', 'www.nsw.gov.au', 'www.fairwork.gov.au',
+                                     ('cis.org.au', 'www.cis.org.au', 'afr.com', 'www.afr.com', 'www.nsw.gov.au', 'www.fairwork.gov.au',
                                       'minister.homeaffairs.gov.au') else 'video')
 
 
@@ -127,6 +135,10 @@ def download_sources(config, root):
                 if host in ('afr.com', 'www.afr.com'):
                     from services.afr_article import fetch_afr_article
                     content = fetch_afr_article(item['url'])
+                elif host in ('cis.org.au', 'www.cis.org.au'):
+                    from services.cis import fetch_cis_article
+                    content = fetch_cis_article(item['url'])
+                    item = {**item, 'publisher': 'Centre for Independent Studies'}
                 elif host == 'www.fairwork.gov.au':
                     from services.fair_work import fetch_fair_work_article
                     content = fetch_fair_work_article(item['url'])
@@ -369,8 +381,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--tasks', required=True, type=Path)
     parser.add_argument('--workspace', required=True, type=Path)
-    parser.add_argument('--step', choices=['all', 'download', 'transcribe', 'merge', 'speakers', 'prepare', 'plan', 'audio', 'paraphrase', 'produce', 'final', 'final-landscape', 'landscape-layout', 'upload'], default='all')
-    parser.add_argument('--upload', action='store_true', help='Upload after an all run')
+    parser.add_argument('--step', choices=['all', 'download', 'transcribe', 'merge', 'speakers', 'prepare', 'plan', 'audio', 'paraphrase', 'produce', 'final', 'final-landscape', 'landscape-layout', 'upload', 'upload-youtube'], default='all')
+    parser.add_argument('--upload', action='store_true', help='Upload to Google Drive and publish on YouTube after an all run')
     args = parser.parse_args()
     config = read_json(args.tasks)
     if not isinstance(config.get('sources'), list) or not config['sources'] or any(
@@ -434,6 +446,9 @@ def main():
         upload_commentary_short_video(paths)
         from experiments.news_commentary.mixed_render import upload_landscape
         upload_landscape(root)
+    if args.step in ('upload', 'upload-youtube') or (args.step == 'all' and args.upload):
+        from experiments.news_commentary.youtube import upload_news_videos
+        upload_news_videos(root)
     print(f'实验阶段完成: {args.step}，工作区: {root}', flush=True)
 
 

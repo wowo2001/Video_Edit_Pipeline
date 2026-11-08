@@ -58,7 +58,7 @@ class ArticleSentenceTests(unittest.TestCase):
     def test_single_sentence_quote_and_evidence(self):
         source = dict(source_id='source_01', source_type='article', url='example', context={},
                       article_sentences=split_article_sentences('First. Second. Third.'))
-        plan = dict(title='Test', segments=[dict(source_id='source_01', type='with_dialogue',
+        plan = dict(title='Test', tags=['澳洲', '新闻', '经济', '企业', '评论'], segments=[dict(source_id='source_01', type='with_dialogue',
             sentence_indices=[1, 1], narration_parts=[dict(kind='paraphrase', text='转述',
                 evidence=[dict(source_id='source_01', sentence_indices=[0, 0])])])])
         segment = validate_plan(plan, [source])['segments'][0]
