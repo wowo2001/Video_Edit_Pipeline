@@ -92,7 +92,9 @@ def screen_topic(items, topic, log=lambda message: None):
     for item in items:
         judgment=mapping.get(item['id'],{})
         if judgment.get('relevant') is True and topic in (judgment.get('matched_topics') or []):
-            selected.append({**item,'reason':judgment.get('reason','')})
+            translation = judgment.get('title_zh')
+            selected.append({**item,'reason':judgment.get('reason',''),
+                             'title_zh':translation.strip() if isinstance(translation,str) else ''})
     missing=sum(r['id'] not in mapping for r in items)
     log(f'Luna 主题筛选完成：{topic}，保留 {len(selected)}/{len(items)} 条，费用已记录')
     if missing:log(f'Luna 未返回 {missing} 条报道的判断，已跳过，任务继续')

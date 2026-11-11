@@ -40,7 +40,7 @@
       "url": "https://www.nsw.gov.au/departments-and-agencies/fair-trading/news",
       "label": "NSW Fair Trading",
       "enabled": true,
-      "days": 30
+      "days": 15
     },
     {
       "module": "youtube",
@@ -416,14 +416,28 @@
       "url": "https://www.youtube.com/@ANNnewsCH",
       "label": "ANNnewsCH",
       "enabled": true,
-      "days": 1
+      "days": 2
     },
     {
       "module": "youtube",
       "url": "https://www.youtube.com/@ntv_news",
       "label": "ntv_news",
       "enabled": true,
-      "days": 1
+      "days": 2
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@tbsnewsdig",
+      "label": "tbsnewsdig",
+      "enabled": true,
+      "days": 2
+    },
+    {
+      "module": "youtube",
+      "url": "https://www.youtube.com/@tvtokyobiz",
+      "label": "tvtokyobiz",
+      "enabled": true,
+      "days": 2
     }
   ]
 }

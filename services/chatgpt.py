@@ -336,7 +336,7 @@ Selected topics: """ + json.dumps(topics, ensure_ascii=False) + "\nTopic criteri
 Use the topic criteria to determine scope. matched_topics must use the exact selected topic names.
 
 Return only JSON in this exact form:
-{"results":[{"video_id":"...","relevant":true,"matched_topics":["..."],"reason":"简短中文理由"}]}
+{"results":[{"video_id":"...","relevant":true,"matched_topics":["..."],"reason":"简短中文理由","title_zh":"标题的简体中文翻译"}]}
 
 Rules:
 - Return every supplied video_id exactly once.
@@ -353,6 +353,7 @@ Rules:
   identifiable story instead.
 - matched_topics must include ALL substantively matching topics from Selected topics, not just one best match.
 - If relevant is true, matched_topics must contain at least one selected topic.
+- title_zh must faithfully translate the supplied title into Simplified Chinese for every item, preserving names, numbers and uncertainty without adding facts. If already Simplified Chinese, keep the title.
 - reason must be concise Simplified Chinese (maximum 30 characters).
 - Do not use Markdown or add fields.
 
