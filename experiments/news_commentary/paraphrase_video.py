@@ -12,6 +12,30 @@ def run(args):
     subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', *map(str,args)], check=True)
 
 
+
+def concatenate_evidence_clips(clips, audio, seconds, output):
+    """Decode each evidence separately so parameter changes cannot reset its clock."""
+    inputs, filters = [], []
+    for index, clip in enumerate(clips):
+        inputs.extend(['-i', clip])
+        filters.append(
+            f'[{index}:v]scale=1280:720:force_original_aspect_ratio=decrease:'
+            'out_color_matrix=bt709:out_range=tv,'
+            'pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p,'
+            'setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709,'
+            f'fps=30,settb=AVTB,setpts=PTS-STARTPTS[v{index}]')
+    labels = ''.join(f'[v{i}]' for i in range(len(clips)))
+    filters.append(f'{labels}concat=n={len(clips)}:v=1:a=0[v]')
+    # Use the original narration once, avoiding accumulated AAC joins.
+    run([*inputs, '-i', audio, '-filter_complex', ';'.join(filters),
+         '-map', '[v]', '-map', f'{len(clips)}:a',
+         '-c:v', 'libx264', '-preset', 'fast', '-crf', 18, '-pix_fmt', 'yuv420p',
+         '-r', 30, '-video_track_timescale', 15360,
+         '-color_range', 'tv', '-colorspace', 'bt709',
+         '-color_primaries', 'bt709', '-color_trc', 'bt709',
+         '-c:a', 'aac', '-t', seconds, '-movflags', '+faststart', output])
+
+
 def prepare_paraphrase_videos(root):
     root = Path(root)
     catalog = {s['source_id']:s for s in read_json(root/'source_catalog.json')}
@@ -91,11 +115,7 @@ def prepare_paraphrase_videos(root):
                              '-c:v','libx264','-preset','fast','-crf',18,'-pix_fmt','yuv420p','-c:a','aac','-t',duration,clip])
                     clips.append(clip)
                     cursor+=duration
-                listing=folder/'concat.txt'
-                listing.write_text(''.join(f"file '{p.name}'\n" for p in clips), encoding='utf-8')
-                # Keep the original part audio once, avoiding accumulated AAC joins.
-                run(['-f','concat','-safe',0,'-i',listing,'-i',audio,'-map','0:v','-map','1:a',
-                     '-c:v','copy','-c:a','aac','-t',seconds,'-movflags','+faststart',output])
+                concatenate_evidence_clips(clips, audio, seconds, output)
                 write_json({'fingerprint':fingerprint},marker)
             else:
                 print(f'{name}: 复用已完成素材',flush=True)
