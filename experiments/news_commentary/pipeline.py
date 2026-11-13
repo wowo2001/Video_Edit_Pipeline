@@ -154,9 +154,19 @@ def download_sources(config, root):
                 save({**item, 'source_id': sid, 'source_type': kind,
                       'content': content}, paths.root / 'article.json')
             elif kind == 'video':
-                from conference import ParliamentVideoPipeline
-                ParliamentVideoPipeline(paths).download_sources_and_captions(
-                    item['url'], config.get('title', '新闻评论'), item.get('title'))
+                if (paths.root / '.database.done').exists():
+                    from pipeline.download import download_video
+                    download_video(urls=[item['url']], output_path=paths.video,
+                                   origin_path=paths.origin, media_path=paths.media)
+                    media = read_json(paths.media)
+                    media['main'].update(task_title=config.get('title', '新闻评论'),
+                                         task_subtitle=item.get('title', ''),
+                                         source_context=read_json(paths.root / 'database_context.json'))
+                    save(media, paths.media)
+                else:
+                    from conference import ParliamentVideoPipeline
+                    ParliamentVideoPipeline(paths).download_sources_and_captions(
+                        item['url'], config.get('title', '新闻评论'), item.get('title'))
             else:
                 raise ValueError(f'不支持的素材类型：{kind}')
             marker.touch()
@@ -247,7 +257,9 @@ def process_source_speakers(config, root):
             marker.touch()
 
 
-def prepare_sources(config, root):
+def prepare_sources(config, root, force_preprocess=False):
+    from experiments.news_commentary.material_store import restore_materials
+    restore_materials(config, root, force=force_preprocess)
     for action in (download_sources, transcribe_sources, merge_sources,
                    process_source_speakers):
         action(config, root)
@@ -386,6 +398,7 @@ def main():
     parser.add_argument('--workspace', required=True, type=Path)
     parser.add_argument('--step', choices=['all', 'download', 'transcribe', 'merge', 'speakers', 'prepare', 'store', 'plan', 'audio', 'paraphrase', 'produce', 'final', 'final-landscape', 'landscape-layout', 'upload', 'upload-youtube'], default='all')
     parser.add_argument('--upload', action='store_true', help='Upload to Google Drive and publish on YouTube after an all run')
+    parser.add_argument('--force-preprocess', action='store_true', help='Bypass database cache and rerun source preprocessing')
     args = parser.parse_args()
     config = read_json(args.tasks)
     if not isinstance(config.get('sources'), list) or not config['sources'] or any(
@@ -411,7 +424,7 @@ def main():
     if args.step == 'speakers':
         process_source_speakers(config, root)
     if args.step in ('all', 'prepare'):
-        prepare_sources(config, root)
+        prepare_sources(config, root, force_preprocess=args.force_preprocess)
     if args.step == 'store':
         from experiments.news_commentary.material_store import store_materials
         build_source_catalog(config, root)

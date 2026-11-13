@@ -9,6 +9,72 @@ from psycopg.types.json import Jsonb
 from config import POSTGRESQL_PASSWORD, POSTGRESQL_USER
 
 
+def connect():
+    return psycopg.connect(
+        host='192.168.5.113', port=5432, dbname='news',
+        user=POSTGRESQL_USER, password=POSTGRESQL_PASSWORD, connect_timeout=10,
+        options='-c statement_timeout=30000 -c lock_timeout=10000',
+    )
+
+
+def restore_materials(config, root, force=False):
+    from core.path import ProjectPaths
+    from experiments.news_commentary.pipeline import source_type, save
+
+    stages = ('transcribe', 'merge', 'speakers', 'gender', 'recognise')
+    if force:
+        for number, item in enumerate(config['sources'], 1):
+            folder = Path(root) / 'sources' / f'source_{number:02d}'
+            for stage in (*stages, 'database'):
+                (folder / f'.{stage}.done').unlink(missing_ok=True)
+            if source_type(item) == 'article':
+                (folder / '.download.done').unlink(missing_ok=True)
+        print('[database] 强制重新预处理，跳过数据库缓存', flush=True)
+        return
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute('''SELECT url, source_type, title, publisher, language, published_at, content
+                       FROM news_materials WHERE url = ANY(%s)''',
+                    ([s['url'] for s in config['sources']],))
+        cached = {row[0]: row for row in cur.fetchall()}
+    for number, item in enumerate(config['sources'], 1):
+        sid = f'source_{number:02d}'
+        row = cached.get(item['url'])
+        kind = source_type(item)
+        if row is None or row[1] != kind:
+            print(f'[{sid}] 数据库未命中，使用现有预处理流程', flush=True)
+            continue
+        _, _, title, publisher, language, published, content = row
+        transcript = content.get('transcript', {})
+        valid = (isinstance(content.get('text'), str) and bool(content['text'].strip())) if kind == 'article' else (
+            isinstance(transcript, dict) and isinstance(transcript.get('utterances'), list)
+            and bool(transcript['utterances']) and all(
+                isinstance(r, dict) and isinstance(r.get('text'), str)
+                and isinstance(r.get('start_time'), (int, float))
+                and isinstance(r.get('end_time'), (int, float))
+                and isinstance(r.get('attribute'), dict)
+                for r in transcript['utterances']))
+        if not valid or (kind == 'video' and language and item.get('asr_language', 'en-US') != language):
+            print(f'[{sid}] 数据库内容不完整或语言不同，重新预处理', flush=True)
+            continue
+        paths = ProjectPaths(Path(root) / 'sources' / sid)
+        context = {'title': title, 'channel': publisher,
+                   'published_at': published.isoformat() if published else None,
+                   'webpage_url': item['url']}
+        if kind == 'article':
+            save({**item, 'source_id': sid, 'source_type': kind, 'title': title,
+                  'publisher': publisher, 'published_at': context['published_at'],
+                  'content': content['text']}, paths.root / 'article.json')
+            (paths.root / 'article.txt').write_text(content['text'], encoding='utf-8')
+            (paths.root / '.download.done').touch()
+        else:
+            save(transcript, paths.subtitles['json'])
+            save(context, paths.root / 'database_context.json')
+            for stage in stages:
+                (paths.root / f'.{stage}.done').touch()
+        (paths.root / '.database.done').touch()
+        print(f'[{sid}] 数据库命中，已恢复{ "文章正文" if kind == "article" else "整合及人物识别后的字幕" }', flush=True)
+
+
 def publication_time(value):
     if not value:
         return None
@@ -54,13 +120,7 @@ def material_records(root):
 def store_materials(config, root):
     records = material_records(root)
     print(f'[database] 开始写入 news_materials：{len(records)} 条素材', flush=True)
-    with psycopg.connect(
-        host='192.168.5.113',
-        port=5432,
-        dbname='news',
-        user=POSTGRESQL_USER, password=POSTGRESQL_PASSWORD, connect_timeout=10,
-        options='-c statement_timeout=30000 -c lock_timeout=10000',
-    ) as conn:
+    with connect() as conn:
         with conn.cursor() as cur:
             cur.executemany('''
                 INSERT INTO public.news_materials
