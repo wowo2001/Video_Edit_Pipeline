@@ -254,6 +254,8 @@ def prepare_sources(config, root):
         from experiments.news_commentary.costs import summarize
         summarize(root)
     build_source_catalog(config, root)
+    from experiments.news_commentary.material_store import store_materials
+    store_materials(config, root)
 
 
 def build_source_catalog(config, root):
@@ -382,7 +384,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--tasks', required=True, type=Path)
     parser.add_argument('--workspace', required=True, type=Path)
-    parser.add_argument('--step', choices=['all', 'download', 'transcribe', 'merge', 'speakers', 'prepare', 'plan', 'audio', 'paraphrase', 'produce', 'final', 'final-landscape', 'landscape-layout', 'upload', 'upload-youtube'], default='all')
+    parser.add_argument('--step', choices=['all', 'download', 'transcribe', 'merge', 'speakers', 'prepare', 'store', 'plan', 'audio', 'paraphrase', 'produce', 'final', 'final-landscape', 'landscape-layout', 'upload', 'upload-youtube'], default='all')
     parser.add_argument('--upload', action='store_true', help='Upload to Google Drive and publish on YouTube after an all run')
     args = parser.parse_args()
     config = read_json(args.tasks)
@@ -410,6 +412,10 @@ def main():
         process_source_speakers(config, root)
     if args.step in ('all', 'prepare'):
         prepare_sources(config, root)
+    if args.step == 'store':
+        from experiments.news_commentary.material_store import store_materials
+        build_source_catalog(config, root)
+        store_materials(config, root)
     if args.step in ('all', 'plan'):
         catalog = build_source_catalog(config, root)
         result = Planner(usage_report_path=paths.llm_cost_report).plan_parliament_commentary(

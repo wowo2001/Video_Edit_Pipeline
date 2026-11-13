@@ -23,4 +23,5 @@ def task_sources(items):
     topics = load_topics()
     return [{"url": r["url"], "title": r["title"], "source_type": r["type"],
              "publisher": r["publisher"], "topic": r["topic"],
+             "published_at": r.get("published_at"),
              "asr_language": topics[r["topic"]]["asr_language"]} for r in items]
