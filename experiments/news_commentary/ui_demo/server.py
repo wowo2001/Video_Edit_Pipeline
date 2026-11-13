@@ -100,7 +100,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if (not isinstance(source, dict) or source.get('module') not in MODULES
                     or not isinstance(source.get('url'), str)
                     or not isinstance(source.get('label'), str)
-                    or type(source.get('enabled')) is not bool):
+                    or type(source.get('screen')) is not bool):
                     raise ValueError('来源配置无效')
                 source['days'] = int(source.get('days', 3))
                 if not 1 <= source['days'] <= 30:

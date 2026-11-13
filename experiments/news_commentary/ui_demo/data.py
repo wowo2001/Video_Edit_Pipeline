@@ -11,11 +11,17 @@ from core.utils import safe_json_parse
 from core.llm_cost import record_llm_usage
 
 COST = Path('work/news_comment_ui/llm_cost_report.json')
-PROMPT = '''你是一名新闻评论选题编辑。根据输入标题和来源，将适合放在同一条评论视频中讨论的报道分组。
-每组围绕具体问题、同一事件、因果关系或不同观点，不要仅因属于同一大类就放在一起。
+PROMPT = '''你是一名新闻评论选题编辑。根据输入的标题和来源，寻找值得放在
+同一条评论视频里讨论的材料组合
+分组的核心是：这些报道放在一起，能帮助观众理解什么单看其中
+一条不容易看清的问题？
+
+每组先确定一个具体的评论问题，再选择对这个问题有实际贡献的报道。
+组内每条报道都应增加新的信息、解释角度或对照，不能只是重复。
+不要求每条报道的标题都直接出现该组的核心主题。
+
 同一新闻可以出现在多个组中，不要求互斥；同组内不重复，不输出完全相同的组。
 无法合理关联的新闻单独成组，不强行拼凑，不限制组数或每组数量。
-只依据输入信息，不编造事实、因果或立场；不确定时分开。
 每组给出简短中文问题标题及一句 reason 说明关联和评论切入点。
 使用输入 ID 引用，所有新闻至少出现一次。只输出 JSON：
 {"groups":[{"title":"评论问题","reason":"关联和切入点","news_ids":["ID1","ID2"]}]}
@@ -23,8 +29,8 @@ PROMPT = '''你是一名新闻评论选题编辑。根据输入标题和来源�
 
 def fetch_news(body, log=lambda message: None):
     result,errors={},[]
+    direct_ids=set()
     for source in body['sources']:
-        if not source['enabled']: continue
         try:
             url=source['url'].strip();name=source['label'] or url
             days=int(source.get('days',3))
@@ -68,12 +74,18 @@ def fetch_news(body, log=lambda message: None):
                           publisher=row.get('publisher') or row['channel_name'],type=row['source_type'],
                           topic=body['topic'],published_at=row['published_at'],thumbnail=row.get('thumbnail_url'),duration=row.get('duration_seconds'))
                 result[item['id']]=item
+                if not source.get('screen', True):
+                    direct_ids.add(item['id'])
         except Exception as error:
             message=f"{source.get('label') or source['url']}：{error}"
             errors.append(message);log("抓取失败："+message)
     items=sorted(result.values(),key=lambda r:r['published_at'],reverse=True)
     if body.get('screen', True):
-        filtered=screen_topic(items,body['topic'],log)
+        candidates=[item for item in items if item['id'] not in direct_ids]
+        direct=[item for item in items if item['id'] in direct_ids]
+        screened=screen_topic(candidates,body['topic'],log) if candidates else []
+        filtered=sorted(direct+screened,key=lambda r:r['published_at'],reverse=True)
+        log(f'合并完成：直接保留 {len(direct)} 条，LLM 筛选保留 {len(screened)}/{len(candidates)} 条，共 {len(filtered)} 条')
     else:
         log(f'只拉取：{body["topic"]}，跳过 Luna 主题筛选，保留 {len(items)} 条报道')
         filtered=items
@@ -103,9 +115,9 @@ def screen_topic(items, topic, log=lambda message: None):
 def group_news(body, log=lambda message: None):
     items=body['items'];by_id={r['id']:r for r in items}
     if not items:return {'groups':[]}
-    llm=ChatGPT();model=llm.config['models']['screen_news_titles']
+    llm=ChatGPT();model=llm.config['models']['group_commentary_news']
     prompt=PROMPT+'\n当前主题：'+body['topic']+'\n主题范围：'+load_topics()[body['topic']]['prompt']+'\n新闻：'+json.dumps([{'id':r['id'],'title':r['title'],'source':r['source']} for r in items],ensure_ascii=False)
-    log(f'开始 Luna 分组：{len(items)} 条报道')
+    log(f'开始 {model} 分组：{len(items)} 条报道')
     response=llm.client.chat.completions.create(model=model,messages=[{'role':'user','content':prompt}])
     COST.parent.mkdir(parents=True,exist_ok=True)
     record_llm_usage(COST,llm.provider,'group_commentary_news',model,response.usage)
@@ -118,5 +130,5 @@ def group_news(body, log=lambda message: None):
         seen.add(key);covered.update(ids)
         groups.append([str(g.get('title') or '相关报道'),[by_id[i] for i in ids],str(g.get('reason') or '')])
     for i in by_id.keys()-covered:groups.append([by_id[i]['title'],[by_id[i]],'独立报道'])
-    log(f'Luna 分组完成：{len(groups)} 组，费用已记录')
+    log(f'{model} 分组完成：{len(groups)} 组，费用已记录')
     return {'groups':groups,'model':model,'cost_file':str(COST)}
