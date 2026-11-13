@@ -39,8 +39,8 @@ FIX_SUBTITLE_PROMPT = """
 "text": "<弹幕内容>",
 "start_time": <秒数>
 }
-]
-"title":: "<视频标题>"
+],
+"title": "<视频标题>"
 }
 
 说明：
