@@ -13,6 +13,7 @@ class GuardianTests(unittest.TestCase):
             item('business/2026/nov/14/example', recent),
             item('business/2026/nov/14/example', recent),
             item('business/live/2026/nov/14/example', recent),
+            item('commentisfree/picture/2026/nov/14/cartoon', recent),
             item('business/2026/nov/01/old', 'Sun, 01 Nov 2026 19:00:00 GMT'),
         ]) + '</channel></rss>'
         rows = parse_guardian_news(xml, 3, now=datetime(2026, 11, 15, tzinfo=timezone.utc))

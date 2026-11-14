@@ -26,7 +26,7 @@ def validate_url(url):
 def article_url(url):
     parsed = validate_url(url)
     return (bool(re.search(r'/\d{4}/[a-z]{3}/\d{1,2}/', parsed.path))
-            and not any(f'/{kind}/' in parsed.path for kind in ('live', 'video', 'audio', 'gallery')))
+            and not any(f'/{kind}/' in parsed.path for kind in ('live', 'video', 'audio', 'gallery', 'picture')))
 
 
 def parse_guardian_news(xml, days=3, *, now=None):
@@ -68,7 +68,7 @@ def fetch_guardian_news(url=DEFAULT_URL, days=3, *, now=None, log=print):
     response.raise_for_status()
     validate_url(response.url)
     rows = parse_guardian_news(response.content, days, now=now)
-    log(f'Guardian RSS：范围内 {len(rows)} 篇文章（仅覆盖订阅源近期条目，跳过直播/视频/音频/图集）')
+    log(f'Guardian RSS：范围内 {len(rows)} 篇文章（仅覆盖订阅源近期条目，跳过直播/视频/音频/图集/漫画）')
     return rows
 
 
@@ -94,7 +94,7 @@ def parse_guardian_article(page):
 
 def fetch_guardian_article(url):
     if not article_url(url):
-        raise ValueError('需要 Guardian 普通文章网址，暂不支持直播、视频、音频和图集')
+        raise ValueError('需要 Guardian 普通文章网址，暂不支持直播、视频、音频、图集和漫画')
     response = requests.get(url, timeout=30)
     response.raise_for_status()
     validate_url(response.url)
