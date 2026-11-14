@@ -116,7 +116,7 @@ def validate_plan(plan, catalog, advertisement=''):
 
 def source_type(item):
     return item.get('source_type') or ('article' if urlparse(item['url']).hostname in
-                                     ('cis.org.au', 'www.cis.org.au', 'afr.com', 'www.afr.com', 'www.nsw.gov.au', 'www.fairwork.gov.au',
+                                     ('theguardian.com', 'www.theguardian.com', 'cis.org.au', 'www.cis.org.au', 'afr.com', 'www.afr.com', 'www.nsw.gov.au', 'www.fairwork.gov.au',
                                       'minister.homeaffairs.gov.au') else 'video')
 
 
@@ -132,7 +132,11 @@ def download_sources(config, root):
             print(f'[{sid}] download ({kind})', flush=True)
             if kind == 'article':
                 host = urlparse(item['url']).hostname
-                if host in ('afr.com', 'www.afr.com'):
+                if host in ('theguardian.com', 'www.theguardian.com'):
+                    from services.guardian import fetch_guardian_article
+                    content = fetch_guardian_article(item['url'])
+                    item = {**item, 'publisher': 'The Guardian'}
+                elif host in ('afr.com', 'www.afr.com'):
                     from services.afr_article import fetch_afr_article
                     content = fetch_afr_article(item['url'])
                 elif host in ('cis.org.au', 'www.cis.org.au'):
