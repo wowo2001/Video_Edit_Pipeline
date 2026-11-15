@@ -18,7 +18,7 @@ RUNS = {}
 CONFIG = ROOT / 'sources.json'
 LOCK = Lock()
 from experiments.news_commentary.ui_demo.topics import load_topics, task_sources
-MODULES = ('guardian', 'cis', 'youtube', 'afr', 'the_australian', 'nsw_gov', 'fair_work',
+MODULES = ('domain', 'guardian', 'cis', 'youtube', 'afr', 'the_australian', 'nsw_gov', 'fair_work',
            'home_affairs_minister')
 
 class Handler(SimpleHTTPRequestHandler):

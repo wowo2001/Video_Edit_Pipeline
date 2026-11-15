@@ -47,6 +47,9 @@ def fetch_news(body, log=lambda message: None):
                 config={'name':name,'channel_ref':url,'playlist_id':playlist,'live_streams_only':parsed.path.endswith(('/streams','/live'))}
                 rows=client.recent_videos(config,days);client.add_video_durations(rows)
                 for row in rows:row['source_type']='video'
+            elif source['module']=='domain':
+                from services.domain import fetch_domain_news
+                rows=fetch_domain_news(url,days,log=log)
             elif source['module']=='guardian':
                 from services.guardian import fetch_guardian_news
                 rows=fetch_guardian_news(url,days,log=log)

@@ -86,6 +86,8 @@ def produce_mixed(root):
                     logo=Path(__file__).resolve().parents[2]/'assets/afr_logo_1280x720.png'
                 if not logo and source['publisher']=='The Guardian':
                     logo=Path(__file__).resolve().parents[2]/'assets/guardian_typewriter_background_blurred.png'
+                if not logo and source['publisher']=='Domain':
+                    logo=Path(__file__).resolve().parents[2]/'assets/domain_typewriter_background_blurred.png'
                 if logo:
                     inputs=['-loop',1,'-i',logo];vf='setpts=PTS-STARTPTS'
                 else:
