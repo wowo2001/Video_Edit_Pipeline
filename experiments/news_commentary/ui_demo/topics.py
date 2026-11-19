@@ -11,10 +11,11 @@ def load_topics():
         not isinstance(name, str) or not name.strip() or
         not isinstance(description, dict) or
         not isinstance(description.get("prompt"), str) or not description["prompt"].strip() or
+        not isinstance(description.get("sources"), list) or
         not isinstance(description.get("asr_language"), str) or not description["asr_language"].strip()
         for name, description in topics.items()
     ):
-        raise ValueError("topics.json 每个主题必须包含非空 prompt 和 asr_language")
+        raise ValueError("topics.json 每个主题必须包含非空 prompt、asr_language 和 sources 列表")
     return topics
 
 
