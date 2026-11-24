@@ -8,6 +8,28 @@ from core.path import ProjectPaths
 CHANNEL_ID = 'UCGTnz6vvLd3upDsDS0uYwNw'
 
 
+def create_upload_subtitles(root, orientation, main):
+    """Convert body milliseconds to final video time (cover precedes speed-up)."""
+    root = Path(root)
+    speed = float(main['commentary_portrait_speed']) if orientation == 'portrait' else 1.4
+    if not math.isfinite(speed) or speed <= 0:
+        raise ValueError('字幕变速倍率无效')
+    rows = read_json(root/'final_subtitles.json')['utterances']
+    if not rows:
+        raise ValueError('成片字幕为空')
+    def stamp(ms):
+        value = round((float(ms) + 1000) / speed)
+        return f'{value//3600000:02d}:{value//60000%60:02d}:{value//1000%60:02d},{value%1000:03d}'
+    blocks = []
+    for i, row in enumerate(rows, 1):
+        if row['start_time'] < 0 or row['end_time'] <= row['start_time']:
+            raise ValueError('成片字幕时间范围无效')
+        blocks.append(f"{i}\n{stamp(row['start_time'])} --> {stamp(row['end_time'])}\n{row['text']}\n")
+    path = root/f'youtube_{orientation}.srt'
+    path.write_text('\n'.join(blocks), encoding='utf-8')
+    return str(path)
+
+
 def build_upload_config(root, orientation='landscape'):
     """Build arguments only; no network requests or uploads."""
     if orientation not in ('portrait', 'landscape'):
@@ -25,6 +47,7 @@ def build_upload_config(root, orientation='landscape'):
     links = '\n'.join(f"{s.get('publisher') or s['source_id']}: {s['url']}" for s in sources)
     return dict(video_path=main[video_key], title=plan['title'], channel_id=CHANNEL_ID,
                 thumbnail_path=main[cover_key],
+                caption_path=create_upload_subtitles(root, orientation, main),
                 description=(plan.get('summary', '') + '\n\n素材来源：\n' + links).strip(),
                 tags=tags, privacy='public', publish_at=None)
 
@@ -76,5 +99,5 @@ def upload_news_videos(root):
             'receipt_path': str(receipt), 'privacy': 'public', 'tags': config['tags']}
         write_json(media, paths.media, ensure_ascii=False, indent=2)
         results[orientation] = result
-        print(f'YouTube {orientation} 视频及封面上传成功: {result["url"]}', flush=True)
+        print(f'YouTube {orientation} 视频、封面及字幕上传成功: {result["url"]}', flush=True)
     return results

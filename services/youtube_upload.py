@@ -18,7 +18,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 SCOPES = ['https://www.googleapis.com/auth/youtube.upload',
-          'https://www.googleapis.com/auth/youtube.readonly']
+          'https://www.googleapis.com/auth/youtube.readonly',
+          'https://www.googleapis.com/auth/youtube.force-ssl']
 
 
 def save_json(path, data, private=False):
@@ -99,7 +100,8 @@ def upload_video(*, video_path, title, channel_id, client_secrets='auth/youtube_
                  token_path='auth/youtube_token.json', thumbnail_path=None, receipt_path=None,
                  description='', privacy='private', tags=None, category_id='25', language='zh',
                  made_for_kids=False, contains_synthetic_media=None, publish_at=None,
-                 notify_subscribers=False, processing_timeout=600, service=None):
+                 notify_subscribers=False, processing_timeout=600, service=None,
+                 caption_path=None, caption_language='zh-Hans', caption_name='简体中文'):
     """Upload one video. Reuse a saved video ID when retrying thumbnail processing."""
     video = Path(video_path).resolve()
     if not video.is_file() or not video.stat().st_size:
@@ -112,6 +114,9 @@ def upload_video(*, video_path, title, channel_id, client_secrets='auth/youtube_
     if thumbnail and (not thumbnail.is_file() or not 0 < thumbnail.stat().st_size <= 50 * 1024 * 1024
                       or thumbnail.suffix.lower() not in ('.jpg', '.jpeg', '.png')):
         raise ValueError('封面需为不超过 50 MB 的非空 PNG/JPEG 文件')
+    caption = Path(caption_path).resolve() if caption_path else None
+    if caption and (not caption.is_file() or not 0 < caption.stat().st_size <= 100 * 1024 * 1024):
+        raise ValueError('字幕文件缺失、为空或超过100 MB')
     receipt = Path(receipt_path) if receipt_path else video.with_suffix('.youtube.json')
     digest = hashlib.sha256()
     with video.open('rb') as stream:
@@ -150,7 +155,30 @@ def upload_video(*, video_path, title, channel_id, client_secrets='auth/youtube_
                 str(thumbnail), mimetype=mimetypes.guess_type(str(thumbnail))[0])).execute(num_retries=3)
             state.update(thumbnail_sha256=thumbnail_hash, thumbnail_path=str(thumbnail))
             save_json(receipt, state)
+    if caption:
+        upload_caption(service, state, receipt, caption, caption_language, caption_name)
     return state
+
+
+def upload_caption(service, state, receipt, path, language, name):
+    identity = dict(sha256=hashlib.sha256(path.read_bytes()).hexdigest(), language=language, name=name)
+    if state.get('caption', {}).get('request') == identity:
+        return
+    # Recover an insert that succeeded remotely even if saving the receipt failed.
+    tracks = service.captions().list(part='snippet', videoId=state['video_id']).execute(num_retries=3)
+    existing = next((t for t in tracks.get('items', [])
+                     if t['snippet']['language'] == language and t['snippet']['name'] == name), None)
+    media = MediaFileUpload(str(path), mimetype='application/octet-stream')
+    if existing:
+        request = service.captions().update(part='snippet',
+            body={'id': existing['id'], 'snippet': {'isDraft': False}}, media_body=media)
+    else:
+        request = service.captions().insert(part='snippet', body={'snippet': {
+            'videoId': state['video_id'], 'language': language, 'name': name, 'isDraft': False}}, media_body=media)
+    result = request.execute(num_retries=3)
+    state['caption'] = {'id': result['id'], 'request': identity, 'path': str(path)}
+    save_json(receipt, state)
+    print('YouTube 中文字幕轨道上传成功', flush=True)
 
 
 def main():

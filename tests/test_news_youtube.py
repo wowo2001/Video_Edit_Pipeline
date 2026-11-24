@@ -15,7 +15,8 @@ class NewsYouTubeTests(unittest.TestCase):
                 'commentary_news_video_path','commentary_landscape_video_path',
                 'commentary_cover_path','commentary_cover_landscape_path')}
             for path in files.values(): Path(path).write_bytes(b'test')
-            (root/'media.json').write_text(json.dumps({'main':files}))
+            (root/'media.json').write_text(json.dumps({'main':{**files, 'commentary_portrait_speed':1.4}}))
+            (root/'final_subtitles.json').write_text(json.dumps({'utterances':[{'start_time':0,'end_time':1800,'text':'测试字幕'}]}))
             (root/'commentary_plan.json').write_text(json.dumps({'title':'标题','summary':'简介','tags':['澳洲','新闻']}))
             (root/'source_catalog.json').write_text(json.dumps([{'source_id':'s1','publisher':'ABC','url':'https://example.com'}]))
             ok={'video_id':'id1','url':'https://www.youtube.com/watch?v=id1'}
