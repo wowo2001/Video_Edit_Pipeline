@@ -1,30 +1,624 @@
 {
   "房产": {
     "prompt": "房价、租赁、住房供给、房贷、房地产政策。",
-    "asr_language": "en-US"
+    "asr_language": "en-US",
+    "sources": [
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@ABCNewsAustralia",
+        "label": "ABC News Australia",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@7news",
+        "label": "7NEWS",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/property/residential",
+        "label": "AFR · Property",
+        "days": 2,
+        "screen": false
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@9NewsAUS",
+        "label": "9 News Australia",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/property/commercial",
+        "label": "AFR · Property",
+        "days": 2,
+        "screen": false
+      },
+      {
+        "module": "nsw_gov",
+        "url": "https://www.nsw.gov.au/departments-and-agencies/fair-trading/news",
+        "label": "NSW Fair Trading",
+        "days": 10,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@Cotality_AU/videos",
+        "label": "CoreLogic",
+        "days": 30,
+        "screen": false
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/the-afr-view",
+        "label": "AFR · View",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/playlist?list=PLECacouYcyPsf8T7pOrM7c0x1ChV_BPy4",
+        "label": "Rask",
+        "days": 2,
+        "screen": false
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@60MinutesAU",
+        "label": "60 Minutes",
+        "days": 3,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/chanticleer",
+        "label": "AFR View",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://youtube.com/@financialreview",
+        "label": "AFR",
+        "days": 2,
+        "screen": false
+      },
+      {
+        "module": "guardian",
+        "url": "https://www.theguardian.com/australia-news/housing",
+        "label": "The Guardian Housing",
+        "screen": false,
+        "days": 2
+      },
+      {
+        "module": "domain",
+        "url": "https://www.domain.com.au/news",
+        "label": "Domain Owners",
+        "screen": false,
+        "days": 2
+      }
+    ]
   },
   "社会": {
     "prompt": "社会公共议题，包括治安与司法、教育、医疗、社会福利、人口与社区、社会公平、公共服务及相关政策争议；不因属于日常生活就纳入纯娱乐、旅游攻略或消费推荐。",
-    "asr_language": "en-US"
+    "asr_language": "en-US",
+    "sources": [
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@ABCNewsAustralia",
+        "label": "ABC News Australia",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@7news",
+        "label": "7NEWS",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@9NewsAUS",
+        "label": "9 News Australia",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/the-afr-view",
+        "label": "AFR · View",
+        "days": 3,
+        "screen": false
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@60MinutesAU",
+        "label": "60 Minutes",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "nsw_gov",
+        "url": "https://www.nsw.gov.au/ministerial-releases",
+        "label": "NSW Media Release",
+        "days": 10,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/chanticleer",
+        "label": "AFR View",
+        "days": 2,
+        "screen": false
+      },
+      {
+        "module": "cis",
+        "url": "https://www.cis.org.au/commentary/opinions/",
+        "label": "CIS",
+        "days": 5,
+        "screen": false
+      },
+      {
+        "module": "guardian",
+        "url": "https://www.theguardian.com/australia-news",
+        "label": "The Guardian",
+        "screen": true,
+        "days": 2
+      }
+    ]
   },
-  "签证": {
-    "prompt": "签证、移民政策、申请资格、入籍及签证持有人权益。",
-    "asr_language": "en-US"
+  "移民": {
+    "prompt": "签证、移民政策、移民生活、少数族裔、申请资格、入籍及签证持有人权益。",
+    "asr_language": "en-US",
+    "sources": [
+      {
+        "module": "home_affairs_minister",
+        "url": "https://minister.homeaffairs.gov.au/ministers-for-home-affairs/the-hon-tony-burke-mp",
+        "label": "Home Affairs · Tony Burke",
+        "days": 30,
+        "screen": false
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@SBSAustralia",
+        "label": "SBS Australia",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@ABCNewsAustralia",
+        "label": "ABC News",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@9NewsAUS",
+        "label": "9 News",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@7news",
+        "label": "7 News",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/the-afr-view",
+        "label": "AFR · View",
+        "days": 5,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@60MinutesAU",
+        "label": "60 Minutes",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/chanticleer",
+        "label": "AFR View",
+        "days": 5,
+        "screen": true
+      },
+      {
+        "module": "guardian",
+        "url": "https://www.theguardian.com/australia-news/australian-immigration-and-asylum",
+        "label": "The Guardian Immigration",
+        "screen": false,
+        "days": 2
+      },
+      {
+        "module": "guardian",
+        "url": "https://www.theguardian.com/au/commentisfree",
+        "label": "The Guardian Comment",
+        "screen": true,
+        "days": 2
+      }
+    ]
   },
   "税务": {
     "prompt": "个人和企业税收、报税、税制及税务政策。",
-    "asr_language": "en-US"
+    "asr_language": "en-US",
+    "sources": [
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/policy/tax-and-super",
+        "label": "AFR · Tax",
+        "days": 15,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@ABCNewsAustralia",
+        "label": "ABC News",
+        "days": 3,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@9NewsAUS",
+        "label": "9 News Australia",
+        "days": 3,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@7news",
+        "label": "7NEWS",
+        "days": 3,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/the-afr-view",
+        "label": "AFR · View",
+        "days": 10,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/chanticleer",
+        "label": "AFR View",
+        "days": 10,
+        "screen": true
+      },
+      {
+        "module": "cis",
+        "url": "https://www.cis.org.au/commentary/opinions/",
+        "label": "CIS",
+        "days": 10,
+        "screen": true
+      }
+    ]
   },
   "经济": {
     "prompt": "宏观经济、增长、通胀、利率、财政、贸易及产业政策。",
-    "asr_language": "en-US"
+    "asr_language": "en-US",
+    "sources": [
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/policy/economy",
+        "label": "AFR · Policy",
+        "days": 2,
+        "screen": false
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@ABCNewsAustralia",
+        "label": "ABC News",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@9NewsAUS",
+        "label": "9 News Australia",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@7news",
+        "label": "7NEWS",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "nsw_gov",
+        "url": "https://www.nsw.gov.au/ministerial-releases",
+        "label": "NSW Media Release",
+        "days": 3,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/the-afr-view",
+        "label": "AFR · View",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@60MinutesAU",
+        "label": "60 Minutes",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/chanticleer",
+        "label": "AFR View",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://youtube.com/@financialreview",
+        "label": "AFR",
+        "days": 10,
+        "screen": false
+      },
+      {
+        "module": "cis",
+        "url": "https://www.cis.org.au/commentary/opinions/",
+        "label": "CIS",
+        "days": 5,
+        "screen": false
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/rear-window",
+        "label": "Rear Window",
+        "screen": true,
+        "days": 2
+      },
+      {
+        "module": "guardian",
+        "url": "https://www.theguardian.com/australia-news",
+        "label": "The Guardian",
+        "screen": true,
+        "days": 2
+      }
+    ]
   },
   "职场": {
     "prompt": "就业、工资、劳动权益、工作条件、招聘和劳资关系。",
-    "asr_language": "en-US"
+    "asr_language": "en-US",
+    "sources": [
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@ABCNewsAustralia",
+        "label": "ABC News",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@9NewsAUS",
+        "label": "9 News Australia",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@7news",
+        "label": "7NEWS",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/work-and-careers/workplace",
+        "label": "AFR · Workplace",
+        "days": 5,
+        "screen": false
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/work-and-careers/careers",
+        "label": "AFR · Career",
+        "days": 5,
+        "screen": false
+      },
+      {
+        "module": "nsw_gov",
+        "url": "https://www.nsw.gov.au/ministerial-releases",
+        "label": "NSW Media Release",
+        "days": 5,
+        "screen": true
+      },
+      {
+        "module": "fair_work",
+        "url": "https://www.fairwork.gov.au/newsroom/media-releases",
+        "label": "Fair Work",
+        "days": 5,
+        "screen": false
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/the-afr-view",
+        "label": "AFR · View",
+        "days": 5,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@60MinutesAU",
+        "label": "60 Minutes",
+        "days": 2,
+        "screen": true
+      }
+    ]
   },
   "日本经济": {
     "prompt": "聚焦日本经济，包括经济增长、通胀与工资、日本央行货币政策和利率、日元汇率、财政与税收、就业、消费、贸易、企业投资及产业政策。选择与日本经济有实质关联的报道，不要求与澳大利亚相关；排除无经济关联的旅游攻略、娱乐和一般社会新闻。",
-    "asr_language": "ja-JP"
+    "asr_language": "ja-JP",
+    "sources": [
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@ANNnewsCH",
+        "label": "ANNnewsCH",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@ntv_news",
+        "label": "ntv_news",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@tbsnewsdig",
+        "label": "tbsnewsdig",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@tvtokyobiz",
+        "label": "tvtokyobiz",
+        "days": 2,
+        "screen": true
+      }
+    ]
+  },
+  "躺平叔": {
+    "prompt": "你是一名社会经济评论节目的新闻素材编辑。\n\n节目的长期关注主题是：经济环境、房地产、签证政策、产业变化和社会发展如何改变普通人的生活、收入、财富、工作机会与选择。",
+    "asr_language": "en-US",
+    "sources": [
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@ABCNewsAustralia",
+        "label": "ABC News Australia",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@7news",
+        "label": "7NEWS",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/property/residential",
+        "label": "AFR · Property",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@9NewsAUS",
+        "label": "9 News Australia",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/property/commercial",
+        "label": "AFR · Property",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "nsw_gov",
+        "url": "https://www.nsw.gov.au/departments-and-agencies/fair-trading/news",
+        "label": "NSW Fair Trading",
+        "days": 10,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@Cotality_AU/videos",
+        "label": "CoreLogic",
+        "days": 30,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/the-afr-view",
+        "label": "AFR · View",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/playlist?list=PLECacouYcyPsf8T7pOrM7c0x1ChV_BPy4",
+        "label": "Rask",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://www.youtube.com/@60MinutesAU",
+        "label": "60 Minutes",
+        "days": 3,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/chanticleer",
+        "label": "AFR View",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "youtube",
+        "url": "https://youtube.com/@financialreview",
+        "label": "AFR",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "guardian",
+        "url": "https://www.theguardian.com/australia-news",
+        "label": "The Guardian Housing",
+        "screen": true,
+        "days": 2
+      },
+      {
+        "module": "domain",
+        "url": "https://www.domain.com.au/news",
+        "label": "Domain Owners",
+        "screen": true,
+        "days": 2
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/work-and-careers/workplace",
+        "label": "AFR · Workplace",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/work-and-careers/careers",
+        "label": "AFR · Career",
+        "days": 2,
+        "screen": true
+      },
+      {
+        "module": "afr",
+        "url": "https://www.afr.com/policy/economy",
+        "label": "AFR Policy",
+        "screen": true,
+        "days": 2
+      }
+    ]
   }
 }

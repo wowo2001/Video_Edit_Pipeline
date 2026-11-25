@@ -69,6 +69,8 @@ def prepare_paraphrase_videos(root):
                     background = Path(source['context'].get('typewriter_background') or federal_background or
                         ({'Centre for Independent Studies': ROOT/'assets/cis_typewriter_background.png',
                           'AFR': ROOT/'assets/afr_typewriter_background_blurred.png',
+                          'Domain': ROOT/'assets/domain_typewriter_background_blurred.png',
+                          'The Guardian': ROOT/'assets/guardian_typewriter_background_blurred.png',
                           'NSW Government': ROOT/'assets/nsw_typewriter_background_blurred.png',
                           'Fair Work Ombudsman': ROOT/'assets/australian_government_typewriter_background_blurred.png'
                           }.get(ref['publisher'], '')))

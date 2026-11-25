@@ -46,7 +46,7 @@ PROVIDERS = {
             "select_chinese_australia_topic": "gpt-6.1-sol",
             "plan_parliament_commentary": "gpt-6.1-sol",
             "screen_news_titles": "gpt-6-luna",
-            "group_commentary_news": "gpt-6.1-sol",
+            "group_commentary_news": "gpt-6-luna",
             "plan_translation_advertisement": "gpt-6.1-sol",
         },
     },

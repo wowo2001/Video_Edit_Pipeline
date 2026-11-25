@@ -15,10 +15,10 @@ sys.path.insert(0, str(ROOT.parents[2]))
 from experiments.news_commentary.ui_demo.data import fetch_news, group_news
 JOBS = {}
 RUNS = {}
-CONFIG = ROOT / 'sources.json'
+CONFIG = ROOT / 'topics.json'
 LOCK = Lock()
 from experiments.news_commentary.ui_demo.topics import load_topics, task_sources
-MODULES = ('cis', 'youtube', 'afr', 'the_australian', 'nsw_gov', 'fair_work',
+MODULES = ('domain', 'guardian', 'cis', 'youtube', 'afr', 'the_australian', 'nsw_gov', 'fair_work',
            'home_affairs_minister')
 
 class Handler(SimpleHTTPRequestHandler):
@@ -55,18 +55,37 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(200, load_topics())
         if self.path == '/api/sources':
             with LOCK:
-                self.reply(200, json.loads(CONFIG.read_text(encoding='utf-8')))
+                self.reply(200, {name: config['sources'] for name, config in load_topics().items()})
         else:
             super().do_GET()
 
     def do_POST(self):
-        if self.path not in ('/api/sources','/api/fetch','/api/group','/api/start'):
+        if self.path not in ('/api/topics','/api/sources','/api/fetch','/api/group','/api/start'):
             return self.reply(404, {'error': '接口不存在'})
         try:
             length = int(self.headers.get('Content-Length', '0'))
             if not 0 < length <= 1000000:
                 raise ValueError('请求大小无效')
             body = json.loads(self.rfile.read(length))
+            if self.path == '/api/topics':
+                topic, prompt = body.get('topic'), body.get('prompt')
+                if not isinstance(topic, str) or not topic.strip() or not isinstance(prompt, str) or not prompt.strip():
+                    raise ValueError('主题名称和 prompt 不能为空')
+                topic, prompt = topic.strip(), prompt.strip()
+                with LOCK:
+                    data = load_topics()
+                    if body.get('create') is True:
+                        if topic in data:
+                            raise ValueError('该主题已存在')
+                        data[topic] = {'prompt': prompt, 'asr_language': 'en-US', 'sources': []}
+                    else:
+                        if topic not in data:
+                            raise ValueError('主题不存在')
+                        data[topic]['prompt'] = prompt
+                    temporary = CONFIG.with_suffix('.tmp')
+                    temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
+                    os.replace(temporary, CONFIG)
+                return self.reply(200, {'topic': topic, 'config': data[topic]})
             if self.path in ('/api/fetch','/api/group'):
                 job_id=uuid.uuid4().hex
                 JOBS[job_id]={'status':'running','logs':[]}
@@ -107,7 +126,7 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError('时间范围必须为1至30天')
             with LOCK:
                 data = json.loads(CONFIG.read_text(encoding='utf-8'))
-                data[topic] = sources
+                data[topic]['sources'] = sources
                 temporary = CONFIG.with_suffix('.tmp')
                 temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
                 os.replace(temporary, CONFIG)

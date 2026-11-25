@@ -539,7 +539,10 @@ def classify_speaker_genders(paths: ProjectPaths) -> dict:
         except (IndexError, json.JSONDecodeError) as error:
             raise RuntimeError(f"{speaker} 的性别模型没有返回 JSON：{result.stdout[-800:]}") from error
 
-    media_data["main"]["speaker_gender_mapping"] = genders
+    from experiments.news_commentary.speaker_gender import attach_genders
+    transcript = read_json(paths.subtitles["json"])
+    attach_genders(transcript, genders)
+    write_json(transcript, paths.subtitles["json"], ensure_ascii=False, indent=2)
     media_data["main"]["speaker_gender_audio_dir"] = str(gender_audio_dir)
     write_json(media_data, paths.media)
     print(f"声音性别判断完成: {len(genders)} 个声纹簇")
@@ -991,7 +994,8 @@ def translate_commentary_dialogue(paths: ProjectPaths) -> Path:
     plan = read_json(plan_path)
     subtitles = read_json(paths.subtitles["json"]).get("utterances", [])
     media_data = read_json(paths.media)
-    genders = media_data.get("main", {}).get("speaker_gender_mapping", {})
+    from experiments.news_commentary.speaker_gender import mapping_from_transcript
+    genders = mapping_from_transcript({"utterances": subtitles})
 
     dialogue_rows = []
     for segment in plan.get("segments", []):

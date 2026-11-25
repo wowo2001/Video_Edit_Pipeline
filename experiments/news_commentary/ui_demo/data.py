@@ -11,18 +11,20 @@ from core.utils import safe_json_parse
 from core.llm_cost import record_llm_usage
 
 COST = Path('work/news_comment_ui/llm_cost_report.json')
-PROMPT = '''你是一名新闻评论选题编辑。根据输入的标题和来源，寻找值得放在
-同一条评论视频里讨论的材料组合
-分组的核心是：这些报道放在一起，能帮助观众理解什么单看其中
-一条不容易看清的问题？
+PROMPT = '''你是中文观点视频的选题编辑。你长期关注经济变化如何影响普通人的工作、收入、资产和生活选择，以及收益归谁、成本由谁承担。
 
-每组先确定一个具体的评论问题，再选择对这个问题有实际贡献的报道。
-组内每条报道都应增加新的信息、解释角度或对照，不能只是重复。
-不要求每条报道的标题都直接出现该组的核心主题。
+根据输入的标题和来源，寻找能够共同支撑一个具体评论问题的材料组合。
+分组的核心是：这些报道放在一起，能帮助观众理解什么单看其中一条不容易看清的处境或变化？
+同一组可以跨越房产、就业、消费、政策等类别，不要求标题出现相同关键词；也不要仅因属于同一类别就放在一起。
+
+每组先提出一个值得进一步核实的候选判断，再选择对这个问题有实际贡献的报道。
+优先组合能够互相补充的材料：具体事件与更广泛的变化、政策承诺与实际结果、不同主体受到的影响、相互矛盾的表态或数据。
+组内每条报道都应增加新的信息、解释角度或对照。不要为了覆盖新闻，把关联较弱的报道塞进一组。
+只根据标题和已有信息判断关联；不能确认的联系保持为问题，不编造事实或因果，不强行归结为经济下行。最终判断留给阅读完整材料后的文案规划。
 
 同一新闻可以出现在多个组中，不要求互斥；同组内不重复，不输出完全相同的组。
 无法合理关联的新闻单独成组，不强行拼凑，不限制组数或每组数量。
-每组给出简短中文问题标题及一句 reason 说明关联和评论切入点。
+每组给出简短中文问题标题；reason 简要说明候选角度，以及各条材料分别贡献什么。
 使用输入 ID 引用，所有新闻至少出现一次。只输出 JSON：
 {"groups":[{"title":"评论问题","reason":"关联和切入点","news_ids":["ID1","ID2"]}]}
 '''
@@ -45,6 +47,12 @@ def fetch_news(body, log=lambda message: None):
                 config={'name':name,'channel_ref':url,'playlist_id':playlist,'live_streams_only':parsed.path.endswith(('/streams','/live'))}
                 rows=client.recent_videos(config,days);client.add_video_durations(rows)
                 for row in rows:row['source_type']='video'
+            elif source['module']=='domain':
+                from services.domain import fetch_domain_news
+                rows=fetch_domain_news(url,days,log=log)
+            elif source['module']=='guardian':
+                from services.guardian import fetch_guardian_news
+                rows=fetch_guardian_news(url,days,log=log)
             elif source['module']=='cis':
                 from services.cis import fetch_cis_news
                 rows=fetch_cis_news(url,days,log=log)
