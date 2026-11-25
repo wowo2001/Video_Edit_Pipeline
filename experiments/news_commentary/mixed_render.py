@@ -74,7 +74,9 @@ def produce_mixed(root):
             frames=max(1,round(end*30)-round(cursor*30))
             clip=directory/f'{len(clips):03d}.mp4'
             print(f'合成素材 {len(clips)+1}: {duration:.2f}s',flush=True)
-            if visual:
+            if segment['narration_parts'][0]['kind'] == 'intro':
+                inputs=['-f','lavfi','-i','color=c=black:s=1280x720:r=30'];vf='null'
+            elif visual:
                 inputs=['-i',visual];vf='setpts=PTS-STARTPTS'
             elif bounds:
                 start,stop=bounds

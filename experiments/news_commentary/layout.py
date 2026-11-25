@@ -7,7 +7,7 @@ CONFIG_PATH = Path(__file__).with_name('layout_config.json')
 
 def build_layout_timeline(root, config_path=CONFIG_PATH):
     config = read_json(config_path)
-    kinds = ('bridge','commentary','video_paraphrase','article_paraphrase','article_quote','dialogue','audience_question')
+    kinds = ('intro','bridge','commentary','video_paraphrase','article_paraphrase','article_quote','dialogue','audience_question')
     if any(config[k] not in ('none','small','large') for k in kinds):
         raise ValueError('布局只能是 none、small 或 large')
     if config['transition_seconds'] < 0:

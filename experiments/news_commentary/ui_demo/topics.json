@@ -539,14 +539,14 @@
         "module": "nsw_gov",
         "url": "https://www.nsw.gov.au/departments-and-agencies/fair-trading/news",
         "label": "NSW Fair Trading",
-        "days": 10,
+        "days": 2,
         "screen": true
       },
       {
         "module": "youtube",
         "url": "https://www.youtube.com/@Cotality_AU/videos",
         "label": "CoreLogic",
-        "days": 30,
+        "days": 2,
         "screen": true
       },
       {
@@ -567,7 +567,7 @@
         "module": "youtube",
         "url": "https://www.youtube.com/@60MinutesAU",
         "label": "60 Minutes",
-        "days": 3,
+        "days": 2,
         "screen": true
       },
       {

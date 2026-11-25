@@ -68,15 +68,19 @@ def validate_plan(plan, catalog, advertisement=''):
             indices != list(range(indices[0], indices[-1] + 1))):
             raise ValueError(f'段落 {number} 字幕索引无效或不连续')
         keys = {(segment['source_id'], i) for i in indices}
-        if used & keys:
+        is_intro = any(p.get('kind') == 'intro' for p in segment.get('narration_parts', []) if isinstance(p, dict))
+        if is_intro and (number != 1 or kind != 'narration_only' or len(segment['narration_parts']) != 1):
+            raise ValueError('intro 只能作为第一段唯一的旁白')
+        if not is_intro and used & keys:
             raise ValueError(f'段落 {number} 重复使用证据')
-        used.update(keys)
+        if not is_intro:
+            used.update(keys)
         if 'narration_parts' in segment:
             parts = segment['narration_parts']
             if not isinstance(parts, list) or not parts:
                 raise ValueError(f'段落 {number} 缺少细分旁白')
             for part in parts:
-                if (not isinstance(part, dict) or part.get('kind') not in ('paraphrase', 'bridge', 'commentary')
+                if (not isinstance(part, dict) or part.get('kind') not in ('intro', 'paraphrase', 'bridge', 'commentary')
                     or not isinstance(part.get('text'), str) or not part['text'].strip()):
                     raise ValueError(f'段落 {number} 旁白分类或文本无效')
                 if part['kind'] == 'paraphrase':
