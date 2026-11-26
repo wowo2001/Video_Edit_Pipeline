@@ -1,0 +1,14 @@
+{
+  "intro_delay_seconds": 2,
+  "crop": "520:160:100:115",
+  "portrait": {
+    "width": 460,
+    "x": 500,
+    "y": 1640
+  },
+  "landscape": {
+    "width": 440,
+    "x": 1410,
+    "y": 925
+  }
+}
