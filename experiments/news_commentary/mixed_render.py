@@ -202,14 +202,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     cover = create_landscape_cover(plan.get('cover_title') or plan['title'],
                                    root/'commentary_cover_landscape.png')
     final = root/'commentary_news_landscape.mp4'
-    run(['-loop',1,'-framerate',30,'-i',cover,'-i',body,'-f','lavfi','-i','anullsrc=r=48000:cl=stereo',
+    run(['-loop',1,'-framerate',30,'-i',cover,'-i',body,
         '-filter_complex',
         '[0:v]scale=1920:1080,setsar=1,trim=duration=1,setpts=PTS-STARTPTS,format=yuv420p[c];'
-        '[2:a]atrim=duration=1,asetpts=PTS-STARTPTS[s];'
         '[1:v]fps=30,setsar=1,setpts=PTS-STARTPTS,format=yuv420p[v];'
-        '[1:a]aresample=48000,aformat=channel_layouts=stereo,'
-        'alimiter=limit=0.95:level=false:latency=true,asetpts=PTS-STARTPTS[a];'
-        '[c][s][v][a]concat=n=2:v=1:a=1[outv][outa]',
+        '[c][v]concat=n=2:v=1:a=0[outv];'
+        '[1:a]asetpts=PTS-STARTPTS,adelay=1000:all=1[outa]',
         '-map','[outv]','-map','[outa]','-c:v','libx264','-preset','fast','-crf',20,
         '-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart',final])
     speed_up_final(final, subscribe=has_intro(plan))
