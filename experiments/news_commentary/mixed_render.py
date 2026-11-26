@@ -60,14 +60,14 @@ def produce_mixed(root):
         source=catalog[segment['source_id']]
         components=[]
         for part in segment['narration_parts']:
-            components.append((part['audio_path'],part['text'],part.get('paraphrase_video',{}).get('path'),None))
+            components.append((part['audio_path'],part['text'],part.get('paraphrase_video',{}).get('path'),None,part.get('tts_words')))
         if segment['type']=='with_dialogue':
             dub=segment['dubbed_dialogue'];indices=segment['dialogue_subtitle_indices']
             rows=source['utterances'];bounds=(rows[indices[0]]['start_time']/1000,rows[indices[-1]]['end_time']/1000)
-            components.append((dub['audio_path'],dub['chinese_text'],None,bounds))
+            components.append((dub['audio_path'],dub['chinese_text'],None,bounds,dub.get('tts_words')))
         if segment.get('audience_question_audio_path'):
-            components.append((segment['audience_question_audio_path'],segment['audience_question'],None,None))
-        for audio,text,visual,bounds in components:
+            components.append((segment['audience_question_audio_path'],segment['audience_question'],None,None,segment.get('audience_question_tts_words')))
+        for audio,text,visual,bounds,timing in components:
             decoded=AudioSegment.from_file(audio).set_frame_rate(24000).set_channels(1).set_sample_width(2)
             duration=len(decoded.raw_data)/48000
             end=cursor+duration
@@ -101,7 +101,7 @@ def produce_mixed(root):
                 inputs=['-stream_loop',-1,'-ss',anchor,'-i',Path(source['workspace'])/'video.mp4'];vf='setpts=PTS-STARTPTS'
             vf+=',scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=1'
             run([*inputs,'-an','-vf',vf,'-frames:v',frames,'-c:v','libx264','-preset','fast','-crf',20,'-pix_fmt','yuv420p',clip])
-            subtitles.append({'start':cursor,'end':end,'kind':'narration','text':text})
+            subtitles.append({'start':cursor,'end':end,'kind':'narration','text':text, 'tts_words':timing})
             clips.append(clip);audio_parts.append(decoded);cursor=end
     combined=audio_parts[0]
     for item in audio_parts[1:]:combined+=item

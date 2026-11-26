@@ -1,8 +1,8 @@
-"""End-to-end Australian Parliament commentary-video workflow.
+"""DEPRECATED：旧版议会新闻评论流水线，已废弃。
 
-Running this module with a task file creates an isolated workspace for every
-source, then downloads, transcribes, analyses, renders and uploads every
-candidate topic selected for that source.
+新任务请使用 experiments.news_commentary.pipeline。
+本文件暂保留新闻流水线仍导入的共享函数和常量；不再维护旧版入口。
+旧版字幕流程未接入 TTS 时间戳，不再支持按时长估算字幕。
 """
 
 from __future__ import annotations
@@ -1341,7 +1341,7 @@ def create_commentary_short_video(paths: ProjectPaths) -> Path:
     main_media["news_subtitle"] = subtitle
     main_media.setdefault("commentary_covers", {})[str(paths.root)] = str(cover_path)
     main_media.setdefault("commentary_subtitles", {})[str(paths.root)] = {
-        "source": "script_duration_estimate",
+        "source": "tts_subtitles",
         "final_video_offset_seconds": 1.0,
         "source_video_path": str(preview_path),
         "srt_path": str(srt_path),

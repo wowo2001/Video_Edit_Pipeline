@@ -90,26 +90,24 @@ def write_script_subtitles(events, srt_path, ass_path, json_path):
     font = ImageFont.truetype(str(FONT), FONT_SIZE)
     rows = []
     for event in events:
-        # Keep grammatical pauses separate instead of filling two lines with
-        # several unrelated sentences. Still preserve the exact script text.
-        clauses = re.findall(r'[^，。！？；：,!?;:]+[，。！？；：,!?;:]*|[，。！？；：,!?;:]+', event['text'])
-        cues = []
-        for clause in clauses:
-            lines = wrap_text(clause, font)
-            cues.extend('\n'.join(lines[i:i+2]) for i in range(0, len(lines), 2))
-        def spoken_weight(cue):
-            # Latin letters take less time than the same count of Chinese characters.
-            return max(1, sum(.35 if c.isascii() and c.isalpha() else
-                              .2 if c.isspace() or c in '，。！？；：,!?;:' else 1
-                              for c in cue))
-        weights = [spoken_weight(cue) for cue in cues]
-        total = sum(weights)
-        start = event['start']
-        for cue, weight in zip(cues, weights):
-            end = start+(event['end']-event['start'])*weight/total
-            if end > start:
-                rows.append(dict(start_time=round(start*1000), end_time=round(end*1000), text=cue))
-            start = end
+        pending = []
+
+        def emit():
+            text = ''.join(word['text'] for word in pending).strip()
+            rows.append(dict(start_time=round((event['start']+pending[0]['start'])*1000),
+                             end_time=round((event['start']+pending[-1]['end'])*1000),
+                             text='\n'.join(wrap_text(text, font))))
+            pending.clear()
+
+        for word in event['tts_words']:
+            text = ''.join(w['text'] for w in pending) + word['text']
+            if pending and len(wrap_text(text, font)) > 2:
+                emit()
+            pending.append(word)
+            if word['text'].rstrip().endswith(tuple('，。！？；：,!?;:')):
+                emit()
+        if pending:
+            emit()
     def ass_time(ms):
         cs = round(ms/10)
         return f'{cs//360000}:{cs//6000%60:02d}:{cs//100%60:02d}.{cs%100:02d}'
@@ -133,7 +131,7 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
         ass.append(f"Dialogue: 0,{ass_time(row['start_time'])},{ass_time(row['end_time'])},Default,,0,0,0,,{escaped}\n")
     srt_path.write_text(''.join(srt), encoding='utf-8')
     ass_path.write_text(''.join(ass), encoding='utf-8')
-    json_path.write_text(json.dumps({'source':'script_duration_estimate','utterances':rows},ensure_ascii=False,indent=2),encoding='utf-8')
+    json_path.write_text(json.dumps({'source': 'tts_subtitles','utterances':rows},ensure_ascii=False,indent=2),encoding='utf-8')
     return rows
 
 
@@ -264,7 +262,7 @@ def burn_avatar_subtitles(layout_path, ass_path, final_path):
     return final_path
 
 
-def prepend_cover(body_path, cover_path, output_path, duration=1.0, audio_volume=1.2):
+def prepend_cover(body_path, cover_path, output_path, duration=1.0, audio_volume=1.0):
     """Add a silent cover with configurable body audio gain; retain sync."""
     if duration <= 0:
         raise ValueError('封面时长必须大于零')
@@ -273,14 +271,13 @@ def prepend_cover(body_path, cover_path, output_path, duration=1.0, audio_volume
     filters = (
         f'[0:v]scale={WIDTH}:{HEIGHT},setsar=1,fps={FPS},'
         f'trim=duration={duration},setpts=PTS-STARTPTS,format=yuv420p[cover];'
-        f'[2:a]atrim=duration={duration},asetpts=PTS-STARTPTS[silence];'
         f'[1:v]setsar=1,fps={FPS},setpts=PTS-STARTPTS,format=yuv420p[body];'
-        '[1:a]aresample=48000,aformat=channel_layouts=stereo,'
-        f'volume={audio_volume},alimiter=limit=0.95:level=false:latency=true,asetpts=PTS-STARTPTS[audio];'
-        '[cover][silence][body][audio]concat=n=2:v=1:a=1[v][a]'
+        '[cover][body]concat=n=2:v=1:a=0[v];'
+        f'[1:a]asetpts=PTS-STARTPTS,volume={audio_volume},'
+        f'adelay={duration*1000:g}:all=1[a]'
     )
     subprocess.run(['ffmpeg','-v','warning','-y','-loop','1','-framerate',str(FPS),
-        '-i',str(cover_path),'-i',str(body_path),'-f','lavfi','-i','anullsrc=r=48000:cl=stereo',
+        '-i',str(cover_path),'-i',str(body_path),
         '-filter_complex',filters,'-map','[v]','-map','[a]',
         '-c:v','libx264','-preset','fast','-crf','20','-pix_fmt','yuv420p',
         '-c:a','aac','-b:a','192k','-movflags','+faststart',str(output_path)],check=True)
