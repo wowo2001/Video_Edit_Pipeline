@@ -18,20 +18,32 @@ class PostgresClient:
     def close(self):
         self.conn.close()
 
-    def upsert_source_story(self, drama_title, video_url, summary, embedding):
+    def has_episode(self, drama_title, episode):
+        with self.conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT 1 FROM source_story WHERE drama_title=%s AND episode=%s
+                    UNION ALL SELECT 1 FROM scene WHERE drama_title=%s AND episode=%s
+                    UNION ALL SELECT 1 FROM subtitle WHERE drama_title=%s AND episode=%s
+                )
+            """, (drama_title, episode, drama_title, episode, drama_title, episode))
+            return cursor.fetchone()[0]
+
+    def upsert_source_story(self, drama_title, video_url, summary, embedding, episode=None):
         sql = """
             INSERT INTO source_story (
-                drama_title, video_url, summary, summary_embedding
+                drama_title, video_url, summary, summary_embedding, episode
             )
-            VALUES (%s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (drama_title, video_url)
             DO UPDATE SET
                 summary = EXCLUDED.summary,
-                summary_embedding = EXCLUDED.summary_embedding
+                summary_embedding = EXCLUDED.summary_embedding,
+                episode = COALESCE(EXCLUDED.episode, source_story.episode)
             RETURNING id;
         """
         with self.conn.cursor() as cursor:
-            cursor.execute(sql, (drama_title, video_url, summary, embedding))
+            cursor.execute(sql, (drama_title, video_url, summary, embedding, episode))
             story_id = cursor.fetchone()[0]
 
         self.conn.commit()
@@ -46,18 +58,19 @@ class PostgresClient:
         summary,
         embedding,
         story_id,
+        episode=None,
     ):
         sql = """
             INSERT INTO scene (
-                drama_title, video_url, title, event, summary, summary_embedding, story_id
+                drama_title, video_url, title, event, summary, summary_embedding, story_id, episode
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
         """
         with self.conn.cursor() as cursor:
             cursor.execute(
                 sql,
-                (drama_title, video_url, title, event, summary, embedding, story_id),
+                (drama_title, video_url, title, event, summary, embedding, story_id, episode),
             )
             scene_id = cursor.fetchone()[0]
 
@@ -120,13 +133,14 @@ class PostgresClient:
         speaker,
         scene_id,
         embedding,
+        episode=None,
     ):
         sql = """
             INSERT INTO subtitle (
                 drama_title, video_url, start_time, end_time,
-                content, speaker, scene_id, embedding
+                content, speaker, scene_id, embedding, episode
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
         """
         with self.conn.cursor() as cursor:
             cursor.execute(
@@ -140,6 +154,7 @@ class PostgresClient:
                     speaker,
                     scene_id,
                     embedding,
+                    episode,
                 ),
             )
 

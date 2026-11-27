@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title Conference Pipeline
+title Main Drama Pipeline
 cd /d "%~dp0"
 
 rem A double-clicked batch file does not inherit newly created User variables.
@@ -17,14 +17,14 @@ if not exist ".venv\Scripts\python.exe" (
     exit /b 1
 )
 
-echo Starting full mainworkflow...
+echo Starting main batch. New dramas open the selection tool once before production.
 echo Task file: tasks.json
 echo.
-".venv\Scripts\python.exe" -u main.py
+".venv\Scripts\python.exe" -u main.py %*
 
 echo.
 if errorlevel 1 (
-    echo [FAILED] The workflow stopped. Review the error above.
+    echo [FAILED] Review the errors and work\main_batch_result.json.
 ) else (
     echo [DONE] All candidate videos have been produced and uploaded.
 )

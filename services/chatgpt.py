@@ -8,11 +8,10 @@ from openai import OpenAI
 from config import ALI_API_KEY, OPENAI_API_KEY
 from core.llm_cost import record_llm_usage
 from core.utils import read_json, safe_json_parse, srt_to_seconds, write_json
-from prompts.editing_rules import EDITING_RULES
 from prompts.fix_subtitles import FIX_SUBTITLE_PROMPT
 from prompts.fix_subtitles_input import FIX_SUBTITLES_INPUT_PROMPT
 from prompts.generate_hook import GENERATE_HOOK_PROMPT
-from prompts.generate_script import GENERATE_SCRIPT_PROMPT
+from prompts.generate_script import build_generate_script_prompt
 from prompts.generate_story import build_generate_story_prompt
 from prompts.recognise_speaker_input import build_recognise_speaker_prompt
 from prompts.recognise_parliament_speaker import build_recognise_parliament_speaker_prompt
@@ -21,17 +20,15 @@ from prompts.select_chinese_australia_topic import build_select_chinese_australi
 from prompts.plan_parliament_commentary import build_plan_parliament_commentary_prompt
 from prompts.plan_translation_advertisement import build_plan_translation_advertisement_prompt
 from prompts.refine_narration import ADVERTISEMENT_RULES, REFINE_NARRATION_PROMPT
-from prompts.script_schema import OUTPUT_SCHEMA
 from prompts.select_scene import SELECT_SCENE_PROMPT
 from prompts.split_scene_segment import SPLIT_SCENE_SEGMENT_PROMPT
-from prompts.task_rules import TASK_RULES
 
 
 PROVIDERS = {
     "openai": {
         "api_key": OPENAI_API_KEY,
         "models": {
-            "generate_script": "gpt-6-luna", "fix_subtitles": "gpt-6-luna",
+            "generate_script": "gpt-6.1-sol", "fix_subtitles": "gpt-6-luna",
             "recognise_speaker": "gpt-6.1-sol", "generate_story": "gpt-6.1-sol",
             "select_scene": "gpt-6.1-sol",
             "split_scene_segment": "gpt-6.1-sol", "refine_narration": "gpt-6.1-sol",
@@ -99,13 +96,7 @@ class ChatGPT:
     def generate_script(self, subtitles_path, script_path, story_path):
         subtitles = subtitles_path.read_text(encoding="utf-8")
         story_json = read_json(story_path)
-        if self.provider == "ali":
-            story = story_json.get("总故事")
-        else:
-            ids = set(story_json.get("推荐解说场景", []))
-            story = "\n".join(scene["剧情"] for scene in story_json.get("场景", []) if scene["编号"] in ids)
-        prompt = GENERATE_SCRIPT_PROMPT.format(task_rules=TASK_RULES, editing_rules=EDITING_RULES,
-                                               output_schema=OUTPUT_SCHEMA, subtitles=subtitles, story=story)
+        prompt = build_generate_script_prompt(subtitles, story_json)
         write_json(safe_json_parse(self._complete(prompt)), script_path, ensure_ascii=False, indent=2)
 
     def fix_subtitles(self, subtitles_path, fixed_subtitles_path):

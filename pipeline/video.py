@@ -7,9 +7,6 @@ from core.ffmpeg import blur_regions as blur_regions_ffmpeg
 from core.ffmpeg import change_resolution as change_resolution_ffmpeg
 from core.ffmpeg import concat_media as concat_videos_ffmpeg
 from core.ffmpeg import cut_video as cut_video_ffmpeg
-from core.ffmpeg import mask_sub as mask_sub_ffmpeg
-from core.ffmpeg import mosaic_regions as mosaic_regions_ffmpeg
-from core.ffmpeg import speed_up as speed_up_ffmpeg
 from core.utils import ms_to_seconds
 
 
@@ -107,20 +104,8 @@ def concat_video_paths(video_paths, output_path, list_file):
     list_file.unlink(missing_ok=True)
 
 
-def change_resolution(input_file, output_file, width, height, fps):
-    change_resolution_ffmpeg(Path(input_file), Path(output_file), width, height, fps)
-
-
-def speed_up(input_path, output_path, speed):
-    speed_up_ffmpeg(input_path, output_path, speed)
-
-
-def mask_sub(input_video, output_video, y_offset, mask_height):
-    mask_sub_ffmpeg(input_video, output_video, y_offset, mask_height)
-
-
-def mosaic_regions(input_video, output_video, regions):
-    mosaic_regions_ffmpeg(input_video, output_video, regions)
+def change_resolution(input_file, output_file, width, height, fps, crop_source=True):
+    change_resolution_ffmpeg(Path(input_file), Path(output_file), width, height, fps, crop_source=crop_source)
 
 
 def blur_regions(input_video, output_video, regions):

@@ -31,25 +31,26 @@ def get_duration(path):
 
 
 def mix_narration(video, audio, output, alignment="start"):
-    """Mix narration at the start or end of a video clip."""
+    """Mute source audio during narration; retain dialogue outside that interval."""
     if alignment not in {"start", "end"}:
         raise ValueError("alignment must be 'start' or 'end'")
     narration_duration, video_duration = get_duration(audio), get_duration(video)
     start = 0 if alignment == "start" else max(0, video_duration - narration_duration)
-    end, delay = (narration_duration if alignment == "start" else video_duration), int(start * 1000)
+    end, delay = (narration_duration if alignment == "start" else video_duration), round(start * 1000)
+    start = delay / 1000
     filter_complex = (
-        "[0:a]loudnorm=I=-20:LRA=7:TP=-2[vnorm];[1:a]loudnorm=I=-14:LRA=7:TP=-2[anorm];"
-        "[vnorm]asplit=2[a0][a1];"
-        f"[a0]volume=0.01:enable='between(t,{start},{end})'[a0_low];[a1]volume=1.0[a1_norm];"
-        "[a0_low][a1_norm]amix=inputs=2[aout];"
-        f"[anorm]adelay={delay}|{delay}[a1v];[aout][a1v]amix=inputs=2:normalize=0[outa]"
+        f"[0:a]loudnorm=I=-20:LRA=7:TP=-2,aeval=exprs='if(between(t,{start},{end}),0,val(ch))':c=same[original];"
+        f"[1:a]loudnorm=I=-14:LRA=7:TP=-2,adelay={delay}:all=1[narration];"
+        "[original][narration]amix=inputs=2:duration=longest:normalize=0[outa]"
     )
     run_cmd(["ffmpeg", "-y", "-i", str(video), "-i", str(audio), "-filter_complex", filter_complex, "-map", "0:v", "-map", "[outa]", "-c:v", "copy", "-c:a", "aac", str(output)])
 
 
 def mix_background_narration(video, audio, output):
-    """Use the existing narration mix from the start of a background-only clip."""
-    mix_narration(video, audio, output, alignment="start")
+    """Use only narration audio; never expose source audio at clip boundaries."""
+    run_cmd(["ffmpeg", "-y", "-i", str(video), "-i", str(audio),
+             "-map", "0:v:0", "-map", "1:a:0", "-af", "loudnorm=I=-14:LRA=7:TP=-2",
+             "-c:v", "copy", "-c:a", "aac", "-shortest", str(output)])
 
 
 def encode_to_standard(input_path, output_path):
@@ -67,32 +68,13 @@ def concat_media(filelist, output):
     run_cmd(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(filelist), "-c", "copy", str(output)])
 
 
-def change_resolution(input_file, output_file, width, height, fps):
-    vf = f"crop=960:720:160:0,scale={width}:-2,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1"
+def change_resolution(input_file, output_file, width, height, fps, crop_source=True):
+    if crop_source:
+        vf = f"crop=960:720:160:0,scale={width}:-2,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1"
+    else:
+        vf = (f"scale={width}:-2,crop=w=iw:h='min(ih,{height})':x=0:y=(ih-oh)/2,"
+              f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1")
     run_cmd(["ffmpeg", "-y", "-i", str(input_file), "-vf", vf, "-r", str(fps), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", str(output_file)])
-
-
-def speed_up(input_path, output_path, speed):
-    filters = f"[0:v]setpts=PTS/{speed}[v];[0:a]atempo={speed}[a]"
-    run_cmd(["ffmpeg", "-y", "-i", str(input_path), "-filter_complex", filters, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-c:a", "aac", "-b:a", "192k", str(output_path)])
-
-
-def mask_sub(input_video, output_video, y_offset, mask_height):
-    vf = f"drawbox=x=0:y=ih-{y_offset}:w=iw:h={mask_height}:color=black:t=fill"
-    run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-vf", vf, "-c:v", "libx264", "-c:a", "copy", str(output_video)])
-
-
-def mosaic_regions(input_video, output_video, regions):
-    filter_parts, current = [], "[0:v]"
-    for index, region in enumerate(regions):
-        x, y, width, height = region["x"], region["y"], region["width"], region["height"]
-        size = region.get("mosaic_size", 20)
-        down_width, down_height = max(1, width // size), max(1, height // size)
-        crop, output = f"m{index}", f"v{index}"
-        filter_parts.append(f"[0:v]crop={width}:{height}:{x}:{y},scale={down_width}:{down_height},scale={width}:{height}:flags=neighbor[{crop}]")
-        filter_parts.append(f"{current}[{crop}]overlay={x}:{y}[{output}]")
-        current = f"[{output}]"
-    run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-filter_complex", ";".join(filter_parts), "-map", current, "-map", "0:a?", "-c:v", "libx264", "-c:a", "copy", str(output_video)])
 
 
 def blur_regions(input_video, output_video, regions):
@@ -154,10 +136,6 @@ def add_text_overlay(input_video, output_video, title, subtitle, font_size_title
 def add_gif_overlay(input_video, output_video, gif_path, x, y, scale):
     filters = f"[1:v]scale=iw*{scale}:ih*{scale}[gif];[0:v][gif]overlay={x}:{y}:shortest=1"
     run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-ignore_loop", "0", "-i", str(gif_path), "-filter_complex", filters, "-c:v", "libx264", "-crf", "23", "-preset", "fast", "-c:a", "copy", str(output_video)])
-
-
-def wav_to_map3(wav_path, mp3_path):
-    run_cmd(["ffmpeg", "-y", "-i", str(wav_path), "-codec:a", "libmp3lame", "-q:a", "2", str(mp3_path)])
 
 
 def dub_video_segment(input_video, tts_audio, output_video, start_ms, end_ms, target_duration_ms):

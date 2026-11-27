@@ -2,6 +2,7 @@ CREATE TABLE scene (
     id BIGSERIAL PRIMARY KEY,
 
     drama_title TEXT NOT NULL,
+    episode INTEGER,
 
     video_url TEXT NOT NULL,
 

@@ -1,35 +1,32 @@
 
 import shutil
-import uuid
 
 from core.path import ProjectPaths
+from core.captions import DEFAULT_CAPTION_LAYOUT
 from core.llm_cost import finish_llm_cost_report, start_llm_cost_report
-from core.utils import ms_to_seconds, read_json, safe_filename, clear_workdir, write_json
+from core.utils import ms_to_seconds, read_json, safe_filename, write_json
 from pipeline.subtitles import (
-    apply_character_scene_mapping,
     apply_speaker_mapping,
     apply_timeline,
-    chunk_srt_by_scenes,
     strip_srt,
 )
-from core.whisper import Whisper
 from pipeline.audio import (
     export_audio,
-    mix_background_music,
     mix_narration_audio,
+    mix_background_narration_audio,
     resolve_background_music,
 )
-from core.ffmpeg import concat_media
-from pipeline.download import download_video
-from pipeline.video import add_gif_overlay, add_subtitles, change_resolution, concat_video_paths, cut_video, mask_sub, speed_up, add_text_overlay, blur_regions
-from services.post_cut_service import PostCutService
+from pipeline.source_preprocess import prepare_episode, save_json, validate_profile, probe_source
+from pipeline.video import concat_video_paths, cut_video, cut_video_range, fit_forward_video_range
+from pipeline.scenes import NARRATION_ONLY, WITH_DIALOGUE, normalize_segment_type
+from pipeline.main_postprocess import MainPostProcessor
+from pipeline.main_metadata import load_metadata, save_metadata, sync_assets, read_script, save_script
 from services.chatgpt import ChatGPT
-from services.ali import Ali
+from services.post_cut_service import PostCutService
 from services.volcengine import Volcengine
 from services.google_drive import upload_to_drive
 from pathlib import Path
 from core.demucs import extract_vocals_demucs
-from core.speechbrain import SpeechBrain
 from services.s3 import S3
 
 
@@ -44,10 +41,11 @@ class AutoVideoPipeline:
 
     def _write_media(self, media):
         write_json(media, self.project_paths.media)
+        sync_assets(self.project_paths, media['main'])
 
     def _generate_script_tts(self):
         media, main_media = self._read_main_media()
-        script = read_json(self.project_paths.script)
+        script = read_script(self.project_paths)
         tts = Volcengine()
 
         hook_audio_path = self.project_paths.narration_audios / "hook.mp3"
@@ -71,11 +69,11 @@ class AutoVideoPipeline:
                 "narration_audio_path": str(audio_path)
             }
 
-        write_json(script, self.project_paths.script, ensure_ascii=False, indent=2)
+        save_script(self.project_paths, script)
         self._write_media(media)
 
     def _cut_script_videos(self):
-        script = read_json(self.project_paths.script)
+        script = read_script(self.project_paths)
         media, main_media = self._read_main_media()
         hook_media = main_media["hook"]
         hook_media["video_path"] = str(
@@ -88,14 +86,33 @@ class AutoVideoPipeline:
             )
         )
 
+        source_duration = None
         for item in script["clips"]:
             clip_media = main_media["clips"][str(item["place"])]
+            segment_type = normalize_segment_type(item.get("type", WITH_DIALOGUE))
+            if segment_type == NARRATION_ONLY:
+                if source_duration is None:
+                    source_duration = probe_source(main_media["source_video_path"])["duration"]
+                bounds = item.get("visual_bounds", {"start": 0, "end": source_duration*1000})
+                lower = ms_to_seconds(bounds["start"])
+                upper = min(source_duration, ms_to_seconds(bounds["end"]))
+                start, end = fit_forward_video_range(
+                    ms_to_seconds(item["clip"][0]["start"])-lower,
+                    ms_to_seconds(item["narrative"]["length"]), upper-lower)
+                start, end = start+lower, end+lower
+                clip_media["video_path"] = str(cut_video_range(
+                    main_media["source_video_path"],
+                    self.project_paths.clips / f"clip_{item['place']}.mp4", start, end))
+                clip_media["type"] = segment_type
+                clip_media["source_range"] = {"start": start, "end": end}
+                continue
             clip_media["video_path"] = str(
                 cut_video(
                     main_media["source_video_path"],
                     item["clip"],
                     ms_to_seconds(item["narrative"]["length"]),
                     self.project_paths.clips / f"clip_{item['place']}.mp4",
+                    keep_gaps=True,
                 )
             )
         self._write_media(media)
@@ -105,7 +122,7 @@ class AutoVideoPipeline:
         video_paths = [main_media["hook"]["final_video_path"]]
         video_paths.extend(
             main_media["clips"][str(item["place"])]["final_video_path"]
-            for item in read_json(self.project_paths.script)["clips"]
+            for item in read_script(self.project_paths)["clips"]
         )
         concat_video_paths(
             video_paths,
@@ -126,12 +143,15 @@ class AutoVideoPipeline:
             alignment="end",
         )
 
-        for item in read_json(self.project_paths.script)["clips"]:
+        for item in read_script(self.project_paths)["clips"]:
             clip_media = main_media["clips"][str(item["place"])]
             clip_media["final_video_path"] = str(
                 self.project_paths.final_clips / f"clip_{item['place']}_final.mp4"
             )
-            mix_narration_audio(
+            mixer = (mix_background_narration_audio
+                     if normalize_segment_type(item.get("type", WITH_DIALOGUE)) == NARRATION_ONLY
+                     else mix_narration_audio)
+            mixer(
                 clip_media["video_path"],
                 clip_media["narration_audio_path"],
                 clip_media["final_video_path"],
@@ -142,41 +162,36 @@ class AutoVideoPipeline:
         self,
         urls,
         title,
-        subtitle=None,
+        episode,
         upload=False,
         background_music=None,
         background_music_volume=None,
+        preprocess_profile=None,
     ):
 
+        if type(episode) is not int or episode < 1:
+            raise ValueError('episode 必须是正整数')
+        if preprocess_profile is None:
+            raise ValueError("请先用 main.py 或 configure_main.bat 配置整批素材预处理")
+        validate_profile(preprocess_profile, title)
         start_llm_cost_report(self.project_paths.llm_cost_report)
 
-        print("========== 1. 下载视频 ==========")
-
-        download_video(
-            urls,
-            self.project_paths.video,
-            self.project_paths.origin,
-            self.project_paths.media,
-        )
+        print("========== 1. 下载原片并生成整集母版（一次裁剪、模糊、压缩） ==========")
+        media_data = prepare_episode(urls, self.project_paths, preprocess_profile)
+        media_data['main'].update(drama_title=title, episode=episode)
+        self._write_media(media_data)
 
         print("========== 2. 提取音频 ==========")
 
         media_data = read_json(self.project_paths.media)
-        vocals_paths = []
-        for index, media in enumerate(media_data["sources"]):
-            audio_path = self.project_paths.audio_dir / f"{index:03d}.mp3"
-            export_audio(Path(media["video_path"]), audio_path)
-            vocals_path = extract_vocals_demucs(audio_path)
-
-            media["audio_path"] = str(audio_path)
-            media["vocals_path"] = str(vocals_path)
-            vocals_paths.append(vocals_path)
-
-        write_json(media_data, self.project_paths.media)
-        with open(self.project_paths.vocals_filelist, "w", encoding="utf-8") as file:
-            for vocals_path in vocals_paths:
-                file.write(f"file '{vocals_path.absolute()}'\n")
-        concat_media(self.project_paths.vocals_filelist, self.project_paths.audio)
+        # Recognise the assembled master's own audio, so multi-source joins and
+        # database timestamps use exactly the same timeline as the S3 video.
+        master_id = media_data["main"]["source_master"]["fingerprint"][:16]
+        audio_path = self.project_paths.audio_dir / f"master_{master_id}.mp3"
+        export_audio(Path(media_data["main"]["source_video_path"]), audio_path)
+        vocals_path = extract_vocals_demucs(audio_path)
+        shutil.copy2(vocals_path, self.project_paths.audio)
+        media_data["main"]["raw_audio_path"] = str(audio_path)
         media_data["main"]["vocals_audio_path"] = str(self.project_paths.audio)
         self._write_media(media_data)
 
@@ -188,9 +203,9 @@ class AutoVideoPipeline:
             "json_path": str(self.project_paths.subtitles["json"]),
         }
         self._write_media(media_data)
-        # Whisper().transcribe(self.project_paths.audio, self.project_paths.subtitles)
 
         print("========== 3.1 语音分类 ==========")
+        from core.speechbrain import SpeechBrain
         SpeechBrain().diarize(
             main_media["vocals_audio_path"],
             self.project_paths.subtitles,
@@ -212,9 +227,9 @@ class AutoVideoPipeline:
         
 
         print("========== 4. AI 脚本 ==========")
-        chunk_srt_by_scenes(self.project_paths.subtitles['stripped_srt'], self.project_paths.story,self.project_paths.subtitles['chunked_srt'])
-        Ali(usage_report_path=self.project_paths.llm_cost_report).generate_script(self.project_paths.subtitles['stripped_srt'], self.project_paths.script, self.project_paths.story)
-        apply_timeline(self.project_paths.script, self.project_paths.subtitles['json'])
+        ChatGPT(usage_report_path=self.project_paths.llm_cost_report).generate_script(self.project_paths.subtitles['stripped_srt'], self.project_paths.script, self.project_paths.story)
+        apply_timeline(self.project_paths.script, self.project_paths.subtitles['json'], self.project_paths.story)
+        save_script(self.project_paths, read_json(self.project_paths.script))
 
         print("========== 5. TTS ==========")
 
@@ -232,168 +247,50 @@ class AutoVideoPipeline:
 
         self._concat_script_videos()
 
-        print("========== 9. 改变分辨率 ==========")
-        media_data, main_media = self._read_main_media()
-        change_resolution(
-            main_media["concatenated_video_path"],
-            self.project_paths.changed_resolution_video,
-            width=1080,
-            height=1920,
-            fps=30,
-        )
-        main_media["changed_resolution_video_path"] = str(self.project_paths.changed_resolution_video)
-        self._write_media(media_data)
-
-        print("========== 10. 加速 ==========")
-
-        speed_up(
-            main_media["changed_resolution_video_path"],
-            self.project_paths.speed_up_video,
-            speed=1.2,
-        )
-        main_media["speed_up_video_path"] = str(self.project_paths.speed_up_video)
-        main_media["post_speed_video_path"] = str(self.project_paths.speed_up_video)
-        main_media.pop("background_music", None)
-        self._write_media(media_data)
-
+        music = None
         if background_music:
-            print("========== 10.1 添加背景音乐 ==========")
             music = resolve_background_music(background_music)
-            volume = (
-                background_music_volume
-                if background_music_volume is not None
-                else music.get("default_volume", 0.08)
-            )
-            mix_background_music(
-                self.project_paths.speed_up_video,
-                music["path"],
-                self.project_paths.background_music_video,
-                volume,
-            )
-            main_media["post_speed_video_path"] = str(
-                self.project_paths.background_music_video
-            )
-            main_media["background_music"] = {
-                "id": music["id"],
-                "name": music["name"],
-                "source_audio_path": str(music["path"]),
-                "volume": float(volume),
-                "mixed_video_path": str(self.project_paths.background_music_video),
-            }
-            self._write_media(media_data)
-
-        print("========== 11. 掩码字幕 ==========")
-        region = [
-        {
-            "x": 100,
-            "y": 600,
-            "width": 200,
-            "height": 100,
-        },
-        {
-            "x": 800,
-            "y": 600,
-            "width": 200,
-            "height": 100,
-        },
-        {
-            "x": 0,
-            "y": 1230,
-            "width": 1080,
-            "height": 70,
-        }]
-        blur_regions(main_media["post_speed_video_path"], self.project_paths.masked_video, region)
-        main_media["masked_video_path"] = str(self.project_paths.masked_video)
-        self._write_media(media_data)
-
-
-        print("========== 12. 导出字幕识别音频（不含背景音乐） ==========")
-        export_audio(main_media["speed_up_video_path"], self.project_paths.subtitle_audio)
-        main_media["subtitle_audio_path"] = str(self.project_paths.subtitle_audio)
-        self._write_media(media_data)
-
-        print("========== 13. 成片语音识别导出字幕 ==========")
-        Volcengine().transcribe_audio(main_media["subtitle_audio_path"], self.project_paths.final_subtitles)
-        main_media["final_subtitles"] = {
-            "srt_path": str(self.project_paths.final_subtitles["srt"]),
-            "json_path": str(self.project_paths.final_subtitles["json"]),
-        }
-        self._write_media(media_data)
-
-        print("========== 14. AI修正字幕 ==========")
-        popup_text, _ = Ali(usage_report_path=self.project_paths.llm_cost_report).fix_subtitles(
-            main_media["final_subtitles"]["srt_path"],
-            main_media["final_subtitles"]["srt_path"],
+            music["volume"] = (background_music_volume if background_music_volume is not None
+                               else music.get("default_volume", 0.08))
+        MainPostProcessor(self.project_paths).run(
+            None, None,
+            caption_layout=preprocess_profile.get("caption_layout", DEFAULT_CAPTION_LAYOUT),
+            text_layout=preprocess_profile.get("overlay_layout"),
+            background_music=music,
         )
+        media_data, main_media = self._read_main_media()
+        render = load_metadata(self.project_paths)['render']
+        subtitle = render['subtitle']
 
-        print("========== 15. 添加字幕 ==========")
-        add_subtitles(
-            main_media["masked_video_path"],
-            main_media["final_subtitles"]["srt_path"],
-            self.project_paths.subtitle_video,
-            y=90,
-            font_size=10,
-        )
-        main_media["subtitle_video_path"] = str(self.project_paths.subtitle_video)
-        self._write_media(media_data)
-
-        print("========== 16. 添加标题和副标题 ==========")
-        add_text_overlay(
-            main_media["subtitle_video_path"],
-            self.project_paths.text_overlay_video,
-            title,
-            subtitle,
-            font_size_title=80,
-            font_size_sub=80,
-            title_y=400,
-            sub_y=450,
-            title_color="#FFCC00",
-            sub_color="#FFCC00",
-            popup_text=popup_text,
-            popup_font_size=42,
-            popup_color="#FFFFFF",
-            popup_y=750
-        )
-        main_media["text_overlay_video_path"] = str(self.project_paths.text_overlay_video)
-        self._write_media(media_data)
-
-        print("========== 17. 添加 GIF 动画 ==========")
-        add_gif_overlay(
-            main_media["text_overlay_video_path"],
-            self.project_paths.gif_overlay_video,
-            Path("assets") / "like.gif",
-            x=500,
-            y=1500,
-            scale=2.0
-        )
-        main_media["final_video_path"] = str(self.project_paths.gif_overlay_video)
-        self._write_media(media_data)
-
-        print("========== 18. 上传 ==========")
+        print("========== 13. 上传成片到 Drive ==========")
         if upload:
-            safe_file_name = safe_filename(subtitle)
+            safe_file_name = safe_filename(subtitle or title)
             output_path = self.project_paths.root / f"{safe_file_name}.mp4"
             shutil.copy2(main_media["final_video_path"], output_path)
             upload_to_drive(output_path, folder_name=title)
     
-        print("========== 19. 上传S3 ==========")
-        uuid_value = uuid.uuid4()    
-        video_key = f"videos/{uuid_value}.mp4"
-        s3_url = S3().upload_file(
+        print("========== 14. 上传整集母版到 S3 ==========")
+        master = main_media["source_master"]
+        prefix = f"videos/masters/v{master['version']}/{master['fingerprint']}"
+        s3 = S3()
+        s3_url = s3.upload_file(
             main_media["source_video_path"],
-            video_key
+            f"{prefix}/source.mp4"
         )
+        if not s3_url:
+            raise RuntimeError("母版上传失败，未写入数据库")
+        manifest_path = self.project_paths.root/"source_master_upload.json"
+        save_json(manifest_path, master)
+        metadata_url = s3.upload_file(manifest_path, f"{prefix}/preprocess.json", content_type="application/json")
+        if not metadata_url:
+            raise RuntimeError("母版配置上传失败，未写入数据库")
+        master.update(video_url=s3_url, metadata_url=metadata_url)
+        self._write_media(media_data)
         print(f"视频已上传到 S3: {s3_url}")
 
-        print("========== 20. 写入数据库 ==========")
-        scene_mapping = PostCutService().save_scene_to_db(
-            story_path=self.project_paths.story,
-            video_url=s3_url,
-            drama_title=title
-        )
-
-        apply_character_scene_mapping(self.project_paths.subtitles['json'],self.project_paths.speaker_mapping,self.project_paths.story,scene_mapping,self.project_paths.subtitles_to_db)
-        PostCutService().save_subtitle_to_db(self.project_paths.subtitles_to_db,
-                                             s3_url,
-                                             drama_title=title)
+        print("========== 15. 写入数据库 ==========")
+        database_result = PostCutService().save_episode_to_db(self.project_paths, s3_url, title, episode)
+        metadata = load_metadata(self.project_paths)
+        metadata['database'] = database_result
+        save_metadata(self.project_paths, metadata)
         finish_llm_cost_report(self.project_paths.llm_cost_report)

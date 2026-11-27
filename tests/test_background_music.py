@@ -9,23 +9,18 @@ from pipeline.audio import mix_background_music, resolve_background_music
 
 
 class BackgroundMusicTests(unittest.TestCase):
-    @patch("core.ffmpeg.mix_narration")
-    def test_background_narration_reuses_existing_mix_logic(
-        self,
-        mix_narration,
-    ):
+    @patch("core.ffmpeg.run_cmd")
+    def test_background_narration_uses_only_tts_audio(self, run_command):
         mix_background_narration(
             "video.mp4",
             "narration.mp3",
             "output.mp4",
         )
 
-        mix_narration.assert_called_once_with(
-            "video.mp4",
-            "narration.mp3",
-            "output.mp4",
-            alignment="start",
-        )
+        command = run_command.call_args.args[0]
+        mappings = [command[i+1] for i, value in enumerate(command) if value == '-map']
+        self.assertEqual(mappings, ['0:v:0', '1:a:0'])
+        self.assertIn('-shortest', command)
 
     def test_resolve_background_music_supports_id_and_name(self):
         with tempfile.TemporaryDirectory() as temp_dir:

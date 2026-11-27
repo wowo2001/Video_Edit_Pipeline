@@ -29,16 +29,19 @@ def apply_speaker_mapping(subtitles_path, mapping_path):
     subtitles_path.write_text(text, encoding="utf-8")
 
 
-def apply_timeline(script_path, subtitles_path):
+def apply_timeline(script_path, subtitles_path, story_path=None):
     script = read_json(script_path)
     utterances = read_json(subtitles_path)["utterances"]
+    from pipeline.scenes import NARRATION_ONLY, WITH_DIALOGUE, normalize_segment_type
+    scenes = read_json(story_path).get("场景", []) if story_path else []
 
     def build_clip(index_list):
+        if (not isinstance(index_list, list) or not index_list
+                or any(type(i) is not int or not 0 <= i < len(utterances) for i in index_list)
+                or any(b != a+1 for a, b in zip(index_list, index_list[1:]))):
+            raise ValueError("clip 必须是有效且连续递增的全局字幕索引")
         clips = []
         for index in index_list:
-            if not 0 <= index < len(utterances):
-                print(f"[WARN] index越界: {index}")
-                continue
             utterance = utterances[index]
             clips.append({
                 "index": index,
@@ -51,29 +54,25 @@ def apply_timeline(script_path, subtitles_path):
 
     if "hook" in script:
         script["hook"]["clip"] = build_clip(script["hook"].get("clip", []))
-    for section in script.get("clips", []):
+    previous = -1
+    for place, section in enumerate(script.get("clips", []), 1):
+        segment_type = normalize_segment_type(section.get("type", WITH_DIALOGUE))
+        if section.get("place") != place:
+            raise ValueError("正文 place 必须从 1 连续递增")
         section["clip"] = build_clip(section.get("clip", []))
+        first, last = section["clip"][0]["index"], section["clip"][-1]["index"]
+        if first <= previous:
+            raise ValueError("正文画面索引不能重复或倒退")
+        previous = last
+        if scenes:
+            scene = next((s for s in scenes if s["开始SRT"] <= first <= last <= s["结束SRT"]), None)
+            if scene is None:
+                raise ValueError("正文 clip 必须属于同一个已知场景")
+            if segment_type == NARRATION_ONLY:
+                section["visual_bounds"] = {
+                    "start": utterances[scene["开始SRT"]]["start_time"],
+                    "end": utterances[scene["结束SRT"]]["end_time"]}
     write_json(script, script_path)
-
-
-def chunk_srt_by_scenes(srt_file, story_file, output_file):
-    story = read_json(story_file)
-    recommend_ids = set(story["推荐解说场景"])
-    keep_ids = set()
-
-    for scene in story["场景"]:
-        if scene["编号"] in recommend_ids:
-            keep_ids.update(range(scene["开始SRT"], scene["结束SRT"] + 1))
-
-    pattern = re.compile(r"^\[(\d+)\]")
-    result = []
-    for line in srt_file.read_text(encoding="utf-8").splitlines():
-        match = pattern.match(line)
-        if match and int(match.group(1)) in keep_ids:
-            result.append(line)
-
-    output_file.write_text("\n".join(result), encoding="utf-8")
-    print(f"✅ 解说字幕生成: {output_file}")
 
 
 def apply_character_scene_mapping(

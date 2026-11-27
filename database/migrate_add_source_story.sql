@@ -3,6 +3,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS source_story (
     id BIGSERIAL PRIMARY KEY,
     drama_title TEXT NOT NULL,
+    episode INTEGER,
     video_url TEXT NOT NULL,
     summary TEXT NOT NULL,
     summary_embedding VECTOR(512),
