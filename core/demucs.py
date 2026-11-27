@@ -6,7 +6,7 @@ from core.cmd import run_cmd
 from core.ffmpeg import get_duration
 
 
-CHUNK_SECONDS = 10 * 60
+CHUNK_SECONDS = 5 * 60
 
 
 def _demucs_workspace(input_path: Path) -> Path:
@@ -33,7 +33,7 @@ def _split_audio(input_path: Path, chunks_dir: Path, duration: float) -> list[Pa
 
 
 def extract_vocals_demucs(input_path: Path):
-    """Separate vocals in ten-minute chunks, then join them into one MP3.
+    """Separate vocals in five-minute chunks, then join them into one MP3.
 
     Chunking bounds Demucs' peak memory use on long sources. The final join is
     streamed by FFmpeg, so it does not reintroduce the original memory spike.

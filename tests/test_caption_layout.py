@@ -4,12 +4,18 @@ import unittest
 from pathlib import Path
 
 from PIL import ImageFont
-from core.captions import (DEFAULT_CAPTION_LAYOUT, caption_box_height, read_srt,
+from core.captions import (DEFAULT_CAPTION_LAYOUT, caption_box_height, read_srt, validate_background_opacity,
                            validate_caption_layout, wrap_caption, write_caption_ass)
 from core.ffmpeg import FONT_PATH
 
 
 class CaptionLayoutTests(unittest.TestCase):
+    def test_background_opacity_rejects_invalid_values(self):
+        for value in (-.1, 1.1, float('nan'), True, '0.5'):
+            with self.assertRaises(ValueError):
+                validate_background_opacity(value)
+        self.assertEqual(validate_background_opacity(.65), .65)
+
     def test_wrap_preserves_text_and_every_line_fits(self):
         font = ImageFont.truetype(str(FONT_PATH), 64)
         text = "为什么他明明知道有危险，却还要回来？OpenAI video 2026"

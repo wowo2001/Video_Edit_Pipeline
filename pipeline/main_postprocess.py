@@ -6,7 +6,8 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from core.captions import DEFAULT_CAPTION_LAYOUT, read_srt, validate_caption_layout, overlay_layout
+from core.captions import (DEFAULT_CAPTION_LAYOUT, read_srt, validate_caption_layout, overlay_layout,
+                           DEFAULT_BACKGROUND_OPACITY, validate_background_opacity)
 from pipeline.final_render import MAIN_SPEED, export_recognition_audio, render_final_video, validate_speed
 from pipeline.source_preprocess import load_json, save_json
 from pipeline.main_metadata import load_metadata, save_metadata, sync_assets
@@ -39,9 +40,12 @@ class MainPostProcessor:
         self.fix_subtitles = fix_subtitles
 
     def run(self, title=None, subtitle=None, *, caption_layout=None, background_music=None,
-            speed=None, refresh_subtitles=False, use_existing_subtitles=False, text_layout=None):
+            speed=None, refresh_subtitles=False, use_existing_subtitles=False, text_layout=None,
+            background_opacity=None):
         metadata = load_metadata(self.paths)
         settings = metadata['render']
+        background_opacity = validate_background_opacity(background_opacity if background_opacity is not None
+            else settings.get('background_opacity', DEFAULT_BACKGROUND_OPACITY))
         title = title if title is not None else settings.get('title') or metadata.get('drama_title')
         if not title:
             raise ValueError('metadata 缺少标题或剧名')
@@ -156,7 +160,7 @@ class MainPostProcessor:
         if subtitle is not None:
             settings['subtitle_source'] = 'manual'
         subtitle = subtitle if subtitle is not None else settings.get('subtitle') or settings.get('generated_subtitle', '')
-        settings.update(title=title, subtitle=subtitle, caption_layout=layout,
+        settings.update(title=title, subtitle=subtitle, caption_layout=layout, background_opacity=background_opacity,
                         overlay_layout=text_layout, popup_comments=popups, speed=speed,
                         background_music={**background_music, 'path': str(background_music['path'])} if background_music else None)
         save_metadata(self.paths, metadata)
@@ -165,7 +169,8 @@ class MainPostProcessor:
             music_path=background_music["path"] if background_music else None,
             music_volume=background_music.get("volume", .08) if background_music else .08,
             gif_path=settings.get('gif_path'),
-            ass_path=self.paths.root/"final_render.ass", text_layout=text_layout)
+            ass_path=self.paths.root/"final_render.ass", text_layout=text_layout,
+            background_opacity=background_opacity)
         # Old full-video intermediates are no longer part of the execution path.
         for name in ("changed_resolution_video_path", "speed_up_video_path", "post_speed_video_path",
                      "masked_video_path", "subtitle_video_path", "text_overlay_video_path"):

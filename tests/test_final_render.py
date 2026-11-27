@@ -81,14 +81,16 @@ class FinalRenderIntegrationTests(unittest.TestCase):
         self.assertTrue(all(stream['codec_type']=='audio' for stream in data['streams']))
         self.assertAlmostEqual(float(data['format']['duration']),4,delta=.15)
 
-    def test_custom_title_subtitle_and_popup_positions_are_rendered(self):
+    def test_blurred_background_preserves_custom_text_positions_and_sharp_picture(self):
         output = self.root/'custom_text.mp4'
         render_final_video(self.source, output, self.srt, '顶部标题', '底部副标题',
             self.layout, [{'start_time': 0, 'text': '滚动弹幕'}],
             text_layout={'title': {'y': 100, 'font_size': 48},
                          'subtitle': {'y': 1700, 'font_size': 60},
-                         'popup': {'y': 300, 'font_size': 36}})
+                         'popup': {'y': 300, 'font_size': 36}}, background_opacity=.4)
         frame = self.frame(output, 2)
+        self.assertGreater(frame.getpixel((10, 10))[2], 2, '压暗后的顶部仍应有画面颜色而非纯黑')
+        self.assertGreater(frame.getpixel((10, 960))[2], frame.getpixel((10, 10))[2]+20)
         for y, height in [(100, 70), (1700, 80)]:
             count = sum(r > 180 and g > 100 and b < 90
                         for r, g, b in frame.crop((0, y, 1080, y+height)).getdata())
@@ -96,6 +98,17 @@ class FinalRenderIntegrationTests(unittest.TestCase):
         white = sum(r > 190 and g > 190 and b > 190
                     for r, g, b in frame.crop((0, 300, 1080, 360)).getdata())
         self.assertGreater(white, 50)
+
+    def test_background_opacity_changes_only_the_background(self):
+        frames = []
+        for opacity in (.2, .8):
+            output = self.root/f'opacity_{opacity}.mp4'
+            render_final_video(self.source, output, self.srt, '', '', self.layout,
+                               background_opacity=opacity)
+            frames.append(self.frame(output, .3))
+        self.assertGreater(frames[1].getpixel((10, 10))[2], frames[0].getpixel((10, 10))[2]+20)
+        for a, b in zip(frames[0].getpixel((10, 960)), frames[1].getpixel((10, 960))):
+            self.assertLessEqual(abs(a-b), 3)
 
     def test_narration_only_has_no_appended_source_dialogue(self):
         import array

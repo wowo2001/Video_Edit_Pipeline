@@ -3,6 +3,9 @@ const token = new URLSearchParams(location.search).get('token');
 const url = (path, params = {}) => path + '?' + new URLSearchParams({token, ...params});
 const canvas = $('canvas'), ctx = canvas.getContext('2d');
 const portrait = $('portrait'), portraitCtx = portrait.getContext('2d');
+const backgroundCanvas = document.createElement('canvas');
+backgroundCanvas.width = 270; backgroundCanvas.height = 480;
+const backgroundCtx = backgroundCanvas.getContext('2d');
 let meta, profile, image, mode = 'blur', selected = null, drag = null, request = 0, timer;
 let undoStack = [], redoStack = [], draftKey;
 let revision = 0, finished = false;
@@ -122,6 +125,16 @@ function drawPortrait() {
     const top = (1920 - displayHeight) / 2;
     portraitCtx.fillStyle = 'black';
     portraitCtx.fillRect(0, 0, 1080, 1920);
+    const bgWidth = Math.min(sourceWidth, sourceHeight * 9 / 16);
+    const bgHeight = Math.min(sourceHeight, sourceWidth * 16 / 9);
+    backgroundCtx.clearRect(0, 0, 270, 480);
+    backgroundCtx.filter = 'blur(12px) saturate(70%)';
+    backgroundCtx.drawImage(image, c.x * width + (sourceWidth-bgWidth)/2,
+        c.y * height + (sourceHeight-bgHeight)/2, bgWidth, bgHeight, 0, 0, 270, 480);
+    portraitCtx.save();
+    portraitCtx.globalAlpha = profile.background_opacity ?? .65;
+    portraitCtx.drawImage(backgroundCanvas, 0, 0, 1080, 1920);
+    portraitCtx.restore();
     picture(portraitCtx);
     for (const b of profile.blur_regions) {
         const x = (b.x - c.x) * width * scale;
@@ -134,7 +147,7 @@ function drawPortrait() {
         portraitCtx.filter = 'blur(14px)';
         picture(portraitCtx);
         portraitCtx.filter = 'none';
-        // Clip the tint to the actual picture, leaving title bands black.
+        // Clip the tint to the actual picture, leaving the blurred title background intact.
         portraitCtx.fillStyle = '#00000026';
         portraitCtx.fillRect(0, Math.max(0, top), 1080, Math.min(1920, displayHeight));
         portraitCtx.restore();
@@ -250,7 +263,7 @@ function info() {
     const c = profile.crop, width = meta.info.width, height = meta.info.height;
     const pictureHeight = Math.round(1080 * c.height * height / (c.width * width));
     $('cropInfo').textContent = `竖屏输出 1080 × 1920；画面宽度自动铺满 1080。`
-        + (pictureHeight <= 1920 ? `画面高度约 ${pictureHeight}，上下留黑。` : '超出屏幕的上下部分会居中裁掉。');
+        + (pictureHeight <= 1920 ? `画面高度约 ${pictureHeight}，上下动态模糊填充。` : '超出屏幕的上下部分会居中裁掉。');
     $('regions').replaceChildren();
     profile.blur_regions.forEach((box, index) => {
         const row = document.createElement('div');
@@ -278,6 +291,8 @@ function info() {
     $('redo').disabled = !redoStack.length || Boolean(drag || captionDrag);
     $('crf').value = profile.crf;
     $('preset').value = profile.preset;
+    $('backgroundOpacity').value = Math.round((profile.background_opacity ?? .65)*100);
+    $('backgroundOpacityValue').textContent = $('backgroundOpacity').value+'%';
     for (const key of ['title', 'subtitle', 'popup']) {
         const box = overlayLayout()[key];
         for (const field of ['y', 'font_size']) {
@@ -416,6 +431,9 @@ $('full').onclick = () => crop(null);
 $('skip').onclick = () => change(() => { profile.blur_regions = []; selected = null; mode = 'blur'; });
 $('crf').onchange = () => change(() => { profile.crf = Number($('crf').value); });
 $('preset').onchange = () => change(() => { profile.preset = $('preset').value; });
+$('backgroundOpacity').oninput = () => change(() => {
+    profile.background_opacity = Number($('backgroundOpacity').value)/100;
+});
 for (const key of ['title', 'subtitle', 'popup']) {
     for (const field of ['y', 'font_size']) {
         const input = $(`${key}_${field}`);

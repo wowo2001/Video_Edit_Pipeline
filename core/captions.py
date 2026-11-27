@@ -6,6 +6,13 @@ from pathlib import Path
 from PIL import ImageFont
 
 DEFAULT_CAPTION_LAYOUT = {"x": 70, "y": 1220, "width": 940, "font_size": 64, "max_lines": 2}
+DEFAULT_BACKGROUND_OPACITY = 0.65
+
+
+def validate_background_opacity(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= 1:
+        raise ValueError("背景不透明度必须在 0 到 1 之间")
+    return float(value)
 
 DEFAULT_OVERLAY_LAYOUT = {
     "title": {"y": 400, "font_size": 80},

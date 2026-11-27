@@ -7,7 +7,8 @@ from fractions import Fraction
 from pathlib import Path
 
 from core.cmd import run_cmd
-from core.captions import DEFAULT_CAPTION_LAYOUT, validate_caption_layout, overlay_layout
+from core.captions import (DEFAULT_CAPTION_LAYOUT, validate_caption_layout, overlay_layout,
+                           DEFAULT_BACKGROUND_OPACITY, validate_background_opacity)
 
 VERSION = 1
 
@@ -65,7 +66,8 @@ def default_profile(info, drama_title):
             "crop": {"x": (1-crop_width)/2, "y": (1-crop_height)/2,
                      "width": crop_width, "height": crop_height},
             "blur_regions": [], "crf": 20, "preset": "medium", "max_height": 720,
-            "caption_layout": dict(DEFAULT_CAPTION_LAYOUT), "overlay_layout": overlay_layout()}
+            "caption_layout": dict(DEFAULT_CAPTION_LAYOUT), "overlay_layout": overlay_layout(),
+            "background_opacity": DEFAULT_BACKGROUND_OPACITY}
 
 
 def validate_profile(profile, drama_title=None):
@@ -75,6 +77,7 @@ def validate_profile(profile, drama_title=None):
         raise ValueError("预处理配置的剧名与本批任务不一致")
     validate_caption_layout(profile.get("caption_layout", DEFAULT_CAPTION_LAYOUT))
     overlay_layout(profile.get("overlay_layout"))
+    validate_background_opacity(profile.get('background_opacity', DEFAULT_BACKGROUND_OPACITY))
     reference = profile["reference"]
     if any(not isinstance(reference[k], int) or reference[k] < 2 for k in ("width", "height")):
         raise ValueError("参考画面尺寸无效")
@@ -217,7 +220,7 @@ def prepare_episode(urls, paths, profile):
         check_geometry(info, profile)
     size = output_size(profile, infos)
     # Subtitle placement affects the deliverable, never the whole-episode master.
-    master_profile = {k: v for k, v in profile.items() if k not in ("caption_layout", "overlay_layout")}
+    master_profile = {k: v for k, v in profile.items() if k not in ("caption_layout", "overlay_layout", "background_opacity")}
     signature = {"profile": master_profile, "size": size, "sources": [
         {"url": url, "path": str(p.resolve()), "size": p.stat().st_size,
          "mtime": p.stat().st_mtime_ns} for url, p in zip(urls, raw_paths)]}

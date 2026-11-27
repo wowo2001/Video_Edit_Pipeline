@@ -9,7 +9,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
-from core.captions import DEFAULT_CAPTION_LAYOUT, overlay_layout
+from core.captions import DEFAULT_CAPTION_LAYOUT, overlay_layout, DEFAULT_BACKGROUND_OPACITY
 from pipeline.final_render import render_final_video
 
 from pipeline.source_preprocess import (
@@ -27,6 +27,7 @@ def selection_server(source, drama_title, profile_path, *, initial=None, batch_c
     initial = copy.deepcopy(initial or default_profile(info, drama_title))
     initial.setdefault("caption_layout", dict(DEFAULT_CAPTION_LAYOUT))
     initial["overlay_layout"] = overlay_layout(initial.get("overlay_layout"))
+    initial.setdefault('background_opacity', DEFAULT_BACKGROUND_OPACITY)
     validate_profile(initial, drama_title)
     token = secrets.token_urlsafe(24)
     state = {"done": threading.Event(), "profile": None, "cancelled": False,
@@ -42,6 +43,7 @@ def selection_server(source, drama_title, profile_path, *, initial=None, batch_c
         profile["preset"] = body.get("preset", initial["preset"])
         profile["caption_layout"] = body.get("caption_layout", initial["caption_layout"])
         profile["overlay_layout"] = overlay_layout(body.get("overlay_layout", initial["overlay_layout"]))
+        profile['background_opacity'] = body.get('background_opacity', initial['background_opacity'])
         return validate_profile(profile, drama_title)
 
     class Handler(BaseHTTPRequestHandler):
@@ -160,7 +162,8 @@ def selection_server(source, drama_title, profile_path, *, initial=None, batch_c
                         render_final_video(master_preview, preview_path, sample_srt, drama_title,
                             "副标题预览", profile["caption_layout"],
                             [{"start_time": 0, "text": "这一步，他到底想干什么？"}],
-                            speed=1, text_layout=profile["overlay_layout"])
+                            speed=1, text_layout=profile["overlay_layout"],
+                            background_opacity=profile['background_opacity'])
                     return self.respond({"ok": True})
                 if route == "/api/save":
                     save_json(profile_path, profile)

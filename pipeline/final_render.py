@@ -5,7 +5,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from core.captions import read_srt, validate_caption_layout, write_caption_ass, overlay_layout
+from core.captions import (read_srt, validate_caption_layout, write_caption_ass, overlay_layout,
+                           DEFAULT_BACKGROUND_OPACITY, validate_background_opacity)
 from core.ffmpeg import FONT_PATH
 from pipeline.source_preprocess import probe_source
 
@@ -38,9 +39,11 @@ def export_recognition_audio(source, destination, speed=MAIN_SPEED):
 
 def render_final_video(source, destination, srt_path, title, subtitle, caption_layout,
                        popup_comments=None, *, speed=MAIN_SPEED, music_path=None,
-                       music_volume=.08, gif_path=None, ass_path=None, text_layout=None):
+                       music_volume=.08, gif_path=None, ass_path=None, text_layout=None,
+                       background_opacity=DEFAULT_BACKGROUND_OPACITY):
     """Speed first, then lay out text/animation on the final 1080x1920 clock."""
     speed = validate_speed(speed)
+    background_opacity = validate_background_opacity(background_opacity)
     validate_caption_layout(caption_layout)
     text_layout = overlay_layout(text_layout)
     volume = float(music_volume)
@@ -66,10 +69,16 @@ def render_final_video(source, destination, srt_path, title, subtitle, caption_l
             shutil.copy2(FONT_PATH, folder/"fonts"/FONT_PATH.name)
             shutil.copy2(ass_path, folder/"captions.ass")
             font = "fonts/"+FONT_PATH.name
-            filters = [f"[0:v:0]setpts=(PTS-STARTPTS)/{speed:g},scale=1080:-2,"
-                       "crop=w=iw:h='min(ih,1920)':x=0:y=(ih-oh)/2,"
-                       "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30,"
-                       "ass=filename=captions.ass:fontsdir=fonts"]
+            # Blurred image composited over black: RGB gain equals layer opacity.
+            filters = [f"[0:v:0]setpts=(PTS-STARTPTS)/{speed:g},split=2[sharp_in][bg_in];"
+                "[bg_in]scale=270:480:force_original_aspect_ratio=increase,"
+                "crop=270:480,boxblur=12:2,eq=saturation=0.7,"
+                f"colorchannelmixer=rr={background_opacity:g}:gg={background_opacity:g}:bb={background_opacity:g},"
+                "scale=1080:1920,setsar=1[background];"
+                "[sharp_in]scale=1080:-2,crop=w=iw:h='min(ih,1920)':x=0:y=(ih-oh)/2,"
+                "setsar=1[sharp];"
+                "[background][sharp]overlay=(W-w)/2:(H-h)/2:shortest=1,fps=30,"
+                "ass=filename=captions.ass:fontsdir=fonts"]
 
             def text_filter(text, name, size, color, x, y, extra=""):
                 (folder/name).write_text(str(text), encoding="utf-8")
@@ -127,4 +136,4 @@ def render_final_video(source, destination, srt_path, title, subtitle, caption_l
     finally:
         temporary.unlink(missing_ok=True)
     return {"path": str(destination), "ass_path": str(ass_path.resolve()), "speed": speed,
-            "video_encode_passes": 1, "video": result}
+            "video_encode_passes": 1, "background_opacity": background_opacity, "video": result}

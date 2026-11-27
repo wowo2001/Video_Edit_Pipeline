@@ -46,11 +46,13 @@ def main(argv=None):
     subtitle = args.subtitle
     layout = settings.get('caption_layout', DEFAULT_CAPTION_LAYOUT)
     text_layout = settings.get('overlay_layout')
+    background_opacity = settings.get('background_opacity')
     profile_path = args.profile or batch_profile_path(drama_title)
     if profile_path.exists() and (args.profile or not metadata_exists):
         profile = validate_profile(load_json(profile_path), drama_title)
         layout = profile.get("caption_layout", DEFAULT_CAPTION_LAYOUT)
         text_layout = profile.get("overlay_layout")
+        background_opacity = profile.get('background_opacity')
     elif args.profile:
         parser.error(f"配置文件不存在: {args.profile}")
     music = None
@@ -69,7 +71,7 @@ def main(argv=None):
     save_metadata(paths, metadata)
     output = MainPostProcessor(paths).run(title, subtitle, caption_layout=layout, text_layout=text_layout,
         background_music=music, speed=args.speed, refresh_subtitles=args.refresh_subtitles,
-        use_existing_subtitles=args.use_existing_subtitles)
+        use_existing_subtitles=args.use_existing_subtitles, background_opacity=background_opacity)
     effective_subtitle = subtitle if subtitle is not None else load_metadata(paths)['render'].get('subtitle')
     exported = paths.root/(safe_filename(effective_subtitle or title)+".mp4")
     if exported.resolve() != output.resolve():

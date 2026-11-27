@@ -2,7 +2,7 @@
 from copy import deepcopy
 from pathlib import Path
 
-from core.captions import DEFAULT_CAPTION_LAYOUT, overlay_layout
+from core.captions import DEFAULT_CAPTION_LAYOUT, overlay_layout, DEFAULT_BACKGROUND_OPACITY
 from core.utils import read_json, write_json
 
 
@@ -27,6 +27,7 @@ def load_metadata(paths):
             'caption_layout': deepcopy(media.get('caption_layout', DEFAULT_CAPTION_LAYOUT)),
             'overlay_layout': overlay_layout(media.get('overlay_layout')),
             'speed': media.get('final_render', {}).get('speed', 1.2),
+            'background_opacity': DEFAULT_BACKGROUND_OPACITY,
             'background_music': deepcopy(media.get('background_music')),
             'gif_path': str(Path(__file__).resolve().parents[1]/'assets/like.gif'),
         },

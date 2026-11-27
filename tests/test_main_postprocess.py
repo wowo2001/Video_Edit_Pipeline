@@ -79,12 +79,14 @@ class MainPostprocessTests(unittest.TestCase):
         metadata['render'].update(title='自定义标题', subtitle='自定义副标题',
                                   popup_comments=[{'start_time': .4, 'text': '编辑后的弹幕'}])
         metadata['render']['overlay_layout']['popup']['y'] = 500
+        metadata['render']['background_opacity'] = .25
         save_metadata(self.paths, metadata)
         self.processor.run()
         args, kwargs = self.render_call.call_args
         self.assertEqual(args[3:5], ('自定义标题', '自定义副标题'))
         self.assertEqual(args[6], metadata['render']['popup_comments'])
         self.assertEqual(kwargs['text_layout']['popup']['y'], 500)
+        self.assertEqual(kwargs['background_opacity'], .25)
         self.assertEqual(self.fix.call_count, 1)
         self.assertEqual(self.asr.call_count, 1)
 

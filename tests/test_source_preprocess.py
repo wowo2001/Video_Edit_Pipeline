@@ -82,6 +82,7 @@ class SourcePreprocessTests(unittest.TestCase):
             captions_changed["caption_layout"]["width"] = 600
             captions_changed["overlay_layout"]["title"]["y"] = 250
             captions_changed["overlay_layout"]["popup"]["font_size"] = 60
+            captions_changed['background_opacity'] = .25
             prepare_episode("https://example/a", paths, captions_changed)
             self.assertEqual(encode.call_count, 1, "字幕布局变化不应重压整集母版")
             command = run.call_args.args[0]
@@ -112,6 +113,7 @@ class SourcePreprocessTests(unittest.TestCase):
             try:
                 profile = copy.deepcopy(self.profile)
                 profile['overlay_layout']['popup'] = dict(y=600, font_size=60)
+                profile['background_opacity'] = .25
                 for endpoint in ('preview', 'save'):
                     url = state['url'].replace('/?token=', f'/api/{endpoint}?token=')
                     request = Request(url, data=json.dumps(profile).encode(),
@@ -119,6 +121,7 @@ class SourcePreprocessTests(unittest.TestCase):
                     with urlopen(request, timeout=5) as response:
                         self.assertTrue(json.load(response)['ok'])
                 self.assertEqual(render.call_args.kwargs['text_layout'], profile['overlay_layout'])
+                self.assertEqual(render.call_args.kwargs['background_opacity'], .25)
                 self.assertEqual(load_json(path)['overlay_layout'], profile['overlay_layout'])
             finally:
                 server.shutdown()

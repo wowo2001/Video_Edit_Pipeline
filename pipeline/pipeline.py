@@ -256,6 +256,7 @@ class AutoVideoPipeline:
             None, None,
             caption_layout=preprocess_profile.get("caption_layout", DEFAULT_CAPTION_LAYOUT),
             text_layout=preprocess_profile.get("overlay_layout"),
+            background_opacity=preprocess_profile.get('background_opacity'),
             background_music=music,
         )
         media_data, main_media = self._read_main_media()
