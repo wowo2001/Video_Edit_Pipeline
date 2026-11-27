@@ -300,7 +300,7 @@ class AutoVideoPipeline:
         },
         {
             "x": 0,
-            "y": 1250,
+            "y": 1230,
             "width": 1080,
             "height": 70,
             "mosaic_size": 8,

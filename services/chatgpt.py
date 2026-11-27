@@ -33,7 +33,7 @@ PROVIDERS = {
         "models": {
             "generate_script": "gpt-6-luna", "fix_subtitles": "gpt-6-luna",
             "recognise_speaker": "gpt-6.1-sol", "generate_story": "gpt-6.1-sol",
-            "select_scene": "gpt-5.6-sol",
+            "select_scene": "gpt-6.1-sol",
             "split_scene_segment": "gpt-6.1-sol", "refine_narration": "gpt-6.1-sol",
             "generate_hook": "gpt-6-luna",
             "translate_subtitles": "gpt-6.1-sol",
