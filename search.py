@@ -29,7 +29,7 @@ from pipeline.video import (
     cut_video,
     cut_video_range,
     fit_forward_video_range,
-    mosaic_regions,
+    blur_regions,
 )
 from services.chatgpt import ChatGPT
 from services.postgresql import PostgresClient
@@ -482,9 +482,9 @@ class SearchPipeline:
             # Search clips are masked while still 1280x720. Source subtitles
             # sit in the bottom band (roughly y=620-710), before the pipeline
             # burns its own yellow subtitles in a later step.
-            {"x": 0, "y": 600, "width": 1280, "height": 120, "mosaic_size": 8},
+            {"x": 0, "y": 600, "width": 1280, "height": 120},
         ]
-        mosaic_regions(search_media["post_processing_video_path"], self.paths.masked_video, regions)
+        blur_regions(search_media["post_processing_video_path"], self.paths.masked_video, regions)
         search_media["masked_video_path"] = str(self.paths.masked_video)
         self._write_media(media)
 

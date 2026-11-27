@@ -6,7 +6,9 @@ from core.cmd import run_cmd
 
 
 ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
-FONT_PATH = ASSETS_DIR / "fonts" / "msyh.ttc"
+FONT_PATH = ASSETS_DIR / "fonts" / "SmileySans-Oblique.otf"
+# libass resolves this font by its legacy family name, as in the news renderer.
+FONT_FAMILY = "Smiley Sans Oblique"
 
 
 def _font_filter_path(path):
@@ -93,6 +95,24 @@ def mosaic_regions(input_video, output_video, regions):
     run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-filter_complex", ";".join(filter_parts), "-map", current, "-map", "0:a?", "-c:v", "libx264", "-c:a", "copy", str(output_video)])
 
 
+def blur_regions(input_video, output_video, regions):
+    """Use the news commentary's blurred, lightly darkened masking style."""
+    filter_parts, current = [], "[0:v]"
+    for index, region in enumerate(regions):
+        x, y, width, height = region["x"], region["y"], region["width"], region["height"]
+        crop, output = f"blur{index}", f"v{index}"
+        # Chroma planes are half-size in yuv420p; narrow bands need a smaller radius.
+        radius = min(18, width // 4, height // 4)
+        filter_parts.append(
+            f"[0:v]crop={width}:{height}:{x}:{y},"
+            f"boxblur={radius}:2,"
+            f"drawbox=x=0:y=0:w=iw:h=ih:color=black@0.15:t=fill[{crop}]"
+        )
+        filter_parts.append(f"{current}[{crop}]overlay={x}:{y}[{output}]")
+        current = f"[{output}]"
+    run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-filter_complex", ";".join(filter_parts), "-map", current, "-map", "0:a?", "-c:v", "libx264", "-c:a", "copy", str(output_video)])
+
+
 def add_subtitles(input_video, srt_file, output_video, y, font_size=10):
     # Keep source-title punctuation out of FFmpeg's filter-string parser.
     if "'" in str(Path(srt_file).resolve()):
@@ -105,7 +125,7 @@ def add_subtitles(input_video, srt_file, output_video, y, font_size=10):
     vf = (
         f"subtitles=filename='{srt_path}':fontsdir='{font_dir}':"
         f"force_style='Alignment=2,MarginV={y},FontSize={font_size},"
-        "PrimaryColour=&H00CCFF&,FontName=Microsoft YaHei'"
+        f"PrimaryColour=&H00CCFF&,FontName={FONT_FAMILY},Bold=0,Italic=0'"
     )
     run_cmd(["ffmpeg", "-y", "-i", str(input_video), "-vf", vf, "-c:v", "libx264", "-crf", "23", "-preset", "fast", "-c:a", "copy", str(output_video)])
 

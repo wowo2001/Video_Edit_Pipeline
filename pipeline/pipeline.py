@@ -21,7 +21,7 @@ from pipeline.audio import (
 )
 from core.ffmpeg import concat_media
 from pipeline.download import download_video
-from pipeline.video import add_gif_overlay, add_subtitles, change_resolution, concat_video_paths, cut_video, mask_sub, speed_up, add_text_overlay, mosaic_regions
+from pipeline.video import add_gif_overlay, add_subtitles, change_resolution, concat_video_paths, cut_video, mask_sub, speed_up, add_text_overlay, blur_regions
 from services.post_cut_service import PostCutService
 from services.chatgpt import ChatGPT
 from services.ali import Ali
@@ -289,31 +289,20 @@ class AutoVideoPipeline:
             "y": 600,
             "width": 200,
             "height": 100,
-            "mosaic_size": 8,
         },
         {
             "x": 800,
             "y": 600,
             "width": 200,
             "height": 100,
-            "mosaic_size": 8,
         },
         {
             "x": 0,
             "y": 1230,
             "width": 1080,
             "height": 70,
-            "mosaic_size": 8,
         }]
-        # region = [
-        # {
-        #     "x": 0,
-        #     "y": 1150,
-        #     "width": 1080,
-        #     "height": 50,
-        #     "mosaic_size": 8,
-        # }]
-        mosaic_regions(main_media["post_speed_video_path"], self.project_paths.masked_video, region)
+        blur_regions(main_media["post_speed_video_path"], self.project_paths.masked_video, region)
         main_media["masked_video_path"] = str(self.project_paths.masked_video)
         self._write_media(media_data)
 

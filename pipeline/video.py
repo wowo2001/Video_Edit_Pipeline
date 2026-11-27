@@ -3,6 +3,7 @@ from pathlib import Path
 from core.ffmpeg import add_gif_overlay as add_gif_overlay_ffmpeg
 from core.ffmpeg import add_subtitles as add_subtitles_ffmpeg
 from core.ffmpeg import add_text_overlay as add_text_overlay_ffmpeg
+from core.ffmpeg import blur_regions as blur_regions_ffmpeg
 from core.ffmpeg import change_resolution as change_resolution_ffmpeg
 from core.ffmpeg import concat_media as concat_videos_ffmpeg
 from core.ffmpeg import cut_video as cut_video_ffmpeg
@@ -120,6 +121,10 @@ def mask_sub(input_video, output_video, y_offset, mask_height):
 
 def mosaic_regions(input_video, output_video, regions):
     mosaic_regions_ffmpeg(input_video, output_video, regions)
+
+
+def blur_regions(input_video, output_video, regions):
+    blur_regions_ffmpeg(input_video, output_video, regions)
 
 
 def add_subtitles(input_video, srt_file, output_video, y, font_size):
