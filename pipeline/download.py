@@ -26,7 +26,6 @@ def download_video(urls, output_path, origin_path, media_path):
 
         cmd = [
             "yt-dlp",
-            "--extractor-args", "youtube:player_client=mweb",
             "--js-runtimes", "node",
             "-f", "bestvideo+bestaudio/best",
             "--merge-output-format", "mp4",

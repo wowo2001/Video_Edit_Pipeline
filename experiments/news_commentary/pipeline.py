@@ -68,15 +68,19 @@ def validate_plan(plan, catalog, advertisement=''):
             indices != list(range(indices[0], indices[-1] + 1))):
             raise ValueError(f'段落 {number} 字幕索引无效或不连续')
         keys = {(segment['source_id'], i) for i in indices}
-        if used & keys:
+        is_intro = any(p.get('kind') == 'intro' for p in segment.get('narration_parts', []) if isinstance(p, dict))
+        if is_intro and (number != 1 or kind != 'narration_only' or len(segment['narration_parts']) != 1):
+            raise ValueError('intro 只能作为第一段唯一的旁白')
+        if not is_intro and used & keys:
             raise ValueError(f'段落 {number} 重复使用证据')
-        used.update(keys)
+        if not is_intro:
+            used.update(keys)
         if 'narration_parts' in segment:
             parts = segment['narration_parts']
             if not isinstance(parts, list) or not parts:
                 raise ValueError(f'段落 {number} 缺少细分旁白')
             for part in parts:
-                if (not isinstance(part, dict) or part.get('kind') not in ('paraphrase', 'bridge', 'commentary')
+                if (not isinstance(part, dict) or part.get('kind') not in ('intro', 'paraphrase', 'bridge', 'commentary')
                     or not isinstance(part.get('text'), str) or not part['text'].strip()):
                     raise ValueError(f'段落 {number} 旁白分类或文本无效')
                 if part['kind'] == 'paraphrase':
@@ -329,6 +333,8 @@ def generate_audio(root):
     from experiments.news_commentary.part_tts import generate_part_tts
     catalog = {s['source_id']: s for s in read_json(root / 'source_catalog.json')}
     plan = read_json(root / 'commentary_plan.json')
+    prepared = []
+    records = []
     for segment in plan['segments']:
         source = catalog[segment['source_id']]
         paths = ProjectPaths(root / 'render_segments' / f"{segment['segment_id']:02d}")
@@ -338,12 +344,8 @@ def generate_audio(root):
             'audience_question', 'dialogue_subtitle_indices', 'sentence_indices', 'original_text')}
         inputs['narration_parts'] = [{k: p.get(k) for k in ('kind', 'role', 'text', 'evidence')}
                                      for p in segment.get('narration_parts', [])]
-        inputs['tts_mode'] = 'parts_v3_original_volume'
+        inputs['tts_mode'] = 'merged_subtitles_v2_original_volume'
         completed = paths.root / 'audio_completed_input.json'
-        if completed.exists() and read_json(completed) == inputs:
-            segment.update(read_json(paths.root / 'commentary_plan.json')['segments'][0])
-            print(f"段落 {segment['segment_id']} 复用已完成配音", flush=True)
-            continue
         print(f"段落 {segment['segment_id']} 翻译与配音 ({source.get('source_type', 'video')})", flush=True)
         save({'title': plan['title'], 'segments': [segment]}, paths.root / 'commentary_plan.json')
         if source.get('source_type') == 'article':
@@ -359,11 +361,20 @@ def generate_audio(root):
                               (paths.root / 'dialogue_dubbing.json').exists())
             if not reuse_dialogue:
                 translate_commentary_dialogue(paths)
-        generate_part_tts(paths)
         segment.update(read_json(paths.root / 'commentary_plan.json')['segments'][0])
-        save(inputs, completed)
-        save(plan, root / 'commentary_plan.json')
+        records.extend(read_json(paths.root / 'dialogue_dubbing.json'))
+        prepared.append((paths, inputs))
     save(plan, root / 'commentary_plan.json')
+    save(records, root / 'dialogue_dubbing.json')
+    generate_part_tts(ProjectPaths(root))
+    plan = read_json(root / 'commentary_plan.json')
+    records = read_json(root / 'dialogue_dubbing.json')
+    for segment, (paths, inputs) in zip(plan['segments'], prepared):
+        save({'title': plan['title'], 'segments': [segment]}, paths.root / 'commentary_plan.json')
+        save([r for r in records if r['segment_id'] == segment['segment_id']],
+             paths.root / 'dialogue_dubbing.json')
+        save(inputs, paths.root / 'audio_completed_input.json')
+
 
 
 def produce(root, config):

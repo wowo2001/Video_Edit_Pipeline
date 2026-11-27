@@ -96,6 +96,31 @@ def wait_processed(service, video_id, timeout=600):
         time.sleep(10)
 
 
+def prepare_thumbnail(path):
+    """Keep the original cover; make a compact JPEG for upload when needed."""
+    from io import BytesIO
+    from PIL import Image, ImageOps
+    limit = 2_000_000
+    if path.stat().st_size < limit:
+        return path
+    with Image.open(path) as source:
+        rgba = ImageOps.exif_transpose(source).convert('RGBA')
+        image = Image.new('RGB', rgba.size, 'white')
+        image.paste(rgba, mask=rgba.getchannel('A'))
+    while True:
+        for quality in (95, 90, 85, 80, 70):
+            buffer = BytesIO()
+            image.save(buffer, format='JPEG', quality=quality, optimize=True)
+            if buffer.tell() < limit:
+                output = path.with_name(path.stem + '_youtube.jpg')
+                output.write_bytes(buffer.getvalue())
+                print(f'上传封面压缩: {path.stat().st_size/1024:.0f} KB → '
+                      f'{output.stat().st_size/1024:.0f} KB', flush=True)
+                return output
+        image = image.resize((max(1, image.width*4//5), max(1, image.height*4//5)),
+                             Image.Resampling.LANCZOS)
+
+
 def upload_video(*, video_path, title, channel_id, client_secrets='auth/youtube_client.json',
                  token_path='auth/youtube_token.json', thumbnail_path=None, receipt_path=None,
                  description='', privacy='private', tags=None, category_id='25', language='zh',
@@ -114,6 +139,8 @@ def upload_video(*, video_path, title, channel_id, client_secrets='auth/youtube_
     if thumbnail and (not thumbnail.is_file() or not 0 < thumbnail.stat().st_size <= 50 * 1024 * 1024
                       or thumbnail.suffix.lower() not in ('.jpg', '.jpeg', '.png')):
         raise ValueError('封面需为不超过 50 MB 的非空 PNG/JPEG 文件')
+    if thumbnail:
+        thumbnail = prepare_thumbnail(thumbnail)
     caption = Path(caption_path).resolve() if caption_path else None
     if caption and (not caption.is_file() or not 0 < caption.stat().st_size <= 100 * 1024 * 1024):
         raise ValueError('字幕文件缺失、为空或超过100 MB')

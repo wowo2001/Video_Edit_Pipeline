@@ -23,7 +23,11 @@ def portrait_speed(duration):
     return float(required.quantize(Decimal('0.01'), rounding=ROUND_CEILING))
 
 
-def speed_up_final(video, *, portrait=False):
+def has_intro(plan):
+    return plan['segments'][0]['narration_parts'][0]['kind'] == 'intro'
+
+
+def speed_up_final(video, *, portrait=False, subscribe=False):
     """Speed up a freshly rendered deliverable, including its burned subtitles."""
     video = Path(video)
     speed = 1.4
@@ -35,11 +39,27 @@ def speed_up_final(video, *, portrait=False):
         print(f'竖屏原片 {duration:.3f} 秒，预计输出 {duration / speed:.3f} 秒', flush=True)
     temporary = video.with_name(f'{video.stem}_speed_tmp.mp4')
     print(f'最终成片调整为 {speed:.2f} 倍速: {video.name}', flush=True)
+    inputs = ['-i', video]
+    filters = (f'[0:v:0]setpts=(PTS-STARTPTS)/{speed:.2f}[v];'
+               f'[0:a:0]asetpts=PTS-STARTPTS,atempo={speed:.2f}[a]')
+    if subscribe:
+        assets = Path(__file__).resolve().parents[2]/'assets'/'subscribe'
+        config = read_json(assets/'config.json')
+        position = config['portrait' if portrait else 'landscape']
+        # Cover is one second before speed-up; animation starts two playback
+        # seconds into the intro and itself remains at normal speed.
+        start = 1/speed + config['intro_delay_seconds']
+        inputs += ['-i', assets/'subscribe_overlay.mov']
+        filters += (
+            f";[1:v]crop={config['crop']},scale={position['width']}:-1,"
+            f'setpts=PTS-STARTPTS+{start}/TB[subscribe];'
+            f"[v][subscribe]overlay={position['x']}:{position['y']}:eof_action=pass[outv];"
+            f'[1:a]adelay={start*1000:g}:all=1[ding];'
+            '[a][ding]amix=inputs=2:duration=first:normalize=0[outa]')
+    video_map, audio_map = ('[outv]', '[outa]') if subscribe else ('[v]', '[a]')
     try:
-        run(['-i', video, '-filter_complex',
-             f'[0:v:0]setpts=(PTS-STARTPTS)/{speed:.2f}[v];'
-             f'[0:a:0]asetpts=PTS-STARTPTS,atempo={speed:.2f}[a]',
-             '-map', '[v]', '-map', '[a]',
+        run([*inputs, '-filter_complex', filters,
+             '-map', video_map, '-map', audio_map,
              '-c:v', 'libx264', '-preset', 'fast', '-crf', 20,
              '-pix_fmt', 'yuv420p', '-r', 30,
              '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', temporary])
@@ -60,21 +80,23 @@ def produce_mixed(root):
         source=catalog[segment['source_id']]
         components=[]
         for part in segment['narration_parts']:
-            components.append((part['audio_path'],part['text'],part.get('paraphrase_video',{}).get('path'),None))
+            components.append((part['audio_path'],part['text'],part.get('paraphrase_video',{}).get('path'),None,part.get('tts_words')))
         if segment['type']=='with_dialogue':
             dub=segment['dubbed_dialogue'];indices=segment['dialogue_subtitle_indices']
             rows=source['utterances'];bounds=(rows[indices[0]]['start_time']/1000,rows[indices[-1]]['end_time']/1000)
-            components.append((dub['audio_path'],dub['chinese_text'],None,bounds))
+            components.append((dub['audio_path'],dub['chinese_text'],None,bounds,dub.get('tts_words')))
         if segment.get('audience_question_audio_path'):
-            components.append((segment['audience_question_audio_path'],segment['audience_question'],None,None))
-        for audio,text,visual,bounds in components:
+            components.append((segment['audience_question_audio_path'],segment['audience_question'],None,None,segment.get('audience_question_tts_words')))
+        for audio,text,visual,bounds,timing in components:
             decoded=AudioSegment.from_file(audio).set_frame_rate(24000).set_channels(1).set_sample_width(2)
             duration=len(decoded.raw_data)/48000
             end=cursor+duration
             frames=max(1,round(end*30)-round(cursor*30))
             clip=directory/f'{len(clips):03d}.mp4'
             print(f'合成素材 {len(clips)+1}: {duration:.2f}s',flush=True)
-            if visual:
+            if segment['narration_parts'][0]['kind'] == 'intro':
+                inputs=['-f','lavfi','-i','color=c=black:s=1280x720:r=30'];vf='null'
+            elif visual:
                 inputs=['-i',visual];vf='setpts=PTS-STARTPTS'
             elif bounds:
                 start,stop=bounds
@@ -99,7 +121,7 @@ def produce_mixed(root):
                 inputs=['-stream_loop',-1,'-ss',anchor,'-i',Path(source['workspace'])/'video.mp4'];vf='setpts=PTS-STARTPTS'
             vf+=',scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=1'
             run([*inputs,'-an','-vf',vf,'-frames:v',frames,'-c:v','libx264','-preset','fast','-crf',20,'-pix_fmt','yuv420p',clip])
-            subtitles.append({'start':cursor,'end':end,'kind':'narration','text':text})
+            subtitles.append({'start':cursor,'end':end,'kind':'narration','text':text, 'tts_words':timing})
             clips.append(clip);audio_parts.append(decoded);cursor=end
     combined=audio_parts[0]
     for item in audio_parts[1:]:combined+=item
@@ -126,7 +148,7 @@ def final_mixed(root):
                            paths.root/'final_subtitles.ass',paths.final_subtitles['json'])
     burn_avatar_subtitles(layout,paths.root/'final_subtitles.ass',body)
     prepend_cover(body,cover,final,audio_volume=1.0)
-    speed = speed_up_final(final, portrait=True)
+    speed = speed_up_final(final, portrait=True, subscribe=has_intro(plan))
     media=read_json(paths.media);media['main'].update(commentary_news_video_path=str(final),
         commentary_body_video_path=str(body),commentary_vertical_video_path=str(layout),
         commentary_portrait_speed=speed,
@@ -180,17 +202,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     cover = create_landscape_cover(plan.get('cover_title') or plan['title'],
                                    root/'commentary_cover_landscape.png')
     final = root/'commentary_news_landscape.mp4'
-    run(['-loop',1,'-framerate',30,'-i',cover,'-i',body,'-f','lavfi','-i','anullsrc=r=48000:cl=stereo',
+    run(['-loop',1,'-framerate',30,'-i',cover,'-i',body,
         '-filter_complex',
         '[0:v]scale=1920:1080,setsar=1,trim=duration=1,setpts=PTS-STARTPTS,format=yuv420p[c];'
-        '[2:a]atrim=duration=1,asetpts=PTS-STARTPTS[s];'
         '[1:v]fps=30,setsar=1,setpts=PTS-STARTPTS,format=yuv420p[v];'
-        '[1:a]aresample=48000,aformat=channel_layouts=stereo,'
-        'alimiter=limit=0.95:level=false:latency=true,asetpts=PTS-STARTPTS[a];'
-        '[c][s][v][a]concat=n=2:v=1:a=1[outv][outa]',
+        '[c][v]concat=n=2:v=1:a=0[outv];'
+        '[1:a]asetpts=PTS-STARTPTS,adelay=1000:all=1[outa]',
         '-map','[outv]','-map','[outa]','-c:v','libx264','-preset','fast','-crf',20,
         '-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-movflags','+faststart',final])
-    speed_up_final(final)
+    speed_up_final(final, subscribe=has_intro(plan))
     paths = ProjectPaths(root)
     media = read_json(paths.media)
     media['main'].update(commentary_landscape_video_path=str(final),

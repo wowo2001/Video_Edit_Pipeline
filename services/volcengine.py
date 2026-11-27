@@ -95,13 +95,16 @@ class Volcengine:
 
                 file.write(f"{index}\n{start} --> {end}\n{text}\n\n")
 
-    def generate_tts(self, text, audio_path, speaker=None):
+    def generate_tts(self, text, audio_path, speaker=None, *, subtitle_path=None):
         """把一段文本转换为指定路径的 MP3，并返回时长（毫秒）。"""
         audio_path.parent.mkdir(parents=True, exist_ok=True)
-        audio_path.write_bytes(self._tts_stream(text, speaker or self.speaker))
+        sentences = [] if subtitle_path is not None else None
+        audio_path.write_bytes(self._tts_stream(text, speaker or self.speaker, sentences))
+        if subtitle_path is not None:
+            write_json({'sentences': sentences}, subtitle_path, ensure_ascii=False, indent=2)
         return len(AudioSegment.from_file(audio_path))
 
-    def _tts_stream(self, text: str, speaker: str) -> bytes:
+    def _tts_stream(self, text: str, speaker: str, sentences=None) -> bytes:
         payload = {
             "user": {"uid": "123"},
             "req_params": {
@@ -110,6 +113,8 @@ class Volcengine:
                 "audio_params": {"format": "mp3", "sample_rate": 24000},
             },
         }
+        if sentences is not None:
+            payload['req_params']['audio_params']['enable_subtitle'] = True
         response = requests.post(
             self.tts_url,
             headers=self.tts_headers,
@@ -117,6 +122,7 @@ class Volcengine:
             stream=True,
         )
 
+        response.raise_for_status()
         chunks = []
         for line in response.iter_lines():
             if not line:
@@ -127,8 +133,9 @@ class Volcengine:
                 continue
 
             if result.get("code") not in {0, 20000000}:
-                print("TTS error:", result)
-                continue
+                raise RuntimeError(f"TTS error: {result.get('code')}: {result.get('message')}")
+            if sentences is not None and result.get('sentence', {}).get('words'):
+                sentences.append(result['sentence'])
             if result.get("data"):
                 chunks.append(result["data"])
 

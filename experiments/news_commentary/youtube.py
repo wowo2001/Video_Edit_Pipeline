@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 from core.utils import read_json
 from core.path import ProjectPaths
+from experiments.news_commentary.video_store import store_landscape
 
 CHANNEL_ID = 'UCGTnz6vvLd3upDsDS0uYwNw'
 
@@ -100,4 +101,15 @@ def upload_news_videos(root):
         write_json(media, paths.media, ensure_ascii=False, indent=2)
         results[orientation] = result
         print(f'YouTube {orientation} 视频、封面及字幕上传成功: {result["url"]}', flush=True)
+        if orientation == 'landscape':
+            try:
+                inserted = store_landscape(paths.root, result, config)
+            except Exception as error:
+                media['main']['youtube'][orientation]['database_status'] = 'failed'
+                write_json(media, paths.media, ensure_ascii=False, indent=2)
+                print(f'横屏已上传，但入库失败；重试会复用上传记录：{error}', flush=True)
+                raise
+            media['main']['youtube'][orientation]['database_status'] = 'completed'
+            write_json(media, paths.media, ensure_ascii=False, indent=2)
+            print(f'横屏入库：{"已保存" if inserted else "已存在，保留原记录"}', flush=True)
     return results
